@@ -1,0 +1,5 @@
+# Generated logo sources retained locally for future transparency edits.
+resources/images/brand/*-chroma.png
+
+# Superseded icon draft; use app-icon-maskable-master.png.
+resources/images/brand/app-icon-master.png
