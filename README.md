@@ -165,9 +165,9 @@ The detailed documents are authoritative for their subjects. The root README int
 
 ## Delivery status
 
-Development is active on the `develop` branch. The initial Next.js foundation now includes a populated marketplace, city filters, path-based public and private Guild pages, ride detail pages, SEO routes, a health endpoint, and a mock email-OTP UI flow backed by typed seed data.
+Development is active on the `develop` branch. The initial Next.js foundation now includes a populated marketplace, city filters, path-based public and private Guild pages, ride detail pages, SEO routes, a health endpoint, and a mock email-OTP UI flow. These discovery pages now read through tenant-scoped Prisma repositories backed by PostgreSQL/PostGIS, with an initial migration, database constraints, and repeatable demonstration seeds in place.
 
-The remaining Phase 0 foundation work is PostgreSQL/PostGIS and Prisma persistence, CI, and the first Vercel preview deployment. Provider-backed email, SMS, maps, media, and payments remain deliberately deferred behind development flows.
+The remaining Phase 0 foundation work is CI and the first Vercel preview deployment. Provider-backed email, SMS, maps, media, and payments remain deliberately deferred behind development flows.
 
 ## Product principles
 
@@ -199,6 +199,14 @@ pnpm install
 pnpm dev
 ```
 
+After copying `.env.example` to `.env.local` and supplying pooled and direct PostgreSQL URLs, initialize and verify the database:
+
+```bash
+pnpm db:migrate
+pnpm db:seed
+pnpm db:verify
+```
+
 Open `http://localhost:3000`. Quality checks:
 
 ```bash
@@ -208,7 +216,7 @@ pnpm test
 pnpm build
 ```
 
-The first UI milestone uses typed seed data. PostgreSQL/PostGIS, Redis, and Mailpit are introduced behind application-owned adapters as their phases require them. SMS, email, maps, storage, and Razorpay use development adapters so provider accounts do not block the first phases.
+The demonstration fixture remains the repeatable database seed source, while production UI reads go through tenant-scoped Prisma repositories. Redis and Mailpit are introduced behind application-owned adapters as their phases require them. SMS, email, maps, storage, and Razorpay use development adapters so provider accounts do not block the first phases.
 
 Example local tenant URLs:
 

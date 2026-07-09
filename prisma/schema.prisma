@@ -1,0 +1,149 @@
+generator client {
+  provider = "prisma-client"
+  output   = "../src/generated/prisma"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+enum CommunityStatus {
+  DRAFT
+  ACTIVE
+  SUSPENDED
+  ARCHIVED
+}
+
+enum DirectoryVisibility {
+  LISTED
+  UNLISTED
+}
+
+enum GuildHallAccess {
+  PUBLIC
+  VERIFIED_USERS
+  GUILD_MEMBERS
+  INVITE_ONLY
+}
+
+enum SearchIndexing {
+  INDEXABLE
+  NOINDEX
+}
+
+enum RideVisibility {
+  PUBLIC
+  VERIFIED_USERS
+  GUILD_MEMBERS
+  INVITE_ONLY
+}
+
+enum RideStatus {
+  DRAFT
+  PUBLISHED
+  CLOSED
+  POSTPONED
+  CANCELLED
+  COMPLETED
+}
+
+enum VehicleType {
+  BIKE
+  CAR
+  SUV
+  JEEP
+  OTHER
+}
+
+enum RideDifficulty {
+  EASY
+  MODERATE
+  CHALLENGING
+}
+
+model Community {
+  id             String          @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  slug           String          @unique @db.VarChar(80)
+  name           String          @db.VarChar(160)
+  shortName      String          @map("short_name") @db.VarChar(12)
+  tagline        String          @db.VarChar(240)
+  description    String          @db.Text
+  foundedYear    Int?            @map("founded_year") @db.SmallInt
+  memberCount    Int             @default(0) @map("member_count")
+  completedRides Int             @default(0) @map("completed_rides")
+  status         CommunityStatus @default(DRAFT)
+  accentColor    String          @map("accent_color") @db.VarChar(16)
+  heroGradient   String          @map("hero_gradient") @db.Text
+  specialties    String[]        @default([])
+  createdAt      DateTime        @default(now()) @map("created_at") @db.Timestamptz(3)
+  updatedAt      DateTime        @updatedAt @map("updated_at") @db.Timestamptz(3)
+
+  locations  CommunityLocation[]
+  visibility CommunityVisibility?
+  rides      Ride[]
+
+  @@map("communities")
+}
+
+model CommunityLocation {
+  id          String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  communityId String   @map("community_id") @db.Uuid
+  city        String   @db.VarChar(120)
+  state       String?  @db.VarChar(120)
+  countryCode String   @default("IN") @map("country_code") @db.Char(2)
+  isHome      Boolean  @default(false) @map("is_home")
+  createdAt   DateTime @default(now()) @map("created_at") @db.Timestamptz(3)
+
+  community Community @relation(fields: [communityId], references: [id], onDelete: Cascade)
+
+  @@unique([communityId, city, state, countryCode])
+  @@index([city])
+  @@map("community_locations")
+}
+
+model CommunityVisibility {
+  id                    String              @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  communityId           String              @unique @map("community_id") @db.Uuid
+  directoryVisibility   DirectoryVisibility @default(UNLISTED) @map("directory_visibility")
+  guildHallAccess       GuildHallAccess     @default(INVITE_ONLY) @map("guild_hall_access")
+  searchIndexing        SearchIndexing      @default(NOINDEX) @map("search_indexing")
+  defaultRideVisibility RideVisibility      @default(INVITE_ONLY) @map("default_ride_visibility")
+  createdAt             DateTime            @default(now()) @map("created_at") @db.Timestamptz(3)
+  updatedAt             DateTime            @updatedAt @map("updated_at") @db.Timestamptz(3)
+
+  community Community @relation(fields: [communityId], references: [id], onDelete: Cascade)
+
+  @@map("community_visibility_settings")
+}
+
+model Ride {
+  id           String         @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  communityId  String         @map("community_id") @db.Uuid
+  slug         String         @unique @db.VarChar(100)
+  title        String         @db.VarChar(180)
+  summary      String         @db.Text
+  originCity   String         @map("origin_city") @db.VarChar(120)
+  destination  String         @db.VarChar(160)
+  startsAt     DateTime       @map("starts_at") @db.Timestamptz(3)
+  endsAt       DateTime       @map("ends_at") @db.Timestamptz(3)
+  pricePaise   Int            @map("price_paise")
+  totalSlots   Int            @map("total_slots")
+  bookedSlots  Int            @default(0) @map("booked_slots")
+  vehicleType  VehicleType    @default(BIKE) @map("vehicle_type")
+  difficulty   RideDifficulty
+  status       RideStatus     @default(DRAFT)
+  visibility   RideVisibility @default(PUBLIC)
+  featured     Boolean        @default(false)
+  heroGradient String         @map("hero_gradient") @db.Text
+  distanceKm   Int            @map("distance_km")
+  createdAt    DateTime       @default(now()) @map("created_at") @db.Timestamptz(3)
+  updatedAt    DateTime       @updatedAt @map("updated_at") @db.Timestamptz(3)
+
+  community Community @relation(fields: [communityId], references: [id], onDelete: Restrict)
+
+  @@unique([communityId, slug])
+  @@index([communityId, status, startsAt])
+  @@index([originCity, status, startsAt])
+  @@index([featured, status, startsAt])
+  @@map("rides")
+}

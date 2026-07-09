@@ -2,22 +2,32 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 
-import { getGuildBySlug, getGuildRides, guilds } from "@/data/sample-data";
 import { formatMoney, formatRideDate } from "@/lib/format";
+import {
+  listPublishedRidesForTenant,
+  listStaticGuildSlugs,
+  resolveGuildTenant,
+} from "@/server/repositories/discovery-repository";
 
 type Props = { params: Promise<{ slug: string }> };
 
-export function generateStaticParams() {
-  return guilds.map((guild) => ({ slug: guild.slug }));
+export const revalidate = 300;
+
+export async function generateStaticParams() {
+  return (await listStaticGuildSlugs()).map((slug) => ({ slug }));
 }
 
 export async function generateMetadata({ params }: Props): Promise<Metadata> {
   const { slug } = await params;
-  const guild = getGuildBySlug(slug);
-  if (!guild) return { title: "Guild not found" };
+  const resolved = await resolveGuildTenant(slug);
+  if (!resolved) return { title: "Guild not found" };
+  const { guild } = resolved;
   return {
     title: guild.name,
-    description: guild.description,
+    description:
+      guild.access === "PUBLIC"
+        ? guild.description
+        : "A private Guild Hall hosted on AtRide.",
     alternates: { canonical: `/guilds/${guild.slug}` },
     robots: guild.directoryVisibility === "UNLISTED" ? { index: false, follow: false } : undefined,
   };
@@ -25,8 +35,9 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
 
 export default async function GuildPage({ params }: Props) {
   const { slug } = await params;
-  const guild = getGuildBySlug(slug);
-  if (!guild) notFound();
+  const resolved = await resolveGuildTenant(slug);
+  if (!resolved) notFound();
+  const { guild, tenant } = resolved;
 
   if (guild.access === "INVITE_ONLY") {
     return (
@@ -42,7 +53,7 @@ export default async function GuildPage({ params }: Props) {
     );
   }
 
-  const guildRides = getGuildRides(guild.slug);
+  const guildRides = await listPublishedRidesForTenant(tenant);
 
   return (
     <>

@@ -3,13 +3,13 @@
 import Link from "next/link";
 import { useMemo, useState } from "react";
 
-import type { Guild, Ride } from "@/data/sample-data";
+import type { GuildView, RideView } from "@/domain/discovery";
 import { formatMoney, formatRideDate } from "@/lib/format";
 
 type Props = {
   cities: readonly string[];
-  guilds: Guild[];
-  rides: Ride[];
+  guilds: GuildView[];
+  rides: RideView[];
 };
 
 export function MarketplaceExplorer({ cities, guilds, rides }: Props) {
@@ -63,7 +63,7 @@ export function MarketplaceExplorer({ cities, guilds, rides }: Props) {
                     <div className="absolute inset-0 bg-[radial-gradient(circle_at_75%_20%,rgba(255,255,255,.18),transparent_35%)]" />
                     <div className="relative flex items-start justify-between">
                       <span className="rounded-full bg-black/35 px-3 py-1 text-xs font-bold uppercase tracking-[.14em] text-white backdrop-blur">
-                        {ride.vehicleType === "BIKE" ? "Motorcycle" : "4×4"}
+                        {ride.vehicleType === "BIKE" ? "Motorcycle" : ride.vehicleType}
                       </span>
                       {ride.featured && <span className="rounded-full bg-orange-500 px-3 py-1 text-xs font-bold text-white">Trending</span>}
                     </div>
