@@ -1,0 +1,728 @@
+# @Ride Functional Use Cases
+
+This document defines actors, permissions, and product workflows. Technical implementation details belong in [system-design.md](../architecture/system-design.md).
+
+## 1. Actors
+
+### 1.1 Platform actors
+
+| Actor | Scope |
+| --- | --- |
+| Platform Owner | Full @Ride platform and critical configuration |
+| Platform Admin | Communities, users, moderation, support, and featured content |
+| Platform Support | Limited, audited investigation of support cases |
+| Platform Finance Admin | @Ride's own subscription or service billing, if introduced |
+
+### 1.2 Community actors
+
+| Actor | Scope |
+| --- | --- |
+| Community Owner | Full control of one community and its payment configuration |
+| Community Admin | Community profile, members, staff, rides, and bookings |
+| Ride Manager | Ride creation, editing, publication, and management |
+| Finance Manager | Offline payment verification and payment records |
+| Community Member | Member-only community features and eligible rides |
+| Participant/Guest | Discovery, registration, vehicle profile, and permitted bookings |
+
+### 1.3 Ride actors
+
+| Actor | Scope |
+| --- | --- |
+| Lead Captain | Overall ride control and coordination |
+| Captain | Assigned starting group or route segment |
+| Vice Captain | Delegated assistance to a captain |
+| Sweep | Rear-group progress and incident reporting |
+| Marshal | Assigned checkpoint or route section |
+| Participant | Booked ride information and participant-only progress |
+
+A person can have different roles in different communities and rides. Ride roles do not automatically grant permanent community administration.
+
+## 2. Authorization principles
+
+- One global user account works across @Ride.
+- Every privileged user has an individual account.
+- Platform, community, and ride permissions have independent scopes.
+- Financial permission is separate from ride-operation permission.
+- Communities see only users with a valid membership, booking, invitation, or support relationship.
+- Every sensitive or privileged mutation is audited.
+
+## 3. Public discovery
+
+### UC-01: Discover nearby rides
+
+**Actor:** Visitor or participant
+
+**Preconditions:** None
+
+**Flow:**
+
+1. @Ride determines a preferred location from user selection, profile, browser permission, approximate IP location, or a default.
+2. The marketplace displays relevant trending and upcoming rides across communities.
+3. The visitor filters by origin, destination, date, vehicle type, trip type, price, availability, community, accommodation, or vehicle requirement.
+4. The visitor opens a public ride page.
+
+**Rules:**
+
+- The user can always override an inferred location.
+- Geographic relevance ranks results but does not prevent searching other cities.
+- Promoted results are visibly labelled.
+- Cancelled, archived, private, and draft rides do not appear as bookable public rides.
+
+### UC-02: Discover communities
+
+**Actor:** Visitor or participant
+
+**Flow:**
+
+1. Browse communities near a location or by name.
+2. Open a community's `*.atride.in` page.
+3. View its profile, operating areas, gallery, social links, and published rides.
+
+**Rules:**
+
+- A community subdomain shows only that community's content.
+- Suspended or unknown communities return an appropriate unavailable/404 response.
+
+### UC-03: View trending, featured, and promoted content
+
+**Actor:** Visitor or participant
+
+**Rules:**
+
+- Upcoming is primarily date-based.
+- Recently added is publish-date based.
+- Trending uses recent confirmed bookings, engagement, freshness, quality, and proximity.
+- Featured content is editorially selected by @Ride.
+- Promoted content is paid or contractual placement and is labelled.
+
+### UC-03A: View my upcoming rides on the landing page
+
+**Actor:** Authenticated participant or ride staff member
+
+**Goal:** See every relevant upcoming ride in one place regardless of whether the user's relationship is participant, captain, vice captain, sweep, marshal, or another explicit ride assignment.
+
+**Eligibility:**
+
+A ride appears when the user has at least one active ride-level relationship:
+
+- Confirmed or actionable booking
+- Lead Captain assignment
+- Captain or Vice Captain assignment
+- Sweep or Marshal assignment
+- Another explicit ride-staff assignment
+
+A broad Community Admin role alone does not add every community ride to this personal section. Community-wide ride management remains in the community dashboard.
+
+**Flow:**
+
+1. A logged-in user opens the main `atride.in` landing page.
+2. @Ride displays `Your upcoming rides` above general discovery sections.
+3. Each card shows community, ride, dates, destination, starting group, booking/payment state, role badges, and the next important action.
+4. If the user has several relationships with one ride, @Ride shows one deduplicated card with all relevant role badges.
+5. Clicking the card opens the ride's canonical community URL.
+6. The ride page recalculates current permissions and displays participant information and/or role-specific controls.
+
+**Prioritization:**
+
+1. Live rides
+2. Rides with an action required
+3. Upcoming rides ordered by nearest start time
+
+Action-required examples include pending payment, payment proof, waiver acceptance, missing vehicle details, starting-group selection, schedule acknowledgement, or an incomplete captain checklist.
+
+**Rules:**
+
+- Role badges are informational; the destination page never trusts them for authorization.
+- Current booking, staff assignment, group assignment, and permission records are re-evaluated on every protected page/API request.
+- One ride appears once even when the user is both participant and captain.
+- Completed and archived rides do not appear in the upcoming collection.
+- Cancelled/postponed rides may remain temporarily when an acknowledgement or refund action is required.
+- The initial section may show five rides plus `View all my rides`.
+- Logged-out visitors never receive another user's personalized data or section payload.
+- Personal ride data must not enter public page caches or SEO output.
+
+**Navigation:**
+
+The canonical ride page remains shared:
+
+```text
+{community}.atride.in/rides/{rideSlug}
+```
+
+It can render public details plus protected participant panels. Operational actions link to the authorized ride console:
+
+```text
+{community}.atride.in/manage/rides/{rideId}/control
+```
+
+## 4. Identity and participant profile
+
+### UC-04: Register a participant
+
+**Actor:** Visitor
+
+**Flow:**
+
+1. Enter name and mobile number.
+2. Receive and verify a phone OTP.
+3. Provide email and verify it if required by policy.
+4. Accept terms and privacy notice.
+5. Create the participant profile.
+
+**Rules:**
+
+- OTPs expire, are one-time use, and have resend/attempt limits.
+- Phone numbers and email addresses are normalized.
+- Verification confirms control of the destination, not real-world identity.
+- Recovery flows do not disclose whether an account exists.
+
+### UC-05: Maintain participant and vehicle information
+
+**Actor:** Participant
+
+**Capabilities:**
+
+- Edit profile and home city
+- Add bikes or other supported vehicles to a vehicle garage
+- Maintain emergency contact
+- Maintain dietary/accessibility preferences
+- Configure notification preferences
+- View memberships, bookings, and waiver history
+
+Sensitive fields must be purpose-limited and access-controlled.
+
+## 5. Community and staff management
+
+Detailed community activation is defined in [tenant-onboarding.md](tenant-onboarding.md).
+
+### UC-06: Invite community staff
+
+**Actor:** Community Owner or authorized Community Admin
+
+**Flow:**
+
+1. Enter an email or phone number.
+2. Select a permitted community role.
+3. Send a time-limited invitation.
+4. Recipient registers or signs in.
+5. Recipient accepts the invitation.
+6. Role becomes active and is audited.
+
+**Rules:**
+
+- The inviter cannot grant permissions they do not possess.
+- Community roles apply only to the inviting community.
+- Administrators never create another user's password.
+
+### UC-07: Assign ride staff
+
+**Actor:** Community Admin, Ride Manager, or permitted Lead Captain
+
+**Flow:**
+
+1. Select a published or draft ride.
+2. Assign lead captain, group captains, vice captains, sweeps, and marshals.
+3. Limit each assignment to a ride, group, checkpoint, or route segment.
+
+## 6. Ride creation and publication
+
+### UC-08: Create a ride draft
+
+**Actor:** Ride Manager or authorized Captain
+
+**Ride information:**
+
+- Name, slug, summary, and description
+- Start and expected end date/time
+- Registration window
+- Destination and places covered
+- Ride type and difficulty
+- Primary vehicle type, defaulting to `BIKE`
+- Vehicle ownership mode: participant-owned, organizer-provided, or mixed
+- Visibility: public, community-only, or invitation-only
+- Vehicle and participant eligibility
+- Safety requirements and required gear
+- Cancellation/refund rules
+- Contact and emergency instructions
+
+**Media:**
+
+- Cover image
+- Social image
+- Gallery images
+- Route/itinerary images
+
+**Rules:**
+
+- Drafts are not public or indexable.
+- Public slugs are unique within their intended scope.
+- All date/time values retain an IANA timezone while being stored consistently.
+
+### UC-09: Configure pricing and inclusions
+
+**Actor:** Ride Manager
+
+Pricing options may include:
+
+- Rider with own motorcycle
+- Rider with pillion
+- Pillion-only participant
+- Driver with own vehicle
+- Passenger seat in an organizer-provided vehicle
+- Per-vehicle or per-team entry
+- Single/shared accommodation
+- Community-member rate
+- Early-bird rate
+- Optional add-ons
+
+Each option includes amount, currency, booking unit (`PER_PERSON`, `PER_VEHICLE`, `PER_SEAT`, `PER_ROOM`, or `PER_TEAM`), validity, capacity if applicable, inclusions, exclusions, cancellation rules, and taxes where applicable.
+
+Structured inclusions may cover accommodation, meals, fuel, tickets, support vehicle, mechanical/medical support, merchandise, and insurance.
+
+Confirmed bookings retain price and inclusion snapshots when the ride later changes.
+
+### UC-09A: Select vehicle type and policy
+
+**Actor:** Ride Manager
+
+The ride-creation form requires a vehicle type. `BIKE` is preselected for the initial launch, but the persisted ride always stores the selection explicitly.
+
+Initial values:
+
+```text
+BIKE (default)
+CAR
+SUV
+JEEP
+OTHER
+```
+
+Selecting a type controls contextual fields and terminology:
+
+- `BIKE`: rider, pillion, engine capacity, and bike requirements
+- `CAR`/`SUV`/`JEEP`: driver, co-driver, passenger, seating, drive type, ground clearance, and equipment
+- `OTHER`: platform-approved configuration rather than unrestricted free-form behavior
+
+The initial production release may enable only `BIKE` while retaining the generic persisted model. Four-wheel enablement follows the validation plan in [four-wheel-expansion.md](../planning/four-wheel-expansion.md).
+
+### UC-10: Configure multiple starting groups
+
+**Actor:** Ride Manager
+
+Example:
+
+```text
+Bengaluru group -- Captain A --\
+                                  \
+Chennai group --- Captain B ------+-- Salem merge point -- Kodaikanal
+                                  /
+Coimbatore group - Captain C ----/
+```
+
+Each group defines:
+
+- Origin and coordinates
+- Assembly and departure time
+- Captain, vice captain, and sweep
+- Capacity allocation
+- Route segments and checkpoints
+- Merge point and estimated merge time
+- Group-specific instructions
+
+### UC-11: Publish a ride
+
+**Actor:** Authorized Ride Manager or approver
+
+**Flow:**
+
+1. Validate mandatory fields, pricing, groups, capacity, policy, and media.
+2. Optionally submit for community approval.
+3. Publish and open booking according to schedule.
+4. Create public metadata and sitemap eligibility.
+
+Ride lifecycle:
+
+```text
+DRAFT -> PENDING_APPROVAL -> PUBLISHED -> BOOKING_OPEN
+      -> BOOKING_CLOSED/SOLD_OUT -> CHECK_IN_OPEN
+      -> IN_PROGRESS -> COMPLETED -> ARCHIVED
+```
+
+Alternative states are `POSTPONED` and `CANCELLED`.
+
+## 7. Capacity and waitlists
+
+### UC-12: Configure ride capacity
+
+**Actor:** Ride Manager
+
+Capacity can exist at ride and starting-group levels. A ride can distinguish public capacity from controlled buffer capacity.
+
+Rules:
+
+- Confirmed capacity cannot exceed the permitted maximum.
+- Capacity cannot be reduced below confirmed participants.
+- Capacity and buffer changes are audited.
+- Administrators may release buffer slots according to policy.
+
+### UC-13: Join a waitlist
+
+**Actor:** Participant
+
+When a ride/group is sold out, the participant may join a waitlist. Released capacity can create a time-limited offer for the next eligible participant. Expired offers move to the next entry.
+
+## 8. Booking
+
+### UC-14: Book a ride
+
+**Actor:** Verified participant
+
+**Flow:**
+
+1. Select ride and starting group.
+2. Validate eligibility and availability.
+3. Select participant(s), vehicle, occupant roles, pricing, accommodation, and add-ons.
+4. Review inclusions, exclusions, safety requirements, cancellation rules, and total.
+5. Accept the current waiver and consent.
+6. Create a time-limited capacity reservation.
+7. Select online or offline payment.
+8. Confirm after verified payment.
+
+Booking statuses:
+
+```text
+RESERVED
+PENDING_PAYMENT
+PENDING_VERIFICATION
+CONFIRMED
+WAITLISTED
+CANCELLED
+EXPIRED
+COMPLETED
+```
+
+**Rules:**
+
+- Concurrent requests cannot oversell a slot.
+- The booking records participant, contact, vehicle, occupant roles, group, price, policy, and waiver snapshots.
+- Profile edits do not silently rewrite historical bookings.
+
+## 9. Payments
+
+### UC-15: Pay online through the community
+
+**Actor:** Participant
+
+**Flow:**
+
+1. @Ride loads the ride community's active Razorpay integration.
+2. The backend creates a gateway order using that community's encrypted credentials.
+3. Participant completes Razorpay checkout.
+4. @Ride receives and verifies the signed webhook.
+5. Payment and booking are confirmed atomically.
+6. Participant and organizer receive confirmation.
+
+**Rules:**
+
+- Money goes directly to the community's Razorpay account.
+- @Ride does not collect or settle ride funds.
+- Browser checkout success is not proof of payment.
+- Duplicate webhooks do not duplicate confirmation.
+- Credentials are never displayed after saving or exposed to the client.
+
+Payment statuses:
+
+```text
+NOT_REQUIRED
+UNPAID
+PENDING_VERIFICATION
+PAID_ONLINE
+PAID_OFFLINE
+FAILED
+REJECTED
+REFUND_PENDING
+PARTIALLY_REFUNDED
+REFUNDED
+```
+
+### UC-16: Submit offline payment
+
+**Actor:** Participant
+
+Supported methods may include cash, direct UPI, bank transfer, payment at assembly, or another approved method.
+
+**Flow:**
+
+1. Select offline payment.
+2. Receive a pending booking and reservation deadline.
+3. Optionally upload proof and transaction reference.
+4. Wait for community verification.
+
+### UC-17: Verify offline payment
+
+**Actor:** Community Owner, Community Admin, Finance Manager, or explicitly permitted Captain
+
+**Flow:**
+
+1. Review amount, method, reference, proof, and booking.
+2. Confirm or reject payment.
+3. Record actor, timestamp, amount, method, proof, and note.
+4. Confirm booking or release capacity.
+
+Financial access is not granted to captains by default.
+
+### UC-18: Manage payment expiry and refunds
+
+- Online checkout reservations have a short expiry.
+- Offline reservations use a community/ride-configured deadline.
+- Expired reservations release capacity.
+- Refund status is recorded even when the community performs the refund in its gateway account.
+- Final refund responsibility and policy must be visible to the participant.
+
+## 10. Ride operations
+
+### UC-19: Start a ride group
+
+**Actor:** Assigned Captain or Lead Captain
+
+1. Open the captain console.
+2. Verify group, participants, and starting point.
+3. Start the assigned group.
+4. Notify relevant participants and staff.
+
+The lead captain controls overall ride state. Group captains control only assigned groups unless delegated otherwise.
+
+### UC-20: Check in at a checkpoint
+
+**Actor:** Assigned Captain, Sweep, or Marshal
+
+Capture:
+
+- Planned and actual arrival/departure
+- Group count
+- Status
+- Optional coordinates
+- Optional note/image
+- Delay, incident, or assistance indicator
+- Performing staff member
+
+The client clearly shows pending, successful, and retry states on weak networks.
+
+### UC-21: View ride progress
+
+**Actor:** Confirmed participant or authorized staff
+
+- View completed checkpoints and estimated progress.
+- View the selected starting group's progress before merge.
+- View merged ride progress after the merge event.
+- View last-known authorized crew location if enabled.
+
+Exact live location is never public or indexable. Access expires according to post-ride policy.
+
+### UC-22: Complete a ride
+
+**Actor:** Lead Captain or authorized Ride Manager
+
+1. Complete remaining group/ride state.
+2. Record final progress and notes.
+3. Stop participant live updates.
+4. Apply location-retention policy.
+5. Notify participants and optionally request feedback.
+
+## 11. Notifications
+
+### UC-23: Receive identity messages
+
+- Phone OTP through MSG91
+- Email OTP through Amazon SES
+- Account recovery or security notice
+
+### UC-24: Receive booking and payment messages
+
+- Booking created, expired, confirmed, or cancelled
+- Offline payment proof received, accepted, or rejected
+- Online payment confirmed or failed
+- Waitlist slot offered
+
+### UC-25: Receive ride-event messages
+
+- Ride reminder
+- Starting-group instructions
+- Schedule or route change
+- Postponement or cancellation
+- Group started
+- Important delay, incident, or operational update
+- Ride completed
+
+Messages are delivered through approved templates. Marketing consent is separate from security and essential service communication.
+
+### UC-26: Publish an official ride announcement
+
+**Actor:** Lead Captain, assigned Captain, Ride Manager, Community Admin, or another explicitly permitted ride role
+
+**Flow:**
+
+1. Select an approved announcement type.
+2. Enter validated details and urgency.
+3. Choose the relevant ride groups or all confirmed participants.
+4. Publish to the @Ride ride activity/announcement feed.
+5. Fan out in-app, email, or SMS notifications according to importance and policy.
+6. For a critical announcement, monitor participant acknowledgement.
+
+Examples include assembly instructions, schedule/route changes, accommodation changes, postponement/cancellation, group start, delays, incidents, merge progress, and completion.
+
+**Rules:**
+
+- The @Ride announcement feed is the authoritative operational record.
+- Announcements record author, audience, time, type, content/version, and delivery event.
+- Critical announcements may require an `Acknowledged` action.
+- Casual participant-to-participant chat is outside the MVP.
+
+### UC-27: Configure an external WhatsApp ride group
+
+**Actor:** Community Admin, Ride Manager, or another explicitly permitted ride administrator
+
+**Flow:**
+
+1. Create and administer the WhatsApp group manually.
+2. Paste its invite link into protected ride communication settings.
+3. Choose a mode:
+
+```text
+DISABLED
+DISCUSSION
+ANNOUNCEMENTS_ONLY (recommended default when enabled)
+```
+
+4. Choose visibility, normally confirmed participants and assigned staff.
+5. For `ANNOUNCEMENTS_ONLY`, confirm that WhatsApp's `Only admins can send messages` group permission has been set manually.
+6. Publish the channel and optionally notify eligible participants.
+
+**Rules:**
+
+- @Ride does not create or manage the normal WhatsApp group in the MVP.
+- @Ride stores the intended mode but cannot verify a manually managed group's live permissions.
+- The invite URL is treated as protected bearer-style information and is not exposed publicly or indexed.
+- Booking does not silently add a participant to WhatsApp.
+- Before opening the link, participants are told that joining can expose their WhatsApp phone number/profile information to group members.
+- Essential ride information remains available in @Ride for participants who do not join WhatsApp.
+- The organizer, not @Ride, moderates the external group.
+- The link can have availability and expiry times and can be replaced if leaked.
+- @Ride may record link availability, viewing, and opening, but must not claim that a participant joined unless WhatsApp provides a verified event.
+
+## 12. Dashboards
+
+### Platform administration
+
+- Metrics
+- Community applications and domains
+- User support and moderation
+- Featured/promoted content
+- Security, notification, and audit operations
+
+### Community management
+
+- Profile and branding
+- Rides and drafts
+- Bookings, waitlists, and participants
+- Staff, members, and roles
+- Payments and refunds
+- Payment integration
+- Reports and audit history
+
+### Captain console
+
+- Assigned group
+- Participants
+- Route and checkpoints
+- Start/complete controls
+- Check-ins, delays, incidents, and merge status
+
+### Participant account
+
+- Profile and vehicle garage
+- Upcoming and previous rides
+- Pending and confirmed bookings
+- Payment actions and proofs
+- Group instructions and private ride progress
+- Waivers and notifications
+
+## 13. Community access to participant data
+
+A community can access a user's relevant data only when the user:
+
+- Books that community's ride
+- Joins that community
+- Accepts a staff invitation
+- Is involved in a legitimate, audited support case
+
+Relevant operational fields may include name, contact, emergency contact, group, vehicle, occupant role, accommodation/dietary needs, payment status, and waiver acceptance. Access is role-based, purpose-limited, audited, and subject to retention rules.
+
+## 14. Guild Hall, trust, and visibility
+
+### UC-28: Open a Guild Hall
+
+The community tile/direct URL opens the branded Guild Hall. Sections depend on directory, site-access, ride-visibility, indexing, viewer relationship, and individual consent settings. `Community` remains the domain term; `Guild Hall` is the user-facing experience.
+
+### UC-29: Share a limited Ride Passport
+
+When booking with a new Guild, the participant previews the verified aggregate experience summary that the Guild will receive. Exact private rides, payments, internal notes, incidents, medical data, and other Guild memberships are not disclosed. Individual profiles have no public visibility mode in the initial release.
+
+### UC-30: Welcome a newcomer
+
+After a first confirmed booking/membership, a participant may opt in per Guild to appear in the authenticated Guild-member welcome section. The tile uses first name, optional profile image/initials, city, and consented highlights. Anonymous visitors see no individual newcomer details.
+
+### UC-31: Grant an award
+
+Authorized Guild staff create/assign a moderated award with issuer, reason, period, and optional related ride. System milestones use verified completion data. Grants, correction, and revocation are audited; the recipient controls cross-Guild display.
+
+### UC-32: Review a Guild
+
+Only a verified completed participant can submit one review for the relevant ride/Guild. Guilds can respond or report abuse but cannot selectively hide negative reviews. @Ride does not implement rider star ratings.
+
+### UC-33: Configure Guild and ride visibility
+
+Authorized Guild administrators configure directory listing (`LISTED`/`UNLISTED`), Guild Hall access (`PUBLIC`, `VERIFIED_USERS`, `GUILD_MEMBERS`, `INVITE_ONLY`), indexing, and per-ride visibility. A Guild receives all operating features when unlisted/private, and its subdomain never promotes competing Guilds.
+
+### UC-34: Embed a public Guild widget
+
+An authorized Guild creates an allowed-origin configuration for an upcoming-rides, featured-ride, calendar, or Guild-summary widget. The widget contains public/explicitly embeddable data only. Login, booking, payment, member information, administration, and precise location open as top-level @Ride/custom-domain pages rather than operating inside the iframe.
+
+Detailed rules:
+
+- [Guild Hall and reputation](guild-hall-and-reputation.md)
+- [Guild visibility and embedding](guild-visibility-and-embedding.md)
+
+## 15. SEO requirements
+
+Public pages include:
+
+- Marketplace and useful city/destination discovery pages
+- Community profiles
+- One stable page per published public ride
+
+Required capabilities:
+
+- Dynamic titles and descriptions
+- Canonical URLs
+- Sitemaps and robots rules
+- Open Graph/social images
+- Meaningful headings and content
+- `WebSite`, `Organization`, and `Event` structured data where applicable
+- Redirect management for changed slugs
+
+Private application, payment, draft, participant, and exact-location pages must not be indexed.
+
+## 16. Non-functional acceptance themes
+
+- Mobile-first and accessible
+- Tenant-safe
+- Transaction-safe
+- Idempotent provider handling
+- Auditable privileged changes
+- Privacy-conscious
+- Resilient to provider and network failures
+- Observable and supportable
+- SEO-capable for public content
+
+Phase-specific acceptance tests are maintained in the [roadmap](../planning/roadmap.md).
