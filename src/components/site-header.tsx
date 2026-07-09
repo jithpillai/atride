@@ -7,7 +7,7 @@ export function SiteHeader() {
       <div className="mx-auto flex h-20 max-w-7xl items-center justify-between px-5 lg:px-8">
         <Link href="/" className="flex items-center" aria-label="AtRide home">
           <Image
-            src="/brand/domain-lockup.png"
+            src="/brand/domain-lockup-dark.png"
             alt="AtRide"
             width={154}
             height={72}
