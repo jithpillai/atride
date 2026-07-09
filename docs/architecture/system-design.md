@@ -260,18 +260,17 @@ This is a logical organization, not a requirement to make every module an indepe
 
 ## 7. Multi-tenant design
 
-### 7.1 Hostname routing
+### 7.1 Initial path routing and future hostnames
 
 ```text
-atride.in                    -> marketplace
-royalravanas.atride.in       -> Royal Ravanas tenant
-wildgear.atride.in           -> Wild Gear tenant
-admin.atride.in              -> reserved platform administration
+atride.in                           -> marketplace
+atride.in/guilds/royal-ravanas      -> Royal Ravanas tenant
+atride.in/guilds/wild-gear          -> Wild Gear tenant
 ```
 
-The request hostname is normalized and matched against an active `CommunityDomain`. Unknown or suspended tenants return a proper 404. The server must not accept a browser-supplied `communityId` as proof of tenant access.
+Phase 1 resolves a normalized route slug against an active community and creates trusted tenant context server-side. Unknown, private, or suspended tenants return the appropriate unavailable response. The server must not accept a browser-supplied `communityId` as proof of tenant access.
 
-The Next.js proxy/middleware layer performs only fast hostname validation, reserved-host checks, and rewrites. Cached server services perform community lookup and authorization; slow database work should not be placed directly in middleware.
+Subdomains remain a later routing adapter. When enabled, hostname resolution will produce the same tenant context used by path routing, so repositories and authorization policies do not depend on how the tenant was addressed.
 
 ### 7.2 Tenant isolation rules
 
@@ -323,7 +322,9 @@ Authentication, booking, payment, participant data, Ride Passport, administratio
 
 This avoids relying on third-party iframe cookies/storage and limits clickjacking/data exposure. Custom domains later reuse `CommunityDomain` for a first-party full experience.
 
-## 8. DNS and TLS
+## 8. Deferred DNS and TLS
+
+Phase 1 does not require wildcard DNS or tenant certificates. All Guilds use `/guilds/{slug}` on the primary `atride.in` host. The following infrastructure applies only when subdomains are activated later.
 
 Wildcard DNS sends first-level community subdomains to the same application. A self-hosted deployment with a stable IP could use:
 

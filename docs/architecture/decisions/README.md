@@ -15,7 +15,7 @@ Architecture Decision Records (ADRs) capture important choices, their context, a
 | --- | --- | --- |
 | [ADR-001](ADR-001-modular-monolith.md) | TypeScript modular monolith | Accepted |
 | [ADR-002](ADR-002-postgresql-postgis.md) | PostgreSQL/PostGIS as the primary database | Accepted |
-| [ADR-003](ADR-003-hostname-multi-tenancy.md) | Hostname-based multi-tenancy with wildcard subdomains | Accepted |
+| [ADR-003](ADR-003-hostname-multi-tenancy.md) | Path-first multi-tenancy with deferred wildcard subdomains | Accepted |
 | [ADR-004](ADR-004-community-owned-payments.md) | Community-owned Razorpay integrations | Accepted |
 | [ADR-005](ADR-005-central-communications.md) | Central MSG91/SES communication platform | Accepted |
 | [ADR-006](ADR-006-vehicle-neutral-bike-first.md) | Vehicle-neutral core with a bike-first launch | Accepted |

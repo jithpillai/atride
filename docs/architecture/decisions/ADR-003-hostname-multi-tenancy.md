@@ -1,26 +1,27 @@
-# ADR-003: Use hostname-based multi-tenancy and wildcard subdomains
+# ADR-003: Use path-first multi-tenancy and defer wildcard subdomains
 
 - Status: Accepted
 - Date: 2026-07-07
 
 ## Context
 
-Each community needs a branded URL that becomes available without a manual DNS change. All tenants share the application while their data and permissions remain isolated.
+Each community needs a branded URL while all tenants share the application and keep their data and permissions isolated. The first release must minimize DNS, certificate, hosting, and local-development complexity.
 
 ## Decision
 
-Route `*.atride.in` to one application. Resolve the normalized request hostname through `CommunityDomain`, attach trusted tenant context server-side, and require that context in tenant repositories. Unknown or inactive tenants return a controlled 404/unavailable response.
+Launch with `atride.in/guilds/{slug}`. Resolve the normalized route slug server-side, attach trusted tenant context, and require that context in tenant repositories. Unknown or inactive Guilds return a controlled 404/unavailable response.
+
+Keep tenant resolution behind an application boundary so a future `*.atride.in` hostname adapter can produce the same tenant context without changing domain services or repositories.
 
 ## Consequences
 
-- New subdomains activate through database state
-- Wildcard DNS and wildcard/automated TLS are infrastructure requirements
+- Phase 1 needs no wildcard DNS or tenant-specific TLS
+- Guild slugs must be globally unique and protected from reserved-name abuse
 - Cache, queue, storage, and database operations must carry tenant identity
-- Reserved subdomains and impersonation controls are required
-- Custom domains can be added through the same domain-mapping model later
+- Subdomains and custom domains can be added through the domain-mapping model later
 
 ## Alternatives considered
 
 - Manually add one DNS record per community: rejected as operationally slow
-- Path-only tenancy such as `atride.in/c/{club}`: simpler DNS but weaker independent community identity
+- Hostname-first tenancy: stronger independent community identity but deferred because it adds DNS, certificate, preview, and local-development complexity before product validation
 - Separate deployment per community: rejected due to cost and upgrade complexity

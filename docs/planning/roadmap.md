@@ -69,7 +69,7 @@ Build:
 - City and location filters
 - Community public pages
 - Listed/unlisted Guild directory policy and public/private Guild access foundation
-- Hostname-based tenant resolution
+- Path-based tenant resolution using `/guilds/{slug}`; hostname routing is deferred
 - Community themes
 - Metadata, structured data, sitemap, and robots rules
 - Seed data for two or three demonstration communities
@@ -77,18 +77,18 @@ Build:
 Acceptance tests:
 
 - `atride.in` displays the marketplace.
-- `ravanas.localhost:3000` displays only Royal Ravanas content.
-- `wildgear.localhost:3000` displays only Wild Gear content.
-- An unknown hostname returns a proper 404.
+- `/guilds/royal-ravanas` displays only Royal Ravanas content.
+- `/guilds/wild-gear` displays only Wild Gear content.
+- An unknown Guild slug returns a proper 404.
 - Community pages have independent metadata and canonical URLs.
 - Mobile and desktop layouts pass browser tests.
 - An unlisted Guild is reachable by direct URL when configured but absent from marketplace results.
-- A Guild subdomain never displays another Guild's schedule or promotion.
+- A Guild page never displays another Guild's schedule or promotion.
 
 External accounts needed:
 
 - None when using local images and mocked maps.
-- GoDaddy access and staging wildcard DNS only when deploying wildcard staging.
+- No DNS changes are required. Subdomain infrastructure is deferred.
 
 ### Phase 2 — Registration, OTP, and authorization
 

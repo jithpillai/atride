@@ -3,3 +3,21 @@ resources/images/brand/*-chroma.png
 
 # Superseded icon draft; use app-icon-maskable-master.png.
 resources/images/brand/app-icon-master.png
+
+# Dependencies and Next.js outputs
+node_modules/
+.next/
+out/
+coverage/
+*.tsbuildinfo
+next-env.d.ts
+
+# Local environment and platform metadata
+.env
+.env.local
+.env.*.local
+.vercel/
+
+# Logs and OS files
+*.log
+.DS_Store

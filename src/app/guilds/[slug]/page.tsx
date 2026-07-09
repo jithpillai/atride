@@ -1,0 +1,87 @@
+import type { Metadata } from "next";
+import Link from "next/link";
+import { notFound } from "next/navigation";
+
+import { getGuildBySlug, getGuildRides, guilds } from "@/data/sample-data";
+import { formatMoney, formatRideDate } from "@/lib/format";
+
+type Props = { params: Promise<{ slug: string }> };
+
+export function generateStaticParams() {
+  return guilds.map((guild) => ({ slug: guild.slug }));
+}
+
+export async function generateMetadata({ params }: Props): Promise<Metadata> {
+  const { slug } = await params;
+  const guild = getGuildBySlug(slug);
+  if (!guild) return { title: "Guild not found" };
+  return {
+    title: guild.name,
+    description: guild.description,
+    alternates: { canonical: `/guilds/${guild.slug}` },
+    robots: guild.directoryVisibility === "UNLISTED" ? { index: false, follow: false } : undefined,
+  };
+}
+
+export default async function GuildPage({ params }: Props) {
+  const { slug } = await params;
+  const guild = getGuildBySlug(slug);
+  if (!guild) notFound();
+
+  if (guild.access === "INVITE_ONLY") {
+    return (
+      <section className="mx-auto flex min-h-[70vh] max-w-3xl items-center px-5 py-20">
+        <div className="w-full rounded-[2rem] border border-violet-400/20 p-9 text-center" style={{ background: guild.gradient }}>
+          <div className="mx-auto grid size-16 place-items-center rounded-2xl border border-white/20 bg-black/25 text-xl font-black">{guild.shortName}</div>
+          <p className="mt-7 text-xs font-bold uppercase tracking-[.18em] text-violet-200">Private Guild Hall</p>
+          <h1 className="mt-3 text-4xl font-black">{guild.name}</h1>
+          <p className="mx-auto mt-4 max-w-lg text-sm leading-7 text-white/70">This Guild is unlisted and invite-only. Sign in with an invited account to view its rides and member information.</p>
+          <div className="mt-8 flex justify-center gap-3"><Link href="/login" className="rounded-full bg-white px-6 py-3 text-sm font-black text-black">Sign in</Link><Link href="/" className="rounded-full border border-white/20 px-6 py-3 text-sm font-black">Return home</Link></div>
+        </div>
+      </section>
+    );
+  }
+
+  const guildRides = getGuildRides(guild.slug);
+
+  return (
+    <>
+      <section className="relative overflow-hidden border-b border-white/10" style={{ background: guild.gradient }}>
+        <div className="absolute inset-0 bg-gradient-to-r from-black/75 via-black/35 to-transparent" />
+        <div className="relative mx-auto max-w-7xl px-5 py-24 lg:px-8">
+          <div className="grid size-16 place-items-center rounded-2xl border border-white/25 bg-black/25 text-xl font-black backdrop-blur">{guild.shortName}</div>
+          <p className="mt-8 text-xs font-bold uppercase tracking-[.18em] text-orange-200">Guild Hall · {guild.homeCity}</p>
+          <h1 className="mt-3 max-w-3xl text-5xl font-black tracking-[-.05em] sm:text-6xl">{guild.name}</h1>
+          <p className="mt-5 max-w-2xl text-lg leading-8 text-white/75">{guild.tagline}</p>
+          <div className="mt-8 flex flex-wrap gap-3">
+            {guild.specialties.map((item) => <span key={item} className="rounded-full border border-white/20 bg-black/20 px-4 py-2 text-xs font-bold backdrop-blur">{item}</span>)}
+          </div>
+        </div>
+      </section>
+
+      <section className="mx-auto grid max-w-7xl gap-10 px-5 py-16 lg:grid-cols-[.8fr_1.2fr] lg:px-8">
+        <div>
+          <p className="eyebrow">Welcome to the Hall</p>
+          <h2 className="mt-3 text-3xl font-black tracking-tight">Built around the ride, not the noise.</h2>
+          <p className="mt-5 text-sm leading-7 text-zinc-400">{guild.description}</p>
+          <div className="mt-8 grid grid-cols-3 gap-3">
+            <div className="rounded-2xl border border-white/10 p-4"><p className="text-xl font-black">{guild.memberCount}</p><p className="mt-1 text-xs text-zinc-500">Members</p></div>
+            <div className="rounded-2xl border border-white/10 p-4"><p className="text-xl font-black">{guild.completedRides}</p><p className="mt-1 text-xs text-zinc-500">Completed</p></div>
+            <div className="rounded-2xl border border-white/10 p-4"><p className="text-xl font-black">{guild.foundedYear}</p><p className="mt-1 text-xs text-zinc-500">Founded</p></div>
+          </div>
+        </div>
+        <div>
+          <div className="flex items-end justify-between"><div><p className="eyebrow">Ride calendar</p><h2 className="mt-2 text-3xl font-black">Upcoming with {guild.shortName}</h2></div><span className="text-sm text-zinc-500">{guildRides.length} published</span></div>
+          <div className="mt-6 grid gap-4">
+            {guildRides.map((ride) => (
+              <Link key={ride.slug} href={`/rides/${ride.slug}`} className="group grid overflow-hidden rounded-3xl border border-white/10 bg-[#13171d] sm:grid-cols-[12rem_1fr]">
+                <div className="min-h-44 p-5" style={{ background: ride.gradient }}><span className="rounded-full bg-black/30 px-3 py-1 text-xs font-bold">{ride.destination}</span></div>
+                <div className="p-6"><div className="flex justify-between gap-4"><div><p className="text-xs font-bold uppercase tracking-[.14em] text-orange-400">{formatRideDate(ride.startDate)}</p><h3 className="mt-2 text-xl font-black group-hover:text-orange-300">{ride.title}</h3></div><p className="font-black">{formatMoney(ride.price)}</p></div><p className="mt-3 text-sm leading-6 text-zinc-400">{ride.summary}</p><p className="mt-4 text-xs font-bold text-emerald-400">{ride.totalSlots - ride.bookedSlots} slots available</p></div>
+              </Link>
+            ))}
+          </div>
+        </div>
+      </section>
+    </>
+  );
+}
