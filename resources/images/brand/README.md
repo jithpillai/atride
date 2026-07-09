@@ -7,7 +7,9 @@ geometry should be redrawn as SVG after the visual system is finalized.
 
 | Asset | Intended use |
 | --- | --- |
-| `domain-lockup.png` | Transparent symbol + `atride.in` domain lockup |
+| `domain-lockup.png` | Original transparent symbol + `atride.in` domain lockup |
+| `domain-lockup-light.png` | Domain lockup retained for light backgrounds |
+| `domain-lockup-dark.png` | White/orange domain lockup used on dark backgrounds |
 | `primary-logo.png` | Transparent symbol + `@Ride` for light backgrounds |
 | `primary-logo-dark.png` | Transparent light/orange variant for dark backgrounds |
 | `primary-logo-monochrome.png` | Transparent single-colour charcoal logo |

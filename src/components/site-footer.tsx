@@ -6,7 +6,7 @@ export function SiteFooter() {
     <footer className="border-t border-white/8 bg-[#090b0f]">
       <div className="mx-auto grid max-w-7xl gap-10 px-5 py-12 md:grid-cols-[1.4fr_1fr_1fr] lg:px-8">
         <div>
-          <Image src="/brand/domain-lockup.png" alt="AtRide" width={150} height={70} className="h-14 w-auto" />
+          <Image src="/brand/domain-lockup-dark.png" alt="AtRide" width={150} height={70} className="h-14 w-auto" />
           <p className="mt-3 max-w-sm text-sm leading-6 text-zinc-400">
             One place for road-adventure communities to publish, organize, and run memorable rides.
           </p>
