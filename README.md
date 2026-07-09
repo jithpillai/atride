@@ -2,14 +2,14 @@
 
 > Discover communities. Book rides. Ride together.
 
-@Ride is a multi-tenant platform for organized road-adventure communities. Participants use one account to discover communities and trips, reserve slots, pay, and follow trip progress. The initial experience is bike-first, while the core model supports additional vehicle categories such as cars, SUVs, and 4×4 vehicles. Each participating community gets a branded website and management area under its own `atride.in` subdomain.
+@Ride is a multi-tenant platform for organized road-adventure communities. Participants use one account to discover communities and trips, reserve slots, pay, and follow trip progress. The initial experience is bike-first, while the core model supports additional vehicle categories such as cars, SUVs, and 4×4 vehicles. Each participating community gets a branded Guild page and management area. Phase 1 uses path-based Guild URLs; subdomains remain a later upgrade.
 
 The initial commercial product is a Guild operating system: hosted website, rides, bookings, payments, members, announcements, and ride operations. Participation in the root @Ride discovery marketplace is optional.
 
 ```text
 atride.in                    Public ride and community marketplace
-royalravanas.atride.in       Royal Ravanas community
-wildgear.atride.in           Wild Gear Crew community
+atride.in/guilds/royal-ravanas  Royal Ravanas community
+atride.in/guilds/wild-gear      Wild Gear Crew community
 ```
 
 The visual brand is `@Ride`; the written and search-friendly name is `AtRide`; the primary domain is `atride.in`.
@@ -31,7 +31,7 @@ The visual brand is `@Ride`; the written and search-friendly name is `AtRide`; t
 
 ### For communities
 
-- Branded wildcard subdomain with listed, unlisted, public, members-only, or invite-only access
+- Branded Guild page with listed, unlisted, public, members-only, or invite-only access
 - Community owners, administrators, ride managers, and finance roles
 - Staff invitations and scoped access control
 - Draft and publish trips with a vehicle type, images, pricing, inclusions, and capacity
@@ -54,7 +54,7 @@ The visual brand is `@Ride`; the written and search-friendly name is `AtRide`; t
 ### For the @Ride team
 
 - Approve and manage communities
-- Reserve and manage subdomains
+- Reserve and manage Guild slugs, with subdomains planned later
 - Moderate public content
 - Curate featured and promoted rides
 - Support users without breaking tenant isolation
@@ -165,9 +165,9 @@ The detailed documents are authoritative for their subjects. The root README int
 
 ## Delivery status
 
-The project is currently in product definition and architecture planning. Application scaffolding has not started.
+Development is active on the `develop` branch. The initial Next.js foundation now includes a populated marketplace, city filters, path-based public and private Guild pages, ride detail pages, SEO routes, a health endpoint, and a mock email-OTP UI flow backed by typed seed data.
 
-The first implementation milestone is Phase 0 in the [roadmap](docs/planning/roadmap.md): establish the Next.js/TypeScript application, PostgreSQL/PostGIS, Redis, Prisma migrations, automated tests, CI, and a staging deployment.
+The remaining Phase 0 foundation work is PostgreSQL/PostGIS and Prisma persistence, CI, and the first Vercel preview deployment. Provider-backed email, SMS, maps, media, and payments remain deliberately deferred behind development flows.
 
 ## Product principles
 
@@ -184,21 +184,38 @@ The first implementation milestone is Phase 0 in the [roadmap](docs/planning/roa
 
 ## Local development
 
-Local development commands will be added when Phase 0 scaffolds the application. The planned prerequisites are:
+Prerequisites:
 
 - Git
 - Node.js active LTS, pinned with `.nvmrc`
-- npm
-- Docker and Docker Compose
+- pnpm through Corepack
+- Docker and Docker Compose when local PostgreSQL is introduced
 
-PostgreSQL/PostGIS, Redis, and Mailpit will run locally. SMS, maps, storage, and Razorpay will have development adapters so provider accounts do not block the first phases.
+Install and run:
+
+```bash
+corepack enable pnpm
+pnpm install
+pnpm dev
+```
+
+Open `http://localhost:3000`. Quality checks:
+
+```bash
+pnpm lint
+pnpm typecheck
+pnpm test
+pnpm build
+```
+
+The first UI milestone uses typed seed data. PostgreSQL/PostGIS, Redis, and Mailpit are introduced behind application-owned adapters as their phases require them. SMS, email, maps, storage, and Razorpay use development adapters so provider accounts do not block the first phases.
 
 Example local tenant URLs:
 
 ```text
-atride.localhost:3000
-ravanas.localhost:3000
-wildgear.localhost:3000
+localhost:3000
+localhost:3000/guilds/royal-ravanas
+localhost:3000/guilds/wild-gear
 ```
 
 ## Security and secrets
