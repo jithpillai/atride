@@ -2,11 +2,30 @@ import Image from "next/image";
 import Link from "next/link";
 
 import { MarketplaceExplorer } from "@/components/marketplace-explorer";
-import { getListedGuilds, getPublicRides, launchCities } from "@/data/sample-data";
+import {
+  listMarketplaceCities,
+  listMarketplaceGuilds,
+  listMarketplaceRides,
+} from "@/server/repositories/discovery-repository";
 
-export default function HomePage() {
-  const guilds = getListedGuilds();
-  const rides = getPublicRides();
+export const revalidate = 300;
+
+export default async function HomePage() {
+  const [cities, guilds, rides] = await Promise.all([
+    listMarketplaceCities(),
+    listMarketplaceGuilds(),
+    listMarketplaceRides(),
+  ]);
+  const heroRide = rides[0];
+  const heroRideDuration = heroRide
+    ? Math.max(
+        1,
+        Math.ceil(
+          (new Date(heroRide.endDate).getTime() - new Date(heroRide.startDate).getTime()) /
+            (24 * 60 * 60 * 1000),
+        ),
+      )
+    : 0;
 
   const organizationSchema = {
     "@context": "https://schema.org",
@@ -44,8 +63,8 @@ export default function HomePage() {
               </Link>
             </div>
             <div className="mt-12 grid max-w-xl grid-cols-3 divide-x divide-white/10 rounded-2xl border border-white/10 bg-black/20 py-5 backdrop-blur">
-              <div className="px-4"><p className="text-2xl font-black">3</p><p className="mt-1 text-xs text-zinc-500">Launch cities</p></div>
-              <div className="px-4"><p className="text-2xl font-black">5</p><p className="mt-1 text-xs text-zinc-500">Sample rides</p></div>
+              <div className="px-4"><p className="text-2xl font-black">{Math.max(0, cities.length - 1)}</p><p className="mt-1 text-xs text-zinc-500">Launch cities</p></div>
+              <div className="px-4"><p className="text-2xl font-black">{rides.length}</p><p className="mt-1 text-xs text-zinc-500">Upcoming rides</p></div>
               <div className="px-4"><p className="text-2xl font-black">1</p><p className="mt-1 text-xs text-zinc-500">Common account</p></div>
             </div>
           </div>
@@ -55,20 +74,24 @@ export default function HomePage() {
             <div className="relative rotate-2 rounded-[2.5rem] border border-white/15 bg-gradient-to-br from-[#1b2028] to-[#0d1014] p-7 shadow-2xl shadow-black/50">
               <div className="flex items-center justify-between">
                 <p className="text-xs font-bold uppercase tracking-[.16em] text-zinc-500">Live ride board</p>
-                <span className="rounded-full bg-emerald-400/10 px-3 py-1 text-xs font-bold text-emerald-300">Sample preview</span>
+                <span className="rounded-full bg-emerald-400/10 px-3 py-1 text-xs font-bold text-emerald-300">Live preview</span>
               </div>
-              <div className="mt-6 overflow-hidden rounded-3xl border border-white/10 bg-[#11151a]">
-                <div className="h-48 p-6" style={{ background: rides[0].gradient }}>
-                  <div className="flex justify-between"><span className="rounded-full bg-black/30 px-3 py-1 text-xs font-bold">Bengaluru</span><span className="rounded-full bg-orange-500 px-3 py-1 text-xs font-bold">8 slots left</span></div>
-                  <p className="mt-16 text-xs font-bold uppercase tracking-[.16em] text-white/60">Next adventure</p>
-                  <p className="mt-1 text-2xl font-black">{rides[0].title}</p>
+              {heroRide ? (
+                <div className="mt-6 overflow-hidden rounded-3xl border border-white/10 bg-[#11151a]">
+                  <div className="h-48 p-6" style={{ background: heroRide.gradient }}>
+                    <div className="flex justify-between"><span className="rounded-full bg-black/30 px-3 py-1 text-xs font-bold">{heroRide.city}</span><span className="rounded-full bg-orange-500 px-3 py-1 text-xs font-bold">{heroRide.totalSlots - heroRide.bookedSlots} slots left</span></div>
+                    <p className="mt-16 text-xs font-bold uppercase tracking-[.16em] text-white/60">Next adventure</p>
+                    <p className="mt-1 text-2xl font-black">{heroRide.title}</p>
+                  </div>
+                  <div className="grid grid-cols-3 gap-px bg-white/8 text-center">
+                    <div className="bg-[#11151a] p-4"><p className="font-black">{heroRide.distanceKm} km</p><p className="mt-1 text-xs text-zinc-600">Distance</p></div>
+                    <div className="bg-[#11151a] p-4"><p className="font-black">{heroRideDuration} days</p><p className="mt-1 text-xs text-zinc-600">Duration</p></div>
+                    <div className="bg-[#11151a] p-4"><p className="font-black">{heroRide.bookedSlots}/{heroRide.totalSlots}</p><p className="mt-1 text-xs text-zinc-600">Riders</p></div>
+                  </div>
                 </div>
-                <div className="grid grid-cols-3 gap-px bg-white/8 text-center">
-                  <div className="bg-[#11151a] p-4"><p className="font-black">940 km</p><p className="mt-1 text-xs text-zinc-600">Distance</p></div>
-                  <div className="bg-[#11151a] p-4"><p className="font-black">3 days</p><p className="mt-1 text-xs text-zinc-600">Duration</p></div>
-                  <div className="bg-[#11151a] p-4"><p className="font-black">28/36</p><p className="mt-1 text-xs text-zinc-600">Riders</p></div>
-                </div>
-              </div>
+              ) : (
+                <div className="mt-6 rounded-3xl border border-dashed border-white/10 p-10 text-center text-sm text-zinc-500">The next published adventure will appear here.</div>
+              )}
               <div className="mt-5 flex items-center gap-4 rounded-2xl border border-white/8 bg-white/[.03] p-4">
                 <Image src="/brand/symbol-only.png" alt="" width={48} height={48} className="size-12 rounded-xl bg-white object-contain p-1" />
                 <div><p className="text-sm font-bold">One account, every Guild</p><p className="mt-1 text-xs text-zinc-500">Your roles and rides travel with you.</p></div>
@@ -89,7 +112,7 @@ export default function HomePage() {
         </div>
       </section>
 
-      <MarketplaceExplorer cities={launchCities} guilds={guilds} rides={rides} />
+      <MarketplaceExplorer cities={cities} guilds={guilds} rides={rides} />
 
       <section id="how-it-works" className="mx-auto max-w-7xl scroll-mt-28 px-5 py-20 lg:px-8">
         <div className="text-center">

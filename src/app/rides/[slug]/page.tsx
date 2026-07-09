@@ -2,25 +2,32 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 
-import { getGuildBySlug, getRideBySlug, rides } from "@/data/sample-data";
 import { formatMoney, formatRideDate } from "@/lib/format";
+import {
+  findPublicRideBySlug,
+  listPublicRideSlugs,
+  resolveGuildTenant,
+} from "@/server/repositories/discovery-repository";
 
 type Props = { params: Promise<{ slug: string }> };
 
-export function generateStaticParams() {
-  return rides.map((ride) => ({ slug: ride.slug }));
+export const revalidate = 300;
+
+export async function generateStaticParams() {
+  return (await listPublicRideSlugs()).map((slug) => ({ slug }));
 }
 
 export async function generateMetadata({ params }: Props): Promise<Metadata> {
-  const ride = getRideBySlug((await params).slug);
+  const ride = await findPublicRideBySlug((await params).slug);
   return ride ? { title: ride.title, description: ride.summary } : { title: "Ride not found" };
 }
 
 export default async function RidePage({ params }: Props) {
-  const ride = getRideBySlug((await params).slug);
+  const ride = await findPublicRideBySlug((await params).slug);
   if (!ride) notFound();
-  const guild = getGuildBySlug(ride.guildSlug);
-  if (!guild || guild.access !== "PUBLIC") notFound();
+  const resolved = await resolveGuildTenant(ride.guildSlug);
+  if (!resolved || resolved.guild.access !== "PUBLIC") notFound();
+  const { guild } = resolved;
   const slotsLeft = ride.totalSlots - ride.bookedSlots;
 
   return (
