@@ -12,6 +12,7 @@
     "db:seed": "prisma db seed",
     "db:studio": "prisma studio",
     "db:verify": "tsx prisma/verify.ts",
+    "email:verify": "tsx scripts/verify-ses.ts",
     "start": "next start",
     "lint": "eslint .",
     "postinstall": "prisma generate",

@@ -10,7 +10,9 @@ Current infrastructure status:
 - Neon PostgreSQL/PostGIS is provisioned and the initial migration/seed are active.
 - The `atride.in` identity is configured in Amazon SES and sandbox access is available.
 - SES production-access approval has been requested and is pending.
+- The SES email adapter and branded OTP template are implemented; both the mailbox-simulator smoke test and real OTP delivery to a verified sandbox recipient have passed.
 - SMS is explicitly outside the launch critical path and is deferred to an optional final phase. Maps, media uploads, Redis workers, and payments remain deferred to their delivery phases.
+- Phase 2 is in progress: database-backed email OTP, opaque sessions, account/logout, seeded roles, and protected platform/Guild authorization boundaries are implemented. Profiles, garage, invitations, personalized upcoming rides, audit events, and distributed abuse controls remain in this phase.
 
 Related documents:
 

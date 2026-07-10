@@ -86,7 +86,7 @@ The request-response application handles interactive web and API traffic. The wo
 | UI | React and Tailwind CSS | Responsive public and operational interfaces |
 | UI primitives | Headless UI and Heroicons | Accessible components and icons |
 | Forms/contracts | React Hook Form and Zod | Client forms and shared input validation |
-| Authentication | Auth.js sessions plus @Ride OTP | Identity and secure sessions |
+| Authentication | Application-owned email OTP and opaque database sessions | Identity, revocation, and secure sessions |
 | Database | PostgreSQL | Authoritative transactional data |
 | Geospatial | PostGIS | Nearby discovery and route/location queries |
 | ORM | Prisma | Typed data access, migrations, and transactions |
@@ -95,7 +95,7 @@ The request-response application handles interactive web and API traffic. The wo
 | Media | Cloudinary initially | Images, transformations, and protected proof uploads |
 | Payments | Razorpay SDK/API | Community-owned online checkout and webhooks |
 | SMS | Disabled initially | Optional compliant post-launch adapter |
-| Email | Amazon SES | Email OTP and transactional email |
+| Email | Amazon SES v2 HTTPS API | Email OTP and transactional email |
 | Maps | Google Maps Platform | Places, geocoding, maps, and route display |
 | Live updates | Server-Sent Events initially | Participant ride-progress updates |
 | Monitoring | Sentry and Pino | Error tracking and structured logs |
@@ -615,7 +615,7 @@ Request OTP
   -> normalize destination
   -> apply IP, session, and destination limits
   -> generate cryptographically secure code
-  -> store protected challenge data in Redis with short TTL
+  -> store protected challenge data in PostgreSQL with short expiry
   -> deliver through SES email (or the development adapter)
   -> verify with expiry and attempt checks
   -> consume challenge and mark contact verified
@@ -632,6 +632,10 @@ Controls:
 - Older challenge invalidation after resend
 
 Development uses a safe mock email OTP provider. Staging tests the real SES integration.
+
+The SES adapter uses Signature Version 4 over the SES v2 HTTPS API and send-only IAM credentials restricted to the `noreply@atride.in` From address. Provider failures invalidate the newly created OTP challenge so a participant can retry instead of being trapped behind the resend cooldown. Codes are never written to application logs, and only the local non-production mock provider may return a development code to the UI.
+
+Successful verification issues a high-entropy opaque session token in an `HttpOnly`, `SameSite=Lax`, secure production cookie. PostgreSQL stores only the token digest, expiry, last-seen time, and optional revocation time. Protected requests load current role assignments from authoritative data so role revocation is immediate. Redis may later provide distributed request throttling, but it is not required for the initial session or OTP semantics. See [ADR-013](decisions/ADR-013-opaque-database-sessions.md).
 
 ## 14. Notification architecture
 

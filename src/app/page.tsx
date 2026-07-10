@@ -79,26 +79,33 @@ export default async function HomePage() {
             </div>
           </div>
 
-          <div className="relative mx-auto w-full max-w-xl">
+          <div className="relative mx-auto w-full max-w-xl lg:-translate-y-8">
             <div className="absolute inset-12 rounded-full bg-orange-500/20 blur-3xl" />
             <div className="relative rotate-2 rounded-[2.5rem] border border-white/15 bg-gradient-to-br from-[#1b2028] to-[#0d1014] p-7 shadow-2xl shadow-black/50">
               <div className="flex items-center justify-between">
-                <p className="text-xs font-bold uppercase tracking-[.16em] text-zinc-500">Live ride board</p>
-                <span className="rounded-full bg-emerald-400/10 px-3 py-1 text-xs font-bold text-emerald-300">Live preview</span>
+                <p className="text-xs font-bold uppercase tracking-[.16em] text-zinc-500">Featured ride board</p>
+                <span className="rounded-full bg-orange-400/10 px-3 py-1 text-xs font-bold text-orange-300">View ride</span>
               </div>
               {heroRide ? (
-                <div className="mt-6 overflow-hidden rounded-3xl border border-white/10 bg-[#11151a]">
+                <Link
+                  href={`/rides/${heroRide.slug}`}
+                  aria-label={`View ${heroRide.title}`}
+                  className="group mt-6 block overflow-hidden rounded-3xl border border-white/10 bg-[#11151a] outline-none transition duration-300 hover:-translate-y-1 hover:border-orange-400/50 hover:shadow-xl hover:shadow-orange-950/20 focus-visible:border-orange-400 focus-visible:ring-2 focus-visible:ring-orange-400/40"
+                >
                   <div className="h-48 p-6" style={{ background: heroRide.gradient }}>
                     <div className="flex justify-between"><span className="rounded-full bg-black/30 px-3 py-1 text-xs font-bold">{heroRide.city}</span><span className="rounded-full bg-orange-500 px-3 py-1 text-xs font-bold">{heroRide.totalSlots - heroRide.bookedSlots} slots left</span></div>
                     <p className="mt-16 text-xs font-bold uppercase tracking-[.16em] text-white/60">Next adventure</p>
-                    <p className="mt-1 text-2xl font-black">{heroRide.title}</p>
+                    <div className="mt-1 flex items-center justify-between gap-4">
+                      <p className="text-2xl font-black">{heroRide.title}</p>
+                      <span aria-hidden="true" className="text-xl font-black transition-transform group-hover:translate-x-1">→</span>
+                    </div>
                   </div>
                   <div className="grid grid-cols-3 gap-px bg-white/8 text-center">
                     <div className="bg-[#11151a] p-4"><p className="font-black">{heroRide.distanceKm} km</p><p className="mt-1 text-xs text-zinc-600">Distance</p></div>
                     <div className="bg-[#11151a] p-4"><p className="font-black">{heroRideDuration} days</p><p className="mt-1 text-xs text-zinc-600">Duration</p></div>
                     <div className="bg-[#11151a] p-4"><p className="font-black">{heroRide.bookedSlots}/{heroRide.totalSlots}</p><p className="mt-1 text-xs text-zinc-600">Riders</p></div>
                   </div>
-                </div>
+                </Link>
               ) : (
                 <div className="mt-6 rounded-3xl border border-dashed border-white/10 p-10 text-center text-sm text-zinc-500">The next published adventure will appear here.</div>
               )}

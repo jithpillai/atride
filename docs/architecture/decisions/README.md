@@ -25,6 +25,7 @@ Architecture Decision Records (ADRs) capture important choices, their context, a
 | [ADR-010](ADR-010-web-pwa-wrapper-then-android.md) | Complete web, then PWA/wrapper, then optional Android | Accepted |
 | [ADR-011](ADR-011-email-first-defer-sms.md) | Email-first authentication with optional final-phase SMS | Accepted |
 | [ADR-012](ADR-012-cloudinary-media.md) | Cloudinary as initial media provider behind an adapter | Accepted |
+| [ADR-013](ADR-013-opaque-database-sessions.md) | Application-owned opaque PostgreSQL sessions | Accepted |
 
 ## Adding a decision
 

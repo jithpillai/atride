@@ -13,6 +13,45 @@ const prisma = new PrismaClient({
   adapter: new PrismaPg({ connectionString: normalizePostgresUrl(connectionString) }),
 });
 
+type SeedIdentity = {
+  email: string;
+  displayName: string;
+};
+
+async function upsertIdentity({ email, displayName }: SeedIdentity) {
+  const contact = await prisma.userContact.findUnique({
+    where: { type_normalizedValue: { type: "EMAIL", normalizedValue: email } },
+    include: { user: true },
+  });
+
+  if (contact) {
+    await prisma.user.update({
+      where: { id: contact.userId },
+      data: { displayName, status: "ACTIVE" },
+    });
+    await prisma.userContact.update({
+      where: { id: contact.id },
+      data: { displayValue: email, isPrimary: true, verifiedAt: new Date() },
+    });
+    return contact.user;
+  }
+
+  return prisma.user.create({
+    data: {
+      displayName,
+      contacts: {
+        create: {
+          type: "EMAIL",
+          normalizedValue: email,
+          displayValue: email,
+          isPrimary: true,
+          verifiedAt: new Date(),
+        },
+      },
+    },
+  });
+}
+
 async function main() {
   for (const guild of guilds) {
     const visibility = {
@@ -118,12 +157,82 @@ async function main() {
     });
   }
 
-  const [communityCount, rideCount] = await Promise.all([
-    prisma.community.count(),
-    prisma.ride.count(),
+  const [platformAdmin, ravanasAdmin, wildGearCaptain, rider] = await Promise.all([
+    upsertIdentity({ email: "platform.admin@atride.test", displayName: "AtRide Platform Admin" }),
+    upsertIdentity({ email: "ravanas.admin@atride.test", displayName: "Royal Ravanas Admin" }),
+    upsertIdentity({ email: "wildgear.captain@atride.test", displayName: "Wild Gear Captain" }),
+    upsertIdentity({ email: "rider@atride.test", displayName: "Demo Rider" }),
   ]);
 
-  console.log(`Seeded ${communityCount} communities and ${rideCount} rides.`);
+  await prisma.platformRoleAssignment.upsert({
+    where: { userId_role: { userId: platformAdmin.id, role: "PLATFORM_ADMIN" } },
+    create: { userId: platformAdmin.id, role: "PLATFORM_ADMIN" },
+    update: {},
+  });
+
+  const [ravanas, wildGear, valparaiRide] = await Promise.all([
+    prisma.community.findUniqueOrThrow({ where: { slug: "royal-ravanas" } }),
+    prisma.community.findUniqueOrThrow({ where: { slug: "wild-gear" } }),
+    prisma.ride.findUniqueOrThrow({ where: { slug: "valparai-rainforest-loop" } }),
+  ]);
+
+  const ravanasMembership = await prisma.communityMembership.upsert({
+    where: { communityId_userId: { communityId: ravanas.id, userId: ravanasAdmin.id } },
+    create: { communityId: ravanas.id, userId: ravanasAdmin.id, status: "ACTIVE", joinedAt: new Date() },
+    update: { status: "ACTIVE", joinedAt: new Date() },
+  });
+  const captainMembership = await prisma.communityMembership.upsert({
+    where: { communityId_userId: { communityId: wildGear.id, userId: wildGearCaptain.id } },
+    create: { communityId: wildGear.id, userId: wildGearCaptain.id, status: "ACTIVE", joinedAt: new Date() },
+    update: { status: "ACTIVE", joinedAt: new Date() },
+  });
+  await prisma.communityMembership.upsert({
+    where: { communityId_userId: { communityId: ravanas.id, userId: rider.id } },
+    create: { communityId: ravanas.id, userId: rider.id, status: "ACTIVE", joinedAt: new Date() },
+    update: { status: "ACTIVE", joinedAt: new Date() },
+  });
+
+  await Promise.all([
+    prisma.communityRoleAssignment.upsert({
+      where: { membershipId_role: { membershipId: ravanasMembership.id, role: "OWNER" } },
+      create: { membershipId: ravanasMembership.id, role: "OWNER" },
+      update: {},
+    }),
+    prisma.communityRoleAssignment.upsert({
+      where: { membershipId_role: { membershipId: ravanasMembership.id, role: "ADMIN" } },
+      create: { membershipId: ravanasMembership.id, role: "ADMIN" },
+      update: {},
+    }),
+    prisma.communityRoleAssignment.upsert({
+      where: { membershipId_role: { membershipId: captainMembership.id, role: "RIDE_MANAGER" } },
+      create: { membershipId: captainMembership.id, role: "RIDE_MANAGER" },
+      update: {},
+    }),
+    prisma.rideStaffAssignment.upsert({
+      where: {
+        rideId_userId_role: {
+          rideId: valparaiRide.id,
+          userId: wildGearCaptain.id,
+          role: "CAPTAIN",
+        },
+      },
+      create: {
+        communityId: wildGear.id,
+        rideId: valparaiRide.id,
+        userId: wildGearCaptain.id,
+        role: "CAPTAIN",
+      },
+      update: {},
+    }),
+  ]);
+
+  const [communityCount, rideCount, userCount] = await Promise.all([
+    prisma.community.count(),
+    prisma.ride.count(),
+    prisma.user.count(),
+  ]);
+
+  console.log(`Seeded ${communityCount} communities, ${rideCount} rides, and ${userCount} users.`);
 }
 
 main()

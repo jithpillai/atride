@@ -20,9 +20,10 @@ const prisma = new PrismaClient({
 });
 
 async function main() {
-  const [communityCount, rideCount, listedGuilds, privateGuild, postgis] = await Promise.all([
+  const [communityCount, rideCount, userCount, listedGuilds, privateGuild, platformAdmin, captain, postgis] = await Promise.all([
     prisma.community.count(),
     prisma.ride.count(),
+    prisma.user.count(),
     prisma.community.findMany({
       where: {
         status: "ACTIVE",
@@ -38,11 +39,40 @@ async function main() {
         },
       },
     }),
+    prisma.userContact.findUnique({
+      where: { type_normalizedValue: { type: "EMAIL", normalizedValue: "platform.admin@atride.test" } },
+      select: { user: { select: { platformRoles: { select: { role: true } } } } },
+    }),
+    prisma.userContact.findUnique({
+      where: { type_normalizedValue: { type: "EMAIL", normalizedValue: "wildgear.captain@atride.test" } },
+      select: {
+        user: {
+          select: {
+            rideStaffAssignments: {
+              where: { ride: { slug: "valparai-rainforest-loop" } },
+              select: { role: true },
+            },
+          },
+        },
+      },
+    }),
     prisma.$queryRaw<Array<{ version: string }>>`SELECT PostGIS_Version() AS version`,
   ]);
 
   if (communityCount !== 3 || rideCount !== 5) {
     throw new Error(`Unexpected seed counts: ${communityCount} Guilds and ${rideCount} rides.`);
+  }
+
+  if (userCount < 4) {
+    throw new Error(`Expected at least 4 seeded identities, found ${userCount}.`);
+  }
+
+  if (!platformAdmin?.user.platformRoles.some(({ role }) => role === "PLATFORM_ADMIN")) {
+    throw new Error("The seeded platform administrator role is missing.");
+  }
+
+  if (!captain?.user.rideStaffAssignments.some(({ role }) => role === "CAPTAIN")) {
+    throw new Error("The seeded ride captain assignment is missing.");
   }
 
   if (listedGuilds.length !== 2 || listedGuilds.some(({ slug }) => slug === "midnight-compass")) {
@@ -60,7 +90,7 @@ async function main() {
     throw new Error("PostGIS is not enabled.");
   }
 
-  console.log("Database verified: PostGIS enabled, 3 Guilds, 5 rides, 2 marketplace Guilds.");
+  console.log("Database verified: PostGIS, discovery boundaries, identities, RBAC, and ride staff assignments are valid.");
 }
 
 main()
