@@ -163,9 +163,9 @@ It can render public details plus protected participant panels. Operational acti
 
 **Flow:**
 
-1. Enter name and mobile number.
-2. Receive and verify a phone OTP.
-3. Provide email and verify it if required by policy.
+1. Enter name and email address.
+2. Receive and verify an email OTP.
+3. Optionally provide a mobile number during profile setup; a contact number is required when a booking needs operational/emergency contact.
 4. Accept terms and privacy notice.
 5. Create the participant profile.
 
@@ -173,6 +173,7 @@ It can render public details plus protected participant panels. Operational acti
 
 - OTPs expire, are one-time use, and have resend/attempt limits.
 - Phone numbers and email addresses are normalized.
+- The initial release does not claim that a phone number is verified; phone verification remains a later optional capability.
 - Verification confirms control of the destination, not real-world identity.
 - Recovery flows do not disclose whether an account exists.
 
@@ -281,7 +282,54 @@ Structured inclusions may cover accommodation, meals, fuel, tickets, support veh
 
 Confirmed bookings retain price and inclusion snapshots when the ride later changes.
 
-### UC-09A: Select vehicle type and policy
+### UC-09A: Configure itinerary, stays, meals, and activities
+
+**Actor:** Ride Manager
+
+The ride package is structured rather than stored only as formatted announcement text.
+
+Each itinerary day can contain ordered entries such as assembly, departure, regroup, meal, sightseeing, activity, check-in, free time, briefing, campfire, and checkout. Entries include their date/time or time window, location, description, audience, and whether timing is confirmed or provisional.
+
+Accommodation records may include:
+
+- Property name and public location summary
+- Exact address/map visibility, which may be restricted to confirmed participants
+- Check-in/check-out times and number of nights
+- Room or occupancy options
+- Gender/privacy allocation notes where operationally required and legally appropriate
+- Secure parking and organizer-defined property amenities
+- Participant instructions and property restrictions
+
+Meal records specify the service date, meal type, included/not-included state, menu summary, and available dietary choices. A participant's selected diet remains booking-specific; it is not inferred permanently from an old ride.
+
+Activities and amenities are separate from essential inclusions so that a schedule change can identify exactly what changed. Exclusions are explicit. The interface must not imply that an unmentioned item is included.
+
+### UC-09B: Configure rules and commercial policies
+
+**Actor:** Ride Manager
+
+Ride rules cover safety gear, convoy formation, road behavior, substance restrictions, property conduct, participant respect, staff instructions, and consequences for serious violations. Rules must be written clearly, reviewed by the organizer, and must not override applicable law or platform safety policy.
+
+Commercial policies can define:
+
+- Confirmation deposit, remaining balance, and due dates
+- Refundability by payment stage or date
+- Cancellation and no-show handling
+- Participant-requested replacement or transfer workflow
+- Organizer cancellation/postponement handling
+- Whether a confirmed price includes taxes and add-ons
+
+Rules, waivers, package details, and commercial policies are versioned. A confirmed booking stores the versions and price/package snapshots accepted by the participant. Later edits do not silently change an existing booking agreement; material changes require notification and, where appropriate, acknowledgement or renewed consent.
+
+### UC-09C: Generate organizer-ready announcements
+
+**Actor:** Ride Manager or authorized Captain
+
+@Ride can generate a WhatsApp-ready or plain-text announcement from the canonical ride record. The export may include public itinerary, package, pricing, rules, booking instructions, and current availability, but it does not include the participant manifest, personal phone numbers, dietary selections, payment proofs, or protected WhatsApp invite links by default.
+
+Participant manifests are separate authorized views/exports with purpose-limited fields and auditability. Organizers should update structured data first and regenerate the announcement instead of maintaining an independent, conflicting source of truth in chat.
+
+### UC-09D: Select vehicle type and policy
 
 **Actor:** Ride Manager
 
@@ -533,9 +581,9 @@ Exact live location is never public or indexable. Access expires according to po
 
 ### UC-23: Receive identity messages
 
-- Phone OTP through MSG91
 - Email OTP through Amazon SES
 - Account recovery or security notice
+- Optional phone OTP only after the post-launch Indian SMS phase is approved and compliant
 
 ### UC-24: Receive booking and payment messages
 
@@ -566,7 +614,7 @@ Messages are delivered through approved templates. Marketing consent is separate
 2. Enter validated details and urgency.
 3. Choose the relevant ride groups or all confirmed participants.
 4. Publish to the @Ride ride activity/announcement feed.
-5. Fan out in-app, email, or SMS notifications according to importance and policy.
+5. Fan out in-app and email notifications according to importance and policy; SMS may be added by the optional post-launch adapter.
 6. For a critical announcement, monitor participant acknowledgement.
 
 Examples include assembly instructions, schedule/route changes, accommodation changes, postponement/cancellation, group start, delays, incidents, merge progress, and completion.

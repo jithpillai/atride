@@ -1,6 +1,6 @@
 # ADR-005: Centrally operate SMS and email communication
 
-- Status: Accepted
+- Status: Superseded by [ADR-011](ADR-011-email-first-defer-sms.md)
 - Date: 2026-07-07
 
 ## Context

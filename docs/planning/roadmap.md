@@ -2,7 +2,15 @@
 
 This roadmap splits development into phases that each end with a deployable, testable user journey. It is the authoritative source for phase scope, acceptance tests, development environments, external accounts, and credentials.
 
-Most external accounts are not required immediately. Development can begin with local PostgreSQL, Redis, mock SMS/email, placeholder maps, and Razorpay test doubles. Real provider accounts become necessary progressively.
+Most external accounts are not required immediately. Development can begin with local PostgreSQL, Redis, disabled SMS, mock email, placeholder maps, and Razorpay test doubles. Real provider accounts become necessary progressively.
+
+Current infrastructure status:
+
+- `atride.in` is live on Vercel.
+- Neon PostgreSQL/PostGIS is provisioned and the initial migration/seed are active.
+- The `atride.in` identity is configured in Amazon SES and sandbox access is available.
+- SES production-access approval has been requested and is pending.
+- SMS is explicitly outside the launch critical path and is deferred to an optional final phase. Maps, media uploads, Redis workers, and payments remain deferred to their delivery phases.
 
 Related documents:
 
@@ -31,6 +39,7 @@ Related documents:
 | 9 | Production hardening | Security, SEO, monitoring, backups, and launch readiness are verified |
 | 10 | PWA and web wrapper | Completed web product becomes installable and optionally store-packaged |
 | 11 | Optional native Android | Native/offline/tracking client proceeds only after evidence-based approval |
+| 12 | Optional compliant Indian SMS | DLT-compliant OTP/service SMS is considered only when documentation and usage justify it |
 
 ### Phase 0 — Engineering foundation
 
@@ -95,7 +104,6 @@ External accounts needed:
 Build:
 
 - Participant registration
-- Phone OTP verification
 - Email OTP verification
 - Login, logout, recovery, and session management
 - Participant profile and generic vehicle garage
@@ -108,7 +116,9 @@ Build:
 
 Acceptance tests:
 
-- A participant can register and verify a mocked phone OTP.
+- A participant can register and verify a mocked email OTP.
+- Registration does not depend on an SMS provider or a verified phone number.
+- A phone number collected for booking/emergency contact is clearly marked unverified until an approved verification method exists.
 - A participant cannot access community administration.
 - A Royal Ravanas administrator cannot administer Wild Gear.
 - An invited captain can accept the invitation.
@@ -122,7 +132,7 @@ Acceptance tests:
 External accounts needed:
 
 - Not required for initial implementation; use an on-screen development OTP and Mailpit for local email.
-- MSG91 test account and Amazon SES sandbox become necessary for staging integration.
+- Amazon SES sandbox is used for staging email integration; no SMS or DLT account is required.
 
 ### Phase 3 — Community administration
 
@@ -166,7 +176,11 @@ Build:
 - Required vehicle-type selector with `BIKE` selected by default
 - Type-aware participant terminology and vehicle requirements
 - Start and end dates
-- Pricing, accommodation, inclusions, and exclusions
+- Day-wise itinerary with ordered schedule items and locations
+- Accommodation properties, stay dates, room/occupancy options, participant instructions, and amenities
+- Included meals, menu summaries, dietary options, activities, and sightseeing
+- Explicit pricing, inclusions, exclusions, add-ons, confirmation deposit, balance, and due dates
+- Versioned safety rules, waiver references, cancellation/refund, replacement/transfer, and property-conduct policies
 - Multiple starting groups
 - Captains, vice-captains, sweeps, and marshals
 - Routes, checkpoints, and merge points
@@ -174,6 +188,7 @@ Build:
 - Capacity, group capacity, and buffer capacity
 - Ride-staff assignments feed the personalized upcoming-rides section
 - Public read-only upcoming/featured ride widget endpoints
+- WhatsApp-ready/plain-text announcement generation from canonical ride data without participant PII
 
 Acceptance tests:
 
@@ -184,6 +199,10 @@ Acceptance tests:
 - Each group has separate staff, time, route, and capacity.
 - A draft is not publicly visible.
 - Publishing creates a public SEO page.
+- A multi-day ride renders its itinerary, stays, amenities, meals, activities, inclusions, and exclusions in the correct day/order.
+- Exact stay information can be restricted to confirmed participants while a safe public summary remains available.
+- The public ride page clearly distinguishes included, excluded, optional, and not-yet-confirmed items.
+- Generated announcement text matches the current published package and excludes participant names, phone numbers, dietary selections, payment evidence, and protected invite links.
 - Capacity cannot be reduced below confirmed bookings.
 - Unauthorized captains cannot edit unrelated rides.
 - An explicitly assigned captain sees the ride on the landing page.
@@ -201,7 +220,10 @@ Build:
 
 - Participant selection
 - Starting-group selection
-- Pricing and add-ons
+- Rider/pillion or other applicable occupant-role selection
+- Booking-specific dietary and accessibility choices
+- Pricing, accommodation option, and add-ons
+- Confirmation deposit, balance schedule, and payment-state tracking
 - Waiver acceptance
 - Capacity reservation
 - Booking confirmation
@@ -210,12 +232,17 @@ Build:
 - Payment-proof upload
 - Finance review
 - Reservation expiry and slot release
+- Participant-requested replacement/transfer workflow governed by the accepted policy
 - Booking relationships, payment state, role badges, and next actions in `Your upcoming rides`
 - Durable ride participation relationship and per-Guild newcomer consent capture
 
 Acceptance tests:
 
 - A participant reserves an available slot.
+- The participant reviews day-wise package details, explicit exclusions, rules, and commercial policies before confirming.
+- A booking preserves the accepted price, itinerary/package summary, rules, waiver, and refund-policy versions.
+- Changing a ride package later does not silently rewrite confirmed booking snapshots.
+- A sold-out ride rejects new bookings and exposes only the configured waitlist/contact path.
 - Simultaneous requests cannot oversell the final slot.
 - Unpaid reservations expire and release capacity.
 - A participant uploads offline payment proof.
@@ -267,11 +294,10 @@ External accounts needed:
 - Test webhook secret
 - Later, every onboarded community needs its own activated Razorpay account and credentials
 
-### Phase 7 — SMS, email, and event notifications
+### Phase 7 — Email, in-app, and event notifications
 
 Build:
 
-- MSG91 phone OTP
 - Amazon SES email OTP
 - Booking confirmations
 - Offline payment notifications
@@ -292,9 +318,8 @@ Build:
 
 Acceptance tests:
 
-- Phone OTP is delivered and verified using MSG91 staging configuration.
 - Email OTP is delivered through SES.
-- Booking confirmation creates an in-app notification, SMS, and email.
+- Booking confirmation creates an in-app notification and email.
 - A temporary provider failure retries automatically.
 - Reprocessing the same event does not send uncontrolled duplicates.
 - Changed ride times invalidate obsolete reminder jobs.
@@ -306,14 +331,8 @@ Acceptance tests:
 - Participants who do not join WhatsApp still receive essential information through @Ride.
 - The system never reports that a user joined WhatsApp based only on opening the link.
 
-MSG91 supports OTP operations for mobile and email destinations, but our proposed design uses MSG91 for Indian SMS and SES for email. [MSG91 OTP documentation](https://docs.msg91.com/otp-widget)
-
 External accounts needed:
 
-- MSG91 account
-- MSG91 auth key
-- DLT/entity, sender/header, and approved template configuration for production Indian SMS
-- OTP and transactional SMS template IDs
 - AWS account and SES region
 - Verified `atride.in` SES identity
 - SPF, DKIM, and DMARC DNS records
@@ -442,7 +461,7 @@ Decision gates:
 If approved, build:
 
 - React Native/Expo Android client
-- OTP and secure device-session authentication
+- Email OTP and secure device-session authentication
 - My upcoming/live rides
 - Ride details, itinerary, announcements, and acknowledgements
 - Captain manifest, group start/complete, check-ins, delays, incidents, and photos
@@ -470,6 +489,42 @@ External accounts needed:
 
 iOS remains deferred until Android/PWA demand justifies a separate release phase.
 
+### Phase 12 — Optional compliant Indian SMS
+
+This phase is last and is not required for launch. It begins only if @Ride has the organization documentation, budget, operational ownership, and real usage that justify Indian SMS registration and ongoing template administration.
+
+Decision gates:
+
+- A suitable legal/business entity can register as the Principal Entity.
+- TRAI/TCCCPR and access-provider DLT requirements can be satisfied.
+- Sender/header and OTP/service content templates are approved.
+- Email OTP failure or time-critical field operations demonstrate a material need for SMS.
+- Consent, suppression, cost monitoring, abuse controls, and support ownership are defined.
+
+If approved, build:
+
+- Provider adapter selected at implementation time rather than hard-coding MSG91 now
+- Phone OTP as an optional verification method
+- Explicit verified/unverified phone-contact state
+- Essential service/transactional SMS only for approved event types
+- DLT identifiers and provider-template mappings
+- Delivery receipts, retries, suppression, rate limiting, audit, and cost controls
+
+Acceptance tests:
+
+- The application works fully with `SMS_PROVIDER=disabled`.
+- Enabling SMS does not change email OTP or session semantics.
+- Only approved templates and purposes can send.
+- A phone is marked verified only after a successful one-time challenge.
+- Provider/DLT outages degrade to email and in-app communication without losing business events.
+
+External accounts needed only if this phase is approved:
+
+- TRAI-compliant Principal Entity/DLT registration through an access provider
+- Registered sender/header
+- Approved OTP/service content templates and required consent configuration
+- Selected SMS aggregator account, credentials, balance, and webhook configuration
+
 ## Development environments
 
 We should maintain four isolated environments.
@@ -486,7 +541,7 @@ Required on the development machine:
 - PostgreSQL/PostGIS container
 - Redis container
 - Mailpit for viewing local email
-- Mock SMS, Maps, Razorpay, and storage adapters where possible
+- Disabled SMS plus mock Maps, Razorpay, and storage adapters where possible
 
 Local tenant URLs can use:
 
@@ -520,7 +575,7 @@ Recommended staging resources:
 - Staging web deployment
 - Staging worker
 - Separate PostgreSQL and Redis
-- MSG91 and SES test/sandbox configuration
+- SES test/sandbox configuration
 - Razorpay Test mode
 - Restricted staging Maps keys
 - Separate Cloudinary folder or account/environment
@@ -560,13 +615,8 @@ No live SMS, email, maps, or payment keys are needed for Phase 0.
 
 Google recommends separate keys and both application and API restrictions. Browser keys should be restricted by website/referrer and server keys by the appropriate server restriction. [Google Maps API security guidance](https://developers.google.com/maps/api-security-best-practices)
 
-### Needed for OTP and notifications
+### Needed for email OTP and notifications
 
-- MSG91 account and organization details
-- MSG91 authentication key
-- DLT/entity registration information
-- Approved sender/header
-- Approved OTP and transactional templates
 - Amazon AWS account
 - SES-verified domain
 - SES production-access approval
@@ -601,7 +651,6 @@ The community enters credentials into an encrypted settings screen. Credentials 
 - Production worker
 - Cloudinary production configuration
 - Google Maps billing, quotas, and alerts
-- MSG91 production balance and templates
 - SES production access
 - Sentry project
 - Search Console account
@@ -610,7 +659,7 @@ The community enters credentials into an encrypted settings screen. Credentials 
 - Emergency and incident-handling process
 - Demo or pilot riding community
 
-### Needed only for later mobile phases
+### Needed only for later optional phases
 
 - Web-push/VAPID configuration if PWA push is enabled
 - Google Play Console account for a packaged wrapper or native Android release
@@ -620,6 +669,7 @@ The community enters credentials into an encrypted settings screen. Credentials 
 - App-link/deep-link domain verification
 - Android internal/closed test users and representative physical devices
 - Background-location declaration, prominent disclosure, privacy policy, and review materials only if native crew tracking ships
+- Principal Entity/DLT registration, sender/header, templates, and aggregator credentials only if Phase 12 SMS is approved
 
 These dependencies do not block web Phases 0–9.
 
@@ -635,11 +685,6 @@ REDIS_URL
 AUTH_SECRET
 APP_ENCRYPTION_KEY
 APP_BASE_URL
-
-MSG91_AUTH_KEY
-MSG91_OTP_TEMPLATE_ID
-MSG91_BOOKING_TEMPLATE_ID
-MSG91_RIDE_UPDATE_TEMPLATE_ID
 
 AWS_REGION
 AWS_ACCESS_KEY_ID
@@ -661,6 +706,12 @@ RAZORPAY_TEST_KEY_ID
 RAZORPAY_TEST_KEY_SECRET
 RAZORPAY_TEST_WEBHOOK_SECRET
 
+# Added only if the optional compliant Indian SMS phase is approved
+SMS_PROVIDER
+SMS_PROVIDER_AUTH_KEY
+SMS_OTP_TEMPLATE_ID
+SMS_SERVICE_TEMPLATE_IDS
+
 # Added only if PWA web push is enabled
 NEXT_PUBLIC_VAPID_PUBLIC_KEY
 VAPID_PRIVATE_KEY
@@ -676,6 +727,6 @@ To begin Phases 0 and 1, I only need:
 2. Temporary or final @Ride logo, colors, and branding direction.
 3. Two sample bike communities, three to six sample rides, and one representative future four-wheel expedition scenario.
 4. Confirmation of the primary initial market—presumably India—and default currency `INR`.
-5. A decision on OTP-first versus password-plus-OTP authentication.
+5. Confirmation of the accepted email-OTP-first authentication decision.
 
-MSG91, SES, Razorpay, Cloudinary, and Google Maps accounts can be created when their corresponding integration phase approaches. This keeps account setup from blocking the foundation and public marketplace work.
+SES, Razorpay, Cloudinary, and Google Maps accounts can be created when their corresponding integration phase approaches. Indian SMS accounts and DLT work are deliberately excluded unless Phase 12 is later approved.

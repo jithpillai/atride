@@ -99,8 +99,8 @@ identity | communities | rides | bookings | payments | tracking
    |             |                    |
    v             v                    v
 PostgreSQL     Redis           External services
-+ PostGIS      + BullMQ        Razorpay, MSG91,
-                                SES, Maps, Cloudinary
++ PostGIS      + BullMQ        Razorpay, SES,
+                                Maps, Cloudinary
                  |
                  v
           TypeScript worker
@@ -119,8 +119,9 @@ PostgreSQL     Redis           External services
 | Images and media | Cloudinary initially |
 | Maps and geocoding | Google Maps Platform |
 | Online payments | Per-community Razorpay integration |
-| SMS and phone OTP | MSG91 |
-| Email and email OTP | Amazon SES |
+| Authentication OTP | Amazon SES email OTP initially |
+| SMS | Optional post-launch integration after Indian DLT readiness |
+| Email | Amazon SES |
 | Live progress | Server-Sent Events initially |
 | Monitoring | Sentry and structured application logs |
 | Testing | Vitest, Testing Library, and Playwright |
@@ -165,9 +166,9 @@ The detailed documents are authoritative for their subjects. The root README int
 
 ## Delivery status
 
-Development is active on the `develop` branch. The initial Next.js foundation now includes a populated marketplace, city filters, path-based public and private Guild pages, ride detail pages, SEO routes, a health endpoint, and a mock email-OTP UI flow. These discovery pages now read through tenant-scoped Prisma repositories backed by PostgreSQL/PostGIS, with an initial migration, database constraints, and repeatable demonstration seeds in place.
+Development is active on the `develop` branch, and `atride.in` is live on Vercel. The initial Next.js foundation includes a populated marketplace, city filters, path-based public and private Guild pages, ride detail pages, SEO routes, a health endpoint, and a mock email-OTP UI flow. These discovery pages read through tenant-scoped Prisma repositories backed by Neon PostgreSQL/PostGIS, with an initial migration, database constraints, and repeatable demonstration seeds in place.
 
-The remaining Phase 0 foundation work is CI and the first Vercel preview deployment. Provider-backed email, SMS, maps, media, and payments remain deliberately deferred behind development flows.
+Amazon SES domain authentication and sandbox access are configured; production-access approval is pending. The remaining Phase 0 foundation work is CI and operational hardening. Provider-backed SMS, maps, media, Redis workers, and payments remain deliberately deferred behind development flows.
 
 ## Product principles
 
@@ -216,7 +217,7 @@ pnpm test
 pnpm build
 ```
 
-The demonstration fixture remains the repeatable database seed source, while production UI reads go through tenant-scoped Prisma repositories. Redis and Mailpit are introduced behind application-owned adapters as their phases require them. SMS, email, maps, storage, and Razorpay use development adapters so provider accounts do not block the first phases.
+The demonstration fixture remains the repeatable database seed source, while production UI reads go through tenant-scoped Prisma repositories. Redis and Mailpit are introduced behind application-owned adapters as their phases require them. Email, maps, storage, and Razorpay use development adapters so provider accounts do not block the first phases. SMS is disabled and is not a launch dependency.
 
 Example local tenant URLs:
 
@@ -239,7 +240,6 @@ localhost:3000/guilds/wild-gear
 
 Accepted architectural choices are recorded in [architecture decisions](docs/architecture/decisions/README.md). Important product questions still to finalize include:
 
-- OTP-first authentication versus password plus OTP
 - Community verification and publishing approval policy
 - Default financial permissions for captains
 - Refund responsibilities for community-owned gateways
@@ -256,8 +256,9 @@ Accepted architectural choices are recorded in [architecture decisions](docs/arc
 - [PostGIS](https://postgis.net/documentation/)
 - [Prisma transactions](https://www.prisma.io/docs/orm/prisma-client/queries/transactions)
 - [Razorpay developer documentation](https://razorpay.com/docs/)
-- [MSG91 OTP documentation](https://docs.msg91.com/otp-widget)
 - [Amazon SES documentation](https://docs.aws.amazon.com/ses/)
+- [Cloudinary upload documentation](https://cloudinary.com/documentation/upload_images)
+- [TRAI advice to senders](https://trai.gov.in/advice-to-senders)
 - [Google Maps Platform documentation](https://developers.google.com/maps/documentation)
 - [Google Event structured data](https://developers.google.com/search/docs/appearance/structured-data/event)
 
