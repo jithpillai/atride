@@ -114,8 +114,8 @@ PostgreSQL     Redis           External services
 | Backend/API | Next.js route handlers and TypeScript application services on Node.js |
 | Database | PostgreSQL with PostGIS |
 | ORM/migrations | Prisma ORM |
-| Cache, OTP state, and queue | Redis with BullMQ |
-| Authentication | Auth.js sessions with @Ride OTP verification |
+| Cache, distributed throttling, and queue | Redis with BullMQ when required by scale |
+| Authentication | Application-owned email OTP and opaque PostgreSQL sessions |
 | Images and media | Cloudinary initially |
 | Maps and geocoding | Google Maps Platform |
 | Online payments | Per-community Razorpay integration |
@@ -166,9 +166,9 @@ The detailed documents are authoritative for their subjects. The root README int
 
 ## Delivery status
 
-Development is active on the `develop` branch, and `atride.in` is live on Vercel. The initial Next.js foundation includes a populated marketplace, city filters, path-based public and private Guild pages, ride detail pages, SEO routes, a health endpoint, and a mock email-OTP UI flow. These discovery pages read through tenant-scoped Prisma repositories backed by Neon PostgreSQL/PostGIS, with an initial migration, database constraints, and repeatable demonstration seeds in place.
+Development is active on the `develop` branch, and `atride.in` is live on Vercel. Phase 1 provides a populated marketplace, city filters, path-based public and private Guild pages, ride detail pages, SEO routes, and a health endpoint. Phase 2 identity work has started with database-backed email OTP challenges, secure opaque sessions, logout, an account page, and protected platform/Guild role boundaries. Discovery pages read through tenant-scoped Prisma repositories backed by Neon PostgreSQL/PostGIS, with migrations, database constraints, and repeatable demonstration seeds in place.
 
-Amazon SES domain authentication and sandbox access are configured; production-access approval is pending. The remaining Phase 0 foundation work is CI and operational hardening. Provider-backed SMS, maps, media, Redis workers, and payments remain deliberately deferred behind development flows.
+Amazon SES domain authentication and sandbox access are configured; production-access approval is pending. Email OTP delivery supports a local mock and an SES v2 HTTPS adapter with narrowly scoped credentials. The remaining Phase 0 foundation work is CI and operational hardening. Provider-backed SMS, maps, media, Redis workers, and payments remain deliberately deferred behind development flows.
 
 ## Product principles
 
