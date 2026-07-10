@@ -42,19 +42,29 @@ export default async function HomePage() {
       <section className="relative isolate overflow-hidden border-b border-white/8">
         <div className="absolute inset-0 -z-20 bg-[radial-gradient(circle_at_78%_24%,rgba(255,90,24,.24),transparent_22rem),radial-gradient(circle_at_10%_10%,rgba(54,89,104,.18),transparent_24rem)]" />
         <div className="absolute inset-0 -z-10 opacity-[.08] [background-image:linear-gradient(rgba(255,255,255,.2)_1px,transparent_1px),linear-gradient(90deg,rgba(255,255,255,.2)_1px,transparent_1px)] [background-size:64px_64px]" />
-        <div className="mx-auto grid min-h-[720px] max-w-7xl items-center gap-12 px-5 py-20 lg:grid-cols-[1.05fr_.95fr] lg:px-8">
+        <div className="mx-auto grid min-h-[720px] max-w-7xl items-center gap-12 px-5 py-14 lg:grid-cols-[1.05fr_.95fr] lg:px-8 lg:py-16">
           <div>
             <div className="inline-flex items-center gap-2 rounded-full border border-orange-500/25 bg-orange-500/10 px-4 py-2 text-xs font-bold uppercase tracking-[.15em] text-orange-300">
               <span className="size-2 rounded-full bg-orange-400 shadow-[0_0_16px_#fb923c]" />
               Built for the road ahead
             </div>
-            <h1 className="mt-7 max-w-4xl text-5xl font-black leading-[.98] tracking-[-.055em] text-white sm:text-6xl lg:text-7xl">
-              Find your crew.<br />Choose the route.<br /><span className="text-orange-500">Ride together.</span>
+            <Image
+              src="/brand/hero-domain-lockup-dark.png"
+              alt="AtRide.in"
+              width={1536}
+              height={1024}
+              className="mb-3 mt-5 block h-auto w-full max-w-[15rem] sm:max-w-[17rem] lg:max-w-[19rem]"
+              priority
+            />
+            <h1 className="max-w-xl font-black leading-[1.02] tracking-[-.045em] text-white">
+              <span className="block text-4xl sm:text-[2.5rem] lg:text-[2.75rem]">Find your crew.</span>
+              <span className="block text-4xl sm:text-[2.5rem] lg:text-[2.75rem]">Choose the route.</span>
+              <span className="mt-2 block text-4xl text-orange-500 sm:text-5xl lg:text-6xl">Ride together.</span>
             </h1>
-            <p className="mt-7 max-w-xl text-lg leading-8 text-zinc-300">
+            <p className="mt-5 max-w-xl text-lg leading-8 text-zinc-300">
               Discover trusted riding communities, reserve a place on their next adventure, and keep every mile organized in one shared home.
             </p>
-            <div className="mt-9 flex flex-wrap gap-4">
+            <div className="mt-7 flex flex-wrap gap-4">
               <Link href="#rides" className="rounded-full bg-orange-500 px-7 py-3.5 text-sm font-black text-white shadow-xl shadow-orange-950/40 transition hover:-translate-y-0.5 hover:bg-orange-400">
                 Explore upcoming rides
               </Link>
@@ -62,7 +72,7 @@ export default async function HomePage() {
                 Browse Guilds
               </Link>
             </div>
-            <div className="mt-12 grid max-w-xl grid-cols-3 divide-x divide-white/10 rounded-2xl border border-white/10 bg-black/20 py-5 backdrop-blur">
+            <div className="mt-8 grid max-w-xl grid-cols-3 divide-x divide-white/10 rounded-2xl border border-white/10 bg-black/20 py-5 backdrop-blur">
               <div className="px-4"><p className="text-2xl font-black">{Math.max(0, cities.length - 1)}</p><p className="mt-1 text-xs text-zinc-500">Launch cities</p></div>
               <div className="px-4"><p className="text-2xl font-black">{rides.length}</p><p className="mt-1 text-xs text-zinc-500">Upcoming rides</p></div>
               <div className="px-4"><p className="text-2xl font-black">1</p><p className="mt-1 text-xs text-zinc-500">Common account</p></div>

@@ -28,7 +28,7 @@ When WhatsApp is enabled, `ANNOUNCEMENTS_ONLY` is the recommended default. The o
 - Invite links require protected storage, access control, expiry, and privacy disclosure.
 - Opening an invite link cannot be treated as verified group membership.
 - External group moderation remains the community's responsibility.
-- Official announcements can fan out through in-app, email, and SMS.
+- Official announcements fan out through in-app and email initially; an approved optional SMS adapter may be added later.
 - A future official WhatsApp adapter can be added behind the communication-channel interface if API limits and eligibility become suitable.
 
 ## Alternatives considered

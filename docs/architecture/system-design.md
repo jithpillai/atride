@@ -30,7 +30,8 @@ Participants             Community staff                 @Ride staff
        |                       |                        |
        v                       v                        v
  Community Razorpay      Communication services    Maps and media
- accounts                MSG91 + Amazon SES         Google + Cloudinary
+ accounts                In-app + Amazon SES        Google + Cloudinary
+                         SMS deferred
                                |
                                v
                     @Ride application platform
@@ -65,7 +66,7 @@ TypeScript on Node.js
              |                   |                 |
              v                   v                 v
      PostgreSQL/PostGIS        Redis        External providers
-     authoritative data     cache/OTP/queue  Razorpay/MSG91/SES/
+     authoritative data     cache/OTP/queue  Razorpay/SES/
                                              Maps/Cloudinary
              ^                   |
              |                   v
@@ -93,7 +94,7 @@ The request-response application handles interactive web and API traffic. The wo
 | Queue | BullMQ | Delayed and asynchronous work |
 | Media | Cloudinary initially | Images, transformations, and protected proof uploads |
 | Payments | Razorpay SDK/API | Community-owned online checkout and webhooks |
-| SMS | MSG91 | Phone OTP and transactional SMS |
+| SMS | Disabled initially | Optional compliant post-launch adapter |
 | Email | Amazon SES | Email OTP and transactional email |
 | Maps | Google Maps Platform | Places, geocoding, maps, and route display |
 | Live updates | Server-Sent Events initially | Participant ride-progress updates |
@@ -178,7 +179,7 @@ Repositories use Prisma and require tenant context for tenant-owned records. Raw
 
 ```text
 PaymentGateway       Razorpay implementation
-SmsProvider          MSG91 implementation
+SmsProvider          Disabled implementation; compliant provider optional later
 EmailProvider        Amazon SES implementation
 MediaProvider        Cloudinary implementation
 MapsProvider         Google Maps implementation
@@ -473,10 +474,20 @@ PostgreSQL/PostGIS is authoritative. Redis stores only short-lived or recomputab
 - `ride_group_staff`
 - `ride_route_segments`
 - `ride_checkpoints`
+- `ride_itinerary_days`
+- `ride_itinerary_items`
+- `ride_accommodations`
+- `ride_accommodation_amenities`
+- `ride_meals`
+- `ride_activities`
 - `ride_pricing_options`
+- `ride_payment_schedules`
 - `ride_vehicle_policies`
 - `ride_inclusions`
+- `ride_exclusions`
 - `ride_addons`
+- `ride_rule_sets`
+- `ride_policy_versions`
 - `ride_status_history`
 
 ### 10.4 Bookings and payments
@@ -484,6 +495,9 @@ PostgreSQL/PostGIS is authoritative. Redis stores only short-lived or recomputab
 - `bookings`
 - `booking_participants`
 - `booking_price_snapshots`
+- `booking_package_snapshots`
+- `booking_policy_acceptances`
+- `booking_preferences`
 - `booking_status_history`
 - `capacity_reservations`
 - `waitlist_entries`
@@ -594,7 +608,7 @@ This avoids losing a message after a successful booking commit and avoids callin
 
 ## 13. Authentication and OTP
 
-Phone and email are verified independently. Phone verification is required for participant registration; final product policy will determine whether email is also mandatory.
+Email OTP is the required initial authentication method. A phone number may be collected later in profile/booking flows for operational or emergency contact, but it remains explicitly unverified unless the optional compliant SMS phase is implemented. Registration and the launch product do not depend on an SMS provider.
 
 ```text
 Request OTP
@@ -602,7 +616,7 @@ Request OTP
   -> apply IP, session, and destination limits
   -> generate cryptographically secure code
   -> store protected challenge data in Redis with short TTL
-  -> deliver through MSG91 or SES
+  -> deliver through SES email (or the development adapter)
   -> verify with expiry and attempt checks
   -> consume challenge and mark contact verified
 ```
@@ -617,15 +631,15 @@ Controls:
 - No plaintext OTP in database, logs, analytics, or error reports
 - Older challenge invalidation after resend
 
-Development uses a safe mock OTP provider. Staging tests real MSG91 and SES integrations.
+Development uses a safe mock email OTP provider. Staging tests the real SES integration.
 
 ## 14. Notification architecture
 
-@Ride centrally owns communication provider accounts. Communities provide branding, support contacts, and reply-to addresses, not MSG91 or SES secrets.
+@Ride centrally owns communication provider accounts. Communities provide branding, support contacts, and reply-to addresses, not SES or future SMS-provider secrets.
 
 | Channel | Provider | Initial use |
 | --- | --- | --- |
-| SMS | MSG91 | Phone OTP and essential transactional messages |
+| SMS | Disabled initially | Optional final-phase phone OTP/service messages after DLT readiness |
 | Email | Amazon SES | Email OTP and transactional email |
 | In-app | @Ride | Notification center and unread state |
 | WhatsApp group | External/manual in MVP | Optional protected invite link to an organizer-managed group |
@@ -635,7 +649,7 @@ Provider interfaces:
 
 ```text
 OtpProvider
-SmsProvider
+SmsProvider (optional; disabled adapter initially)
 EmailProvider
 ```
 
@@ -695,11 +709,13 @@ RideAnnouncement
 - version
 ```
 
-Announcements and acknowledgement records are tenant-scoped and auditable. Critical messages use the transactional outbox to fan out to in-app, email, and SMS channels without making provider delivery part of the publish transaction.
+Announcements and acknowledgement records are tenant-scoped and auditable. Critical messages use the transactional outbox to fan out to in-app and email channels without making provider delivery part of the publish transaction. An optional SMS adapter may subscribe to approved events only after Phase 12.
 
 ## 15. Media and maps
 
-Cloudinary stores community logos, ride media, route images, galleries, and protected payment proofs. Sensitive media uses authenticated delivery or short-lived signed URLs.
+Cloudinary is the accepted initial media provider. It stores community logos/covers/galleries, ride media, route images, user avatars, and protected payment proofs. Upload authorization is tenant- and purpose-scoped, browser uploads use short-lived server-signed parameters, and Neon stores only provider identifiers, ownership, dimensions, format, size, access policy, ordering, and audit metadata—not image binaries or expiring delivery URLs.
+
+Public Guild and published-ride media uses CDN delivery and controlled transformations. User avatars are authenticated by default because individual profiles are not public. Payment proofs, incident/evidence media, and identity/vehicle documents use authenticated/private delivery with short-lived signed URLs. Upload policies enforce MIME/format and size limits, automatic resizing/orientation, metadata/EXIF removal, replacement/delete authorization, tenant quotas, and orphan cleanup. A `MediaProvider` adapter preserves the option to move object storage later without changing domain records.
 
 Google Maps uses separate restricted keys for browser and server traffic. Browser keys are restricted by approved origins and APIs; server keys are kept out of the client and restricted according to the deployment. Only required APIs are enabled.
 
