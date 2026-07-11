@@ -3,6 +3,7 @@
 import { FormEvent, useState } from "react";
 import Image from "next/image";
 import Link from "next/link";
+import { PendingOverlay } from "@/components/pending-feedback";
 
 const googleErrors: Record<string, string> = {
   google_cancelled: "Google sign-in was cancelled.",
@@ -18,10 +19,12 @@ export function MockEmailLogin({ returnTo = "/account", googleError }: { returnT
   const [error, setError] = useState("");
   const [developmentCode, setDevelopmentCode] = useState("");
   const [loading, setLoading] = useState(false);
+  const [loadingLabel, setLoadingLabel] = useState("Please wait…");
 
   async function requestOtp(event: FormEvent) {
     event.preventDefault();
     setError("");
+    setLoadingLabel("Sending secure code…");
     setLoading(true);
     try {
       const response = await fetch("/api/auth/email/request", {
@@ -44,6 +47,7 @@ export function MockEmailLogin({ returnTo = "/account", googleError }: { returnT
   async function verifyOtp(event: FormEvent) {
     event.preventDefault();
     setError("");
+    setLoadingLabel("Verifying email…");
     setLoading(true);
     try {
       const response = await fetch("/api/auth/email/verify", {
@@ -62,10 +66,11 @@ export function MockEmailLogin({ returnTo = "/account", googleError }: { returnT
   }
 
   return (
-    <form onSubmit={step === "email" ? requestOtp : verifyOtp} className="rounded-3xl border border-white/10 bg-[#14181f] p-7 shadow-2xl shadow-black/30">
+    <form onSubmit={step === "email" ? requestOtp : verifyOtp} className="relative overflow-hidden rounded-3xl border border-white/10 bg-[#14181f] p-7 shadow-2xl shadow-black/30">
+      <PendingOverlay show={loading} label={loadingLabel} />
       {step === "email" && (
         <>
-          <Link href={`/api/auth/google/start?returnTo=${encodeURIComponent(returnTo)}`} className="flex w-full items-center justify-center gap-3 rounded-2xl border border-white/15 bg-white px-5 py-3.5 text-sm font-black text-zinc-900 transition hover:bg-zinc-100">
+          <Link onClick={() => { setLoadingLabel("Opening Google sign-in…"); setLoading(true); }} href={`/api/auth/google/start?returnTo=${encodeURIComponent(returnTo)}`} className="flex w-full items-center justify-center gap-3 rounded-2xl border border-white/15 bg-white px-5 py-3.5 text-sm font-black text-zinc-900 transition hover:bg-zinc-100">
             <Image src="/brand/google-logo.png" alt="" aria-hidden="true" width={40} height={20} className="h-5 w-10 object-contain" />
             Continue with Google
           </Link>

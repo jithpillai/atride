@@ -39,7 +39,21 @@ export default async function AccountPage() {
         <Link href="/account/profile" className="rounded-3xl border border-white/10 bg-white/[.025] p-7 transition hover:border-orange-400/30 hover:bg-orange-400/[.035]">
           <p className="eyebrow">Participant profile</p>
           <h2 className="mt-3 text-2xl font-black">Personal and ride details</h2>
-          <p className="mt-3 text-sm leading-6 text-zinc-500">{session.user.profile.homeCity} · Phone {session.user.profile.phoneVerifiedAt ? "verified" : "unverified"}</p>
+          <div className="mt-3 flex flex-wrap items-center gap-2 text-sm leading-6">
+            <span className="text-zinc-500">{session.user.profile.homeCity}</span>
+            <span aria-hidden="true" className="text-zinc-700">·</span>
+            {session.user.profile.phoneVerifiedAt ? (
+              <span className="inline-flex items-center gap-1.5 font-semibold text-emerald-400">
+                <span aria-hidden="true" className="inline-grid size-4 place-items-center rounded-full bg-emerald-500 text-[10px] font-black leading-none text-white">✓</span>
+                Phone verified
+              </span>
+            ) : (
+              <span className="inline-flex items-center gap-1.5 font-semibold text-amber-400">
+                <span aria-hidden="true" className="inline-grid size-4 place-items-center rounded-full bg-amber-500 text-[10px] font-black leading-none text-black">!</span>
+                Phone unverified
+              </span>
+            )}
+          </div>
         </Link>
 
         <Link href="/account/vehicles" className="rounded-3xl border border-white/10 bg-white/[.025] p-7 transition hover:border-orange-400/30 hover:bg-orange-400/[.035]">

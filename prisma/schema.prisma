@@ -76,6 +76,16 @@ enum ExternalIdentityProvider {
   GOOGLE
 }
 
+enum PhoneVerificationProvider {
+  FIREBASE
+}
+
+enum PhoneVerificationStatus {
+  PENDING
+  VERIFIED
+  FAILED
+}
+
 enum OtpPurpose {
   SIGN_IN
   ACCOUNT_RECOVERY
@@ -210,14 +220,15 @@ model User {
   createdAt   DateTime   @default(now()) @map("created_at") @db.Timestamptz(3)
   updatedAt   DateTime   @updatedAt @map("updated_at") @db.Timestamptz(3)
 
-  contacts             UserContact[]
-  sessions             Session[]
-  platformRoles        PlatformRoleAssignment[]
-  communityMemberships CommunityMembership[]
-  rideStaffAssignments RideStaffAssignment[]
-  profile              ParticipantProfile?
-  vehicles             Vehicle[]
-  externalIdentities   ExternalIdentity[]
+  contacts                    UserContact[]
+  sessions                    Session[]
+  platformRoles               PlatformRoleAssignment[]
+  communityMemberships        CommunityMembership[]
+  rideStaffAssignments        RideStaffAssignment[]
+  profile                     ParticipantProfile?
+  vehicles                    Vehicle[]
+  externalIdentities          ExternalIdentity[]
+  phoneVerificationChallenges PhoneVerificationChallenge[]
 
   @@map("users")
 }
@@ -239,29 +250,52 @@ model ExternalIdentity {
 }
 
 model ParticipantProfile {
-  id                    String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
-  userId                String    @unique @map("user_id") @db.Uuid
-  homeCity              String?   @map("home_city") @db.VarChar(120)
-  homeState             String?   @map("home_state") @db.VarChar(120)
-  countryCode           String    @default("IN") @map("country_code") @db.Char(2)
-  operationalPhone      String?   @map("operational_phone") @db.VarChar(24)
-  phoneVerifiedAt       DateTime? @map("phone_verified_at") @db.Timestamptz(3)
-  emergencyContactName  String?   @map("emergency_contact_name") @db.VarChar(120)
-  emergencyContactPhone String?   @map("emergency_contact_phone") @db.VarChar(24)
-  emergencyRelationship String?   @map("emergency_relationship") @db.VarChar(80)
-  dietaryPreference     String?   @map("dietary_preference") @db.VarChar(120)
-  bloodGroup            String?   @map("blood_group") @db.VarChar(20)
-  accessibilityNotes    String?   @map("accessibility_notes") @db.Text
-  termsAcceptedAt       DateTime? @map("terms_accepted_at") @db.Timestamptz(3)
-  privacyAcceptedAt     DateTime? @map("privacy_accepted_at") @db.Timestamptz(3)
-  onboardingCompletedAt DateTime? @map("onboarding_completed_at") @db.Timestamptz(3)
-  createdAt             DateTime  @default(now()) @map("created_at") @db.Timestamptz(3)
-  updatedAt             DateTime  @updatedAt @map("updated_at") @db.Timestamptz(3)
+  id                        String                     @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  userId                    String                     @unique @map("user_id") @db.Uuid
+  homeCity                  String?                    @map("home_city") @db.VarChar(120)
+  homeState                 String?                    @map("home_state") @db.VarChar(120)
+  countryCode               String                     @default("IN") @map("country_code") @db.Char(2)
+  operationalPhone          String?                    @map("operational_phone") @db.VarChar(24)
+  phoneVerifiedAt           DateTime?                  @map("phone_verified_at") @db.Timestamptz(3)
+  phoneVerificationProvider PhoneVerificationProvider? @map("phone_verification_provider")
+  emergencyContactName      String?                    @map("emergency_contact_name") @db.VarChar(120)
+  emergencyContactPhone     String?                    @map("emergency_contact_phone") @db.VarChar(24)
+  emergencyRelationship     String?                    @map("emergency_relationship") @db.VarChar(80)
+  dietaryPreference         String?                    @map("dietary_preference") @db.VarChar(120)
+  bloodGroup                String?                    @map("blood_group") @db.VarChar(20)
+  accessibilityNotes        String?                    @map("accessibility_notes") @db.Text
+  termsAcceptedAt           DateTime?                  @map("terms_accepted_at") @db.Timestamptz(3)
+  privacyAcceptedAt         DateTime?                  @map("privacy_accepted_at") @db.Timestamptz(3)
+  onboardingCompletedAt     DateTime?                  @map("onboarding_completed_at") @db.Timestamptz(3)
+  createdAt                 DateTime                   @default(now()) @map("created_at") @db.Timestamptz(3)
+  updatedAt                 DateTime                   @updatedAt @map("updated_at") @db.Timestamptz(3)
 
   user User @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@index([homeCity])
   @@map("participant_profiles")
+}
+
+model PhoneVerificationChallenge {
+  id              String                    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  userId          String                    @map("user_id") @db.Uuid
+  provider        PhoneVerificationProvider @default(FIREBASE)
+  status          PhoneVerificationStatus   @default(PENDING)
+  normalizedPhone String                    @map("normalized_phone") @db.VarChar(24)
+  tokenHash       String                    @unique @map("token_hash") @db.VarChar(128)
+  requestIpHash   String?                   @map("request_ip_hash") @db.VarChar(128)
+  attemptCount    Int                       @default(0) @map("attempt_count")
+  maxAttempts     Int                       @default(5) @map("max_attempts")
+  expiresAt       DateTime                  @map("expires_at") @db.Timestamptz(3)
+  consumedAt      DateTime?                 @map("consumed_at") @db.Timestamptz(3)
+  createdAt       DateTime                  @default(now()) @map("created_at") @db.Timestamptz(3)
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId, status, createdAt])
+  @@index([normalizedPhone, createdAt])
+  @@index([expiresAt])
+  @@map("phone_verification_challenges")
 }
 
 model Vehicle {

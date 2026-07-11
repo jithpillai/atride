@@ -173,7 +173,9 @@ It can render public details plus protected participant panels. Operational acti
 
 - OTPs expire, are one-time use, and have resend/attempt limits.
 - Phone numbers and email addresses are normalized.
-- The initial release does not claim that a phone number is verified; phone verification remains a later optional capability.
+- A saved operational phone may be verified once through Firebase Phone Authentication; this is optional during registration.
+- Verification proves recent control of the number, not real-world identity or permanent ownership.
+- Changing the operational phone immediately removes its verified status and requires a new verification.
 - Verification confirms control of the destination, not real-world identity.
 - Recovery flows do not disclose whether an account exists.
 
@@ -586,7 +588,7 @@ Exact live location is never public or indexable. Access expires according to po
 
 - Email OTP through Amazon SES
 - Account recovery or security notice
-- Optional phone OTP only after the post-launch Indian SMS phase is approved and compliant
+- Optional one-time Firebase phone-verification code for a saved operational number
 
 ### UC-24: Receive booking and payment messages
 

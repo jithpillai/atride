@@ -61,11 +61,30 @@ export async function updateProfile(previousState: ProfileFormState, formData: F
       revision: previousState.revision + 1,
     };
   }
+  const data = validation.data;
 
-  await db.$transaction([
-    db.user.update({ where: { id: session.userId }, data: { displayName: validation.data.displayName } }),
-    db.participantProfile.update({ where: { userId: session.userId }, data: validation.data.profile }),
-  ]);
+  await db.$transaction(async (tx) => {
+    const existing = await tx.participantProfile.findUnique({
+      where: { userId: session.userId },
+      select: { operationalPhone: true },
+    });
+    const phoneChanged = existing?.operationalPhone !== data.profile.operationalPhone;
+    await tx.user.update({ where: { id: session.userId }, data: { displayName: data.displayName } });
+    await tx.participantProfile.update({
+      where: { userId: session.userId },
+      data: {
+        ...data.profile,
+        ...(phoneChanged ? { phoneVerifiedAt: null, phoneVerificationProvider: null } : {}),
+      },
+    });
+    if (phoneChanged) {
+      await tx.userContact.deleteMany({ where: { userId: session.userId, type: "PHONE" } });
+      await tx.phoneVerificationChallenge.updateMany({
+        where: { userId: session.userId, status: "PENDING" },
+        data: { status: "FAILED", consumedAt: new Date() },
+      });
+    }
+  });
 
   revalidatePath("/account");
   revalidatePath("/account/profile");

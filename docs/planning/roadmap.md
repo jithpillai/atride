@@ -109,6 +109,7 @@ Build:
 - Email OTP verification
 - Login, logout, recovery, and session management
 - Participant profile and generic vehicle garage
+- Optional Firebase verification of a saved operational phone, with number-change invalidation
 - Platform, community, and ride-level roles
 - Staff invitation acceptance
 - Authenticated `Your upcoming rides` landing-page container and protected query contract
@@ -120,7 +121,8 @@ Acceptance tests:
 
 - A participant can register and verify a mocked email OTP.
 - Registration does not depend on an SMS provider or a verified phone number.
-- A phone number collected for booking/emergency contact is clearly marked unverified until an approved verification method exists.
+- A saved phone is unverified by default and can be verified through Firebase without changing @Ride login/session semantics.
+- Changing a verified phone clears verification and requires a new one-time verification.
 - A participant cannot access community administration.
 - A Royal Ravanas administrator cannot administer Wild Gear.
 - An invited captain can accept the invitation.
@@ -134,7 +136,7 @@ Acceptance tests:
 External accounts needed:
 
 - Not required for initial implementation; use an on-screen development OTP and Mailpit for local email.
-- Amazon SES sandbox is used for staging email integration; no SMS or DLT account is required.
+- Amazon SES handles email. Firebase Phone Authentication and billing are required only to test optional phone verification; no @Ride DLT sender or service-SMS account is required.
 
 ### Phase 3 — Community administration
 
@@ -707,6 +709,15 @@ SENTRY_AUTH_TOKEN
 RAZORPAY_TEST_KEY_ID
 RAZORPAY_TEST_KEY_SECRET
 RAZORPAY_TEST_WEBHOOK_SECRET
+
+# Firebase is used only for optional phone ownership verification
+NEXT_PUBLIC_FIREBASE_API_KEY
+NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN
+NEXT_PUBLIC_FIREBASE_PROJECT_ID
+NEXT_PUBLIC_FIREBASE_APP_ID
+FIREBASE_ADMIN_PROJECT_ID
+FIREBASE_ADMIN_CLIENT_EMAIL
+FIREBASE_ADMIN_PRIVATE_KEY
 
 # Added only if the optional compliant Indian SMS phase is approved
 SMS_PROVIDER

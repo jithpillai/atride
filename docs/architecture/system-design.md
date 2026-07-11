@@ -121,6 +121,8 @@ Dependency versions will be pinned during Phase 0. External provider packages mu
 
 React Server Components render public pages and initial dashboard data. Client Components are limited to interaction-heavy features such as forms, filters, maps, uploads, and live progress.
 
+Every user-initiated mutation must expose an immediate pending state. Server-action forms use the shared pending-submit primitive to disable repeat submission and mask the affected card or form until navigation or completion. Client API calls use the shared pending overlay plus a disabled initiating control. Pending copy describes the operation, remains accessible through `aria-live`/`aria-busy`, and is always followed by an explicit success, redirect, or retryable error state. New mutation UI is incomplete until this behavior is implemented and tested.
+
 ### 5.2 HTTP/API
 
 Next.js route handlers expose JSON-over-HTTPS endpoints for web clients, provider callbacks, and a future mobile application. GraphQL is not required initially.
@@ -614,7 +616,7 @@ This avoids losing a message after a successful booking commit and avoids callin
 
 ## 13. Authentication and OTP
 
-Email OTP is the required initial authentication method. A phone number may be collected later in profile/booking flows for operational or emergency contact, but it remains explicitly unverified unless the optional compliant SMS phase is implemented. Registration and the launch product do not depend on an SMS provider.
+Email OTP and Google OpenID Connect are the account authentication methods. A saved operational phone may optionally be verified once with Firebase Phone Authentication. Firebase proves control of the phone number but does not issue the @Ride application session or become an account database. Registration remains usable without phone verification, and ride/service SMS remains disabled.
 
 ```text
 Request OTP
@@ -643,6 +645,8 @@ The SES adapter uses Signature Version 4 over the SES v2 HTTPS API and send-only
 
 Successful verification issues a high-entropy opaque session token in an `HttpOnly`, `SameSite=Lax`, secure production cookie. PostgreSQL stores only the token digest, expiry, last-seen time, and optional revocation time. Protected requests load current role assignments from authoritative data so role revocation is immediate. Redis may later provide distributed request throttling, but it is not required for the initial session or OTP semantics. See [ADR-013](decisions/ADR-013-opaque-database-sessions.md).
 
+Firebase phone verification starts only for an authenticated user and a phone already saved on that user's profile. @Ride creates a short-lived, hashed, single-use challenge before the browser invokes Firebase reCAPTCHA/SMS. The confirmation API validates the Firebase ID-token signature and revocation state, requires a recent `phone` authentication, compares its trusted `phone_number` claim with both the challenge and current profile, and then atomically records `phoneVerifiedAt`, provider, a unique `PHONE` contact, and challenge consumption. Changing the profile phone clears these records and invalidates pending challenges. See [ADR-014](decisions/ADR-014-firebase-phone-verification.md).
+
 Google OpenID Connect is an additional identity proof, not a separate account system. The authorization-code flow uses state, nonce, S256 PKCE, an encrypted short-lived `HttpOnly` flow cookie, exact redirect-URI matching, and Google signing-key verification. Only `openid email profile` scopes are requested. A new Google subject is linked to an existing AtRide user when Google supplies the same verified email; otherwise one common user is created. AtRide stores the stable provider subject and email-at-link but does not retain Google access or refresh tokens.
 
 ## 14. Notification architecture
@@ -651,7 +655,8 @@ Google OpenID Connect is an additional identity proof, not a separate account sy
 
 | Channel | Provider | Initial use |
 | --- | --- | --- |
-| SMS | Disabled initially | Optional final-phase phone OTP/service messages after DLT readiness |
+| Phone verification SMS | Firebase | Optional one-time verification of a saved Indian operational number |
+| Ride/service SMS | Disabled initially | Optional final-phase messages after DLT readiness |
 | Email | Amazon SES | Email OTP and transactional email |
 | In-app | @Ride | Notification center and unread state |
 | WhatsApp group | External/manual in MVP | Optional protected invite link to an organizer-managed group |
