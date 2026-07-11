@@ -40,7 +40,7 @@ function optional(value: string) {
   return value || null;
 }
 
-function normalizePhone(value: string) {
+export function normalizePhone(value: string) {
   const normalized = value.replace(/[\s()-]/g, "");
   if (!normalized) return null;
   if (/^\d{10}$/.test(normalized)) return `+91${normalized}`;
@@ -48,7 +48,7 @@ function normalizePhone(value: string) {
   return normalized;
 }
 
-function validPhone(value: string | null) {
+export function validPhone(value: string | null) {
   return value === null || /^\+[1-9]\d{7,14}$/.test(value);
 }
 

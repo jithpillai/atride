@@ -115,12 +115,12 @@ PostgreSQL     Redis           External services
 | Database | PostgreSQL with PostGIS |
 | ORM/migrations | Prisma ORM |
 | Cache, distributed throttling, and queue | Redis with BullMQ when required by scale |
-| Authentication | Google OpenID Connect plus email OTP and opaque PostgreSQL sessions |
+| Authentication | Google OpenID Connect plus email OTP and opaque PostgreSQL sessions; Firebase only for phone ownership verification |
 | Images and media | Cloudinary initially |
 | Maps and geocoding | Google Maps Platform |
 | Online payments | Per-community Razorpay integration |
 | Authentication OTP | Amazon SES email OTP initially |
-| SMS | Optional post-launch integration after Indian DLT readiness |
+| SMS | Firebase one-time phone verification only; ride/service SMS remains deferred |
 | Email | Amazon SES |
 | Live progress | Server-Sent Events initially |
 | Monitoring | Sentry and structured application logs |
@@ -166,9 +166,9 @@ The detailed documents are authoritative for their subjects. The root README int
 
 ## Delivery status
 
-Development is active on the `develop` branch, and `atride.in` is live on Vercel. Phase 1 provides a populated marketplace, city filters, path-based public and private Guild pages, ride detail pages, SEO routes, and a health endpoint. Phase 2 includes Google OpenID Connect and email OTP sign-in, secure opaque sessions, logout, first-login onboarding, private participant profiles, a bike-first vehicle garage, and protected platform/Guild role boundaries. Discovery pages read through tenant-scoped Prisma repositories backed by Neon PostgreSQL/PostGIS, with migrations, database constraints, and repeatable demonstration seeds in place.
+Development is active on the `develop` branch, and `atride.in` is live on Vercel. Phase 1 provides a populated marketplace, city filters, path-based public and private Guild pages, ride detail pages, SEO routes, and a health endpoint. Phase 2 includes Google OpenID Connect and email OTP sign-in, secure opaque sessions, logout, first-login onboarding, private participant profiles, optional one-time Firebase phone verification, a bike-first vehicle garage, and protected platform/Guild role boundaries. Discovery pages read through tenant-scoped Prisma repositories backed by Neon PostgreSQL/PostGIS, with migrations, database constraints, and repeatable demonstration seeds in place.
 
-Amazon SES domain authentication and sandbox access are configured; production-access approval is pending. Email OTP delivery supports a local mock and an SES v2 HTTPS adapter with narrowly scoped credentials. The remaining Phase 0 foundation work is CI and operational hardening. Provider-backed SMS, maps, media, Redis workers, and payments remain deliberately deferred behind development flows.
+Amazon SES domain authentication and sandbox access are configured; production-access approval is pending. Email OTP delivery supports a local mock and an SES v2 HTTPS adapter with narrowly scoped credentials. Firebase is scoped to one-time ownership verification of a saved operational phone. The remaining Phase 0 foundation work is CI and operational hardening. Ride/service SMS, maps, media, Redis workers, and payments remain deliberately deferred behind development flows.
 
 ## Product principles
 
@@ -217,7 +217,7 @@ pnpm test
 pnpm build
 ```
 
-The demonstration fixture remains the repeatable database seed source, while production UI reads go through tenant-scoped Prisma repositories. Redis and Mailpit are introduced behind application-owned adapters as their phases require them. Email, maps, storage, and Razorpay use development adapters so provider accounts do not block the first phases. SMS is disabled and is not a launch dependency.
+The demonstration fixture remains the repeatable database seed source, while production UI reads go through tenant-scoped Prisma repositories. Redis and Mailpit are introduced behind application-owned adapters as their phases require them. Email, maps, storage, and Razorpay use development adapters so provider accounts do not block the first phases. Ride/service SMS is disabled and is not a launch dependency; Firebase sends only optional one-time phone-verification codes.
 
 Example local tenant URLs:
 

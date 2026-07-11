@@ -1,4 +1,5 @@
 import type { ProfileFormErrors, ProfileFormValues } from "@/server/profile/validation";
+import { PhoneVerificationControl } from "@/components/phone-verification-control";
 
 const baseInputClass = "mt-2 w-full rounded-2xl border bg-black/20 px-4 py-3 text-white outline-none transition placeholder:text-zinc-600";
 
@@ -30,9 +31,15 @@ const bloodGroups = [
   ["UNKNOWN", "Don't know"], ["PREFER_NOT_TO_SAY", "Prefer not to say"],
 ];
 
-type Props = { values: ProfileFormValues; errors?: ProfileFormErrors };
+type Props = {
+  values: ProfileFormValues;
+  errors?: ProfileFormErrors;
+  mode: "onboarding" | "edit";
+  savedPhone?: string | null;
+  phoneVerifiedAt?: Date | string | null;
+};
 
-export function ProfileFields({ values, errors = {} }: Props) {
+export function ProfileFields({ values, errors = {}, mode, savedPhone = "", phoneVerifiedAt }: Props) {
   const errorProps = (name: keyof ProfileFormValues) => ({
     "aria-invalid": errors[name] ? true as const : undefined,
     "aria-describedby": errors[name] ? `${name}-error` : undefined,
@@ -43,7 +50,7 @@ export function ProfileFields({ values, errors = {} }: Props) {
       <label className="text-sm font-semibold text-zinc-200">Display name<input required minLength={2} maxLength={120} name="displayName" defaultValue={values.displayName} className={fieldClass(Boolean(errors.displayName))} {...errorProps("displayName")} /><FieldError name="displayName" errors={errors} /></label>
       <label className="text-sm font-semibold text-zinc-200">Home city<input required minLength={2} maxLength={120} name="homeCity" defaultValue={values.homeCity} placeholder="Bengaluru" className={fieldClass(Boolean(errors.homeCity))} {...errorProps("homeCity")} /><FieldError name="homeCity" errors={errors} /></label>
       <label className="text-sm font-semibold text-zinc-200">State<input maxLength={120} name="homeState" defaultValue={values.homeState} placeholder="Karnataka" className={fieldClass(Boolean(errors.homeState))} {...errorProps("homeState")} /><FieldError name="homeState" errors={errors} /></label>
-      <label className="text-sm font-semibold text-zinc-200">Phone number <span className="font-normal text-amber-400">· Unverified</span><input type="tel" inputMode="tel" maxLength={24} name="operationalPhone" defaultValue={values.operationalPhone} placeholder="9000000001" className={fieldClass(Boolean(errors.operationalPhone))} {...errorProps("operationalPhone")} /><span className="mt-1.5 block text-xs font-normal text-zinc-600">Indian 10-digit numbers get +91 automatically. Used only for booked-ride operations.</span><FieldError name="operationalPhone" errors={errors} /></label>
+      <div className="text-sm font-semibold text-zinc-200"><label htmlFor="operationalPhone">Phone number</label><input id="operationalPhone" type="tel" inputMode="tel" maxLength={24} name="operationalPhone" defaultValue={values.operationalPhone} placeholder="9000000001" className={fieldClass(Boolean(errors.operationalPhone))} {...errorProps("operationalPhone")} /><span className="mt-1.5 block text-xs font-normal text-zinc-600">Indian 10-digit numbers get +91 automatically. Used only for booked-ride operations.</span><FieldError name="operationalPhone" errors={errors} /><PhoneVerificationControl mode={mode} inputId="operationalPhone" savedPhone={savedPhone ?? ""} verifiedAt={phoneVerifiedAt} /></div>
       <label className="text-sm font-semibold text-zinc-200">Emergency contact name<input maxLength={120} name="emergencyContactName" defaultValue={values.emergencyContactName} className={fieldClass(Boolean(errors.emergencyContactName))} {...errorProps("emergencyContactName")} /><FieldError name="emergencyContactName" errors={errors} /></label>
       <label className="text-sm font-semibold text-zinc-200">Emergency contact phone<input type="tel" inputMode="tel" maxLength={24} name="emergencyContactPhone" defaultValue={values.emergencyContactPhone} placeholder="9000000002" className={fieldClass(Boolean(errors.emergencyContactPhone))} {...errorProps("emergencyContactPhone")} /><FieldError name="emergencyContactPhone" errors={errors} /></label>
       <label className="text-sm font-semibold text-zinc-200">Relationship<select name="emergencyRelationship" defaultValue={values.emergencyRelationship} className={fieldClass(Boolean(errors.emergencyRelationship))} {...errorProps("emergencyRelationship")}><option value="">Select relationship</option>{relationships.map(([value, label]) => <option key={value} value={value}>{label}</option>)}</select><FieldError name="emergencyRelationship" errors={errors} /></label>
