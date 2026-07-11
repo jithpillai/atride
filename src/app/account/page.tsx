@@ -1,4 +1,5 @@
 import { redirect } from "next/navigation";
+import Link from "next/link";
 
 import { LogoutButton } from "@/components/logout-button";
 import { getCurrentSession } from "@/server/auth/session";
@@ -8,6 +9,7 @@ export const metadata = { title: "Your account", robots: { index: false, follow:
 export default async function AccountPage() {
   const session = await getCurrentSession();
   if (!session) redirect("/login");
+  if (!session.user.profile?.onboardingCompletedAt) redirect("/onboarding");
 
   const email = session.user.contacts.find((contact) => contact.type === "EMAIL");
 
@@ -34,6 +36,18 @@ export default async function AccountPage() {
       </div>
 
       <div className="mt-10 grid gap-6 md:grid-cols-2">
+        <Link href="/account/profile" className="rounded-3xl border border-white/10 bg-white/[.025] p-7 transition hover:border-orange-400/30 hover:bg-orange-400/[.035]">
+          <p className="eyebrow">Participant profile</p>
+          <h2 className="mt-3 text-2xl font-black">Personal and ride details</h2>
+          <p className="mt-3 text-sm leading-6 text-zinc-500">{session.user.profile.homeCity} · Phone {session.user.profile.phoneVerifiedAt ? "verified" : "unverified"}</p>
+        </Link>
+
+        <Link href="/account/vehicles" className="rounded-3xl border border-white/10 bg-white/[.025] p-7 transition hover:border-orange-400/30 hover:bg-orange-400/[.035]">
+          <p className="eyebrow">Vehicle garage</p>
+          <h2 className="mt-3 text-2xl font-black">Manage your vehicles</h2>
+          <p className="mt-3 text-sm leading-6 text-zinc-500">Add a bike now, with cars and 4×4 vehicles supported by the same garage.</p>
+        </Link>
+
         <article className="rounded-3xl border border-white/10 bg-white/[.025] p-7">
           <p className="eyebrow">Platform access</p>
           <h2 className="mt-3 text-2xl font-black">Roles</h2>

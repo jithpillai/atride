@@ -211,8 +211,55 @@ model User {
   platformRoles        PlatformRoleAssignment[]
   communityMemberships CommunityMembership[]
   rideStaffAssignments RideStaffAssignment[]
+  profile              ParticipantProfile?
+  vehicles             Vehicle[]
 
   @@map("users")
+}
+
+model ParticipantProfile {
+  id                    String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  userId                String    @unique @map("user_id") @db.Uuid
+  homeCity              String?   @map("home_city") @db.VarChar(120)
+  homeState             String?   @map("home_state") @db.VarChar(120)
+  countryCode           String    @default("IN") @map("country_code") @db.Char(2)
+  operationalPhone      String?   @map("operational_phone") @db.VarChar(24)
+  phoneVerifiedAt       DateTime? @map("phone_verified_at") @db.Timestamptz(3)
+  emergencyContactName  String?   @map("emergency_contact_name") @db.VarChar(120)
+  emergencyContactPhone String?   @map("emergency_contact_phone") @db.VarChar(24)
+  emergencyRelationship String?   @map("emergency_relationship") @db.VarChar(80)
+  dietaryPreference     String?   @map("dietary_preference") @db.VarChar(120)
+  accessibilityNotes    String?   @map("accessibility_notes") @db.Text
+  termsAcceptedAt       DateTime? @map("terms_accepted_at") @db.Timestamptz(3)
+  privacyAcceptedAt     DateTime? @map("privacy_accepted_at") @db.Timestamptz(3)
+  onboardingCompletedAt DateTime? @map("onboarding_completed_at") @db.Timestamptz(3)
+  createdAt             DateTime  @default(now()) @map("created_at") @db.Timestamptz(3)
+  updatedAt             DateTime  @updatedAt @map("updated_at") @db.Timestamptz(3)
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([homeCity])
+  @@map("participant_profiles")
+}
+
+model Vehicle {
+  id                String      @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  userId            String      @map("user_id") @db.Uuid
+  type              VehicleType @default(BIKE)
+  nickname          String?     @db.VarChar(80)
+  manufacturer      String      @db.VarChar(100)
+  model             String      @db.VarChar(100)
+  manufactureYear   Int?        @map("manufacture_year") @db.SmallInt
+  color             String?     @db.VarChar(60)
+  registrationLast4 String?     @map("registration_last4") @db.VarChar(4)
+  isPrimary         Boolean     @default(false) @map("is_primary")
+  createdAt         DateTime    @default(now()) @map("created_at") @db.Timestamptz(3)
+  updatedAt         DateTime    @updatedAt @map("updated_at") @db.Timestamptz(3)
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId, type])
+  @@map("vehicles")
 }
 
 model UserContact {

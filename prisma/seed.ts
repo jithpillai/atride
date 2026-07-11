@@ -164,6 +164,53 @@ async function main() {
     upsertIdentity({ email: "rider@atride.test", displayName: "Demo Rider" }),
   ]);
 
+  const seededProfiles = [
+    { user: platformAdmin, homeCity: "Bengaluru", homeState: "Karnataka" },
+    { user: ravanasAdmin, homeCity: "Chennai", homeState: "Tamil Nadu" },
+    { user: wildGearCaptain, homeCity: "Bengaluru", homeState: "Karnataka" },
+    { user: rider, homeCity: "Coimbatore", homeState: "Tamil Nadu" },
+  ];
+  const acceptedAt = new Date();
+  await Promise.all(seededProfiles.map(({ user, homeCity, homeState }) =>
+    prisma.participantProfile.upsert({
+      where: { userId: user.id },
+      create: {
+        userId: user.id,
+        homeCity,
+        homeState,
+        termsAcceptedAt: acceptedAt,
+        privacyAcceptedAt: acceptedAt,
+        onboardingCompletedAt: acceptedAt,
+      },
+      update: {
+        homeCity,
+        homeState,
+        termsAcceptedAt: acceptedAt,
+        privacyAcceptedAt: acceptedAt,
+        onboardingCompletedAt: acceptedAt,
+      },
+    }),
+  ));
+
+  const captainVehicle = await prisma.vehicle.findFirst({
+    where: { userId: wildGearCaptain.id, nickname: "Trail Lead" },
+  });
+  if (!captainVehicle) {
+    await prisma.vehicle.create({
+      data: {
+        userId: wildGearCaptain.id,
+        type: "BIKE",
+        nickname: "Trail Lead",
+        manufacturer: "Adventure Moto",
+        model: "Summit 450",
+        manufactureYear: 2025,
+        color: "Orange",
+        registrationLast4: "450X",
+        isPrimary: true,
+      },
+    });
+  }
+
   await prisma.platformRoleAssignment.upsert({
     where: { userId_role: { userId: platformAdmin.id, role: "PLATFORM_ADMIN" } },
     create: { userId: platformAdmin.id, role: "PLATFORM_ADMIN" },
@@ -226,13 +273,14 @@ async function main() {
     }),
   ]);
 
-  const [communityCount, rideCount, userCount] = await Promise.all([
+  const [communityCount, rideCount, userCount, profileCount] = await Promise.all([
     prisma.community.count(),
     prisma.ride.count(),
     prisma.user.count(),
+    prisma.participantProfile.count(),
   ]);
 
-  console.log(`Seeded ${communityCount} communities, ${rideCount} rides, and ${userCount} users.`);
+  console.log(`Seeded ${communityCount} communities, ${rideCount} rides, ${userCount} users, and ${profileCount} profiles.`);
 }
 
 main()

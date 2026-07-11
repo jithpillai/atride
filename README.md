@@ -166,7 +166,7 @@ The detailed documents are authoritative for their subjects. The root README int
 
 ## Delivery status
 
-Development is active on the `develop` branch, and `atride.in` is live on Vercel. Phase 1 provides a populated marketplace, city filters, path-based public and private Guild pages, ride detail pages, SEO routes, and a health endpoint. Phase 2 identity work has started with database-backed email OTP challenges, secure opaque sessions, logout, an account page, and protected platform/Guild role boundaries. Discovery pages read through tenant-scoped Prisma repositories backed by Neon PostgreSQL/PostGIS, with migrations, database constraints, and repeatable demonstration seeds in place.
+Development is active on the `develop` branch, and `atride.in` is live on Vercel. Phase 1 provides a populated marketplace, city filters, path-based public and private Guild pages, ride detail pages, SEO routes, and a health endpoint. Phase 2 includes database-backed email OTP, secure opaque sessions, logout, first-login onboarding, private participant profiles, a bike-first vehicle garage, and protected platform/Guild role boundaries. Discovery pages read through tenant-scoped Prisma repositories backed by Neon PostgreSQL/PostGIS, with migrations, database constraints, and repeatable demonstration seeds in place.
 
 Amazon SES domain authentication and sandbox access are configured; production-access approval is pending. Email OTP delivery supports a local mock and an SES v2 HTTPS adapter with narrowly scoped credentials. The remaining Phase 0 foundation work is CI and operational hardening. Provider-backed SMS, maps, media, Redis workers, and payments remain deliberately deferred behind development flows.
 
