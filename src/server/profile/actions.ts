@@ -5,33 +5,40 @@ import { redirect } from "next/navigation";
 
 import { db } from "@/lib/db";
 import { requireSession } from "@/server/auth/authorization";
-import { parseProfileInput, parseVehicleInput } from "@/server/profile/validation";
+import { parseVehicleInput, validateProfileInput, type ProfileFormState } from "@/server/profile/validation";
 
 function text(formData: FormData, name: string, maxLength: number) {
   return String(formData.get(name) ?? "").trim().slice(0, maxLength);
 }
 
-export async function completeOnboarding(formData: FormData) {
+export async function completeOnboarding(previousState: ProfileFormState, formData: FormData): Promise<ProfileFormState> {
   const session = await requireSession("/onboarding");
-  const input = parseProfileInput(formData);
-  const acceptsTerms = formData.get("acceptTerms") === "on";
-  const acceptsPrivacy = formData.get("acceptPrivacy") === "on";
-  if (!input || !acceptsTerms || !acceptsPrivacy) redirect("/onboarding?error=invalid");
+  const validation = validateProfileInput(formData);
+  if (!validation.values.acceptTerms) validation.errors.acceptTerms = "Accept the account terms to continue.";
+  if (!validation.values.acceptPrivacy) validation.errors.acceptPrivacy = "Acknowledge the profile privacy policy to continue.";
+  if (!validation.data || Object.keys(validation.errors).length) {
+    return {
+      values: validation.values,
+      errors: validation.errors,
+      message: "Check the highlighted fields. Your entries have been preserved.",
+      revision: previousState.revision + 1,
+    };
+  }
 
   const now = new Date();
   await db.$transaction([
-    db.user.update({ where: { id: session.userId }, data: { displayName: input.displayName } }),
+    db.user.update({ where: { id: session.userId }, data: { displayName: validation.data.displayName } }),
     db.participantProfile.upsert({
       where: { userId: session.userId },
       create: {
         userId: session.userId,
-        ...input.profile,
+        ...validation.data.profile,
         termsAcceptedAt: now,
         privacyAcceptedAt: now,
         onboardingCompletedAt: now,
       },
       update: {
-        ...input.profile,
+        ...validation.data.profile,
         termsAcceptedAt: now,
         privacyAcceptedAt: now,
         onboardingCompletedAt: now,
@@ -43,14 +50,21 @@ export async function completeOnboarding(formData: FormData) {
   redirect("/account?onboarding=complete");
 }
 
-export async function updateProfile(formData: FormData) {
+export async function updateProfile(previousState: ProfileFormState, formData: FormData): Promise<ProfileFormState> {
   const session = await requireSession("/account/profile");
-  const input = parseProfileInput(formData);
-  if (!input) redirect("/account/profile?error=invalid");
+  const validation = validateProfileInput(formData);
+  if (!validation.data) {
+    return {
+      values: validation.values,
+      errors: validation.errors,
+      message: "Check the highlighted fields. Your entries have been preserved.",
+      revision: previousState.revision + 1,
+    };
+  }
 
   await db.$transaction([
-    db.user.update({ where: { id: session.userId }, data: { displayName: input.displayName } }),
-    db.participantProfile.update({ where: { userId: session.userId }, data: input.profile }),
+    db.user.update({ where: { id: session.userId }, data: { displayName: validation.data.displayName } }),
+    db.participantProfile.update({ where: { userId: session.userId }, data: validation.data.profile }),
   ]);
 
   revalidatePath("/account");

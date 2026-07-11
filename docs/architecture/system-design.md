@@ -86,7 +86,7 @@ The request-response application handles interactive web and API traffic. The wo
 | UI | React and Tailwind CSS | Responsive public and operational interfaces |
 | UI primitives | Headless UI and Heroicons | Accessible components and icons |
 | Forms/contracts | React Hook Form and Zod | Client forms and shared input validation |
-| Authentication | Application-owned email OTP and opaque database sessions | Identity, revocation, and secure sessions |
+| Authentication | Google OpenID Connect, email OTP, and opaque database sessions | Identity, account linking, revocation, and secure sessions |
 | Database | PostgreSQL | Authoritative transactional data |
 | Geospatial | PostGIS | Nearby discovery and route/location queries |
 | ORM | Prisma | Typed data access, migrations, and transactions |
@@ -217,7 +217,7 @@ Role badges in the projection are presentation data. Opening a ride invokes fres
 
 ### 5.8 Participant profile and vehicle garage
 
-The global participant profile is private by default and is not a public social profile. It stores home location, an explicitly unverified operational phone, emergency contact, and ride-relevant dietary or accessibility notes. A Guild may receive these fields only through an eligible ride relationship and an authorized operational use case.
+The global participant profile is private by default and is not a public social profile. It stores home location, an explicitly unverified operational phone, emergency contact, canonical relationship/dietary values, optional self-reported blood group, and ride-relevant accessibility or medical notes. A Guild may receive these fields only through an eligible ride relationship and an authorized operational use case. Blood group is labelled unverified emergency-reference data and never substitutes for clinical blood typing or compatibility testing.
 
 The vehicle garage is global to the participant and vehicle-neutral, with `BIKE` selected by default. The initial profile stores only the final two to four registration characters for recognition; a full registration identifier is deferred until field-level encryption and a concrete booking or verification purpose exist. Only one vehicle may be primary, enforced by a database partial unique index.
 
@@ -642,6 +642,8 @@ Development uses a safe mock email OTP provider. Staging tests the real SES inte
 The SES adapter uses Signature Version 4 over the SES v2 HTTPS API and send-only IAM credentials restricted to the `noreply@atride.in` From address. Provider failures invalidate the newly created OTP challenge so a participant can retry instead of being trapped behind the resend cooldown. Codes are never written to application logs, and only the local non-production mock provider may return a development code to the UI. Reserved `.test` identities automatically use this mock outside production so seeded role accounts remain testable while real addresses exercise SES.
 
 Successful verification issues a high-entropy opaque session token in an `HttpOnly`, `SameSite=Lax`, secure production cookie. PostgreSQL stores only the token digest, expiry, last-seen time, and optional revocation time. Protected requests load current role assignments from authoritative data so role revocation is immediate. Redis may later provide distributed request throttling, but it is not required for the initial session or OTP semantics. See [ADR-013](decisions/ADR-013-opaque-database-sessions.md).
+
+Google OpenID Connect is an additional identity proof, not a separate account system. The authorization-code flow uses state, nonce, S256 PKCE, an encrypted short-lived `HttpOnly` flow cookie, exact redirect-URI matching, and Google signing-key verification. Only `openid email profile` scopes are requested. A new Google subject is linked to an existing AtRide user when Google supplies the same verified email; otherwise one common user is created. AtRide stores the stable provider subject and email-at-link but does not retain Google access or refresh tokens.
 
 ## 14. Notification architecture
 

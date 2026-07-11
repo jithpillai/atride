@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { parseProfileInput, parseVehicleInput } from "./validation";
+import { parseProfileInput, parseVehicleInput, validateProfileInput } from "./validation";
 
 function form(values: Record<string, string>) {
   const data = new FormData();
@@ -24,6 +24,44 @@ describe("participant profile validation", () => {
 
   it("rejects an incomplete emergency contact", () => {
     expect(parseProfileInput(form({ displayName: "Priya", homeCity: "Bengaluru", emergencyContactName: "Parent" }))).toBeNull();
+  });
+
+  it("preserves submitted values and identifies only the invalid fields", () => {
+    const result = validateProfileInput(form({
+      displayName: "Jith Pillai",
+      homeCity: "Bengaluru",
+      homeState: "Karnataka",
+      operationalPhone: "123",
+      emergencyContactName: "Divya",
+      emergencyContactPhone: "9000000002",
+      emergencyRelationship: "SPOUSE_PARTNER",
+      dietaryPreference: "NON_VEGETARIAN",
+      bloodGroup: "B_POSITIVE",
+    }));
+
+    expect(result.values).toMatchObject({ displayName: "Jith Pillai", homeState: "Karnataka", bloodGroup: "B_POSITIVE" });
+    expect(result.errors).toEqual({ operationalPhone: "Use a 10-digit Indian number or include an international country code." });
+  });
+
+  it("normalizes Indian 10-digit numbers and canonical dropdown values", () => {
+    const result = parseProfileInput(form({
+      displayName: "Jith Pillai",
+      homeCity: "Bengaluru",
+      operationalPhone: "9000000001",
+      emergencyContactName: "Divya",
+      emergencyContactPhone: "9000000002",
+      emergencyRelationship: "SPOUSE_PARTNER",
+      dietaryPreference: "NON_VEGETARIAN",
+      bloodGroup: "B_POSITIVE",
+    }));
+
+    expect(result?.profile).toMatchObject({
+      operationalPhone: "+919000000001",
+      emergencyContactPhone: "+919000000002",
+      emergencyRelationship: "SPOUSE_PARTNER",
+      dietaryPreference: "NON_VEGETARIAN",
+      bloodGroup: "B_POSITIVE",
+    });
   });
 });
 

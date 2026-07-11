@@ -72,6 +72,10 @@ enum ContactType {
   PHONE
 }
 
+enum ExternalIdentityProvider {
+  GOOGLE
+}
+
 enum OtpPurpose {
   SIGN_IN
   ACCOUNT_RECOVERY
@@ -213,8 +217,25 @@ model User {
   rideStaffAssignments RideStaffAssignment[]
   profile              ParticipantProfile?
   vehicles             Vehicle[]
+  externalIdentities   ExternalIdentity[]
 
   @@map("users")
+}
+
+model ExternalIdentity {
+  id              String                   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  userId          String                   @map("user_id") @db.Uuid
+  provider        ExternalIdentityProvider
+  providerSubject String                   @map("provider_subject") @db.VarChar(255)
+  emailAtLink     String                   @map("email_at_link") @db.VarChar(320)
+  createdAt       DateTime                 @default(now()) @map("created_at") @db.Timestamptz(3)
+  updatedAt       DateTime                 @updatedAt @map("updated_at") @db.Timestamptz(3)
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([provider, providerSubject])
+  @@index([userId, provider])
+  @@map("external_identities")
 }
 
 model ParticipantProfile {
@@ -229,6 +250,7 @@ model ParticipantProfile {
   emergencyContactPhone String?   @map("emergency_contact_phone") @db.VarChar(24)
   emergencyRelationship String?   @map("emergency_relationship") @db.VarChar(80)
   dietaryPreference     String?   @map("dietary_preference") @db.VarChar(120)
+  bloodGroup            String?   @map("blood_group") @db.VarChar(20)
   accessibilityNotes    String?   @map("accessibility_notes") @db.Text
   termsAcceptedAt       DateTime? @map("terms_accepted_at") @db.Timestamptz(3)
   privacyAcceptedAt     DateTime? @map("privacy_accepted_at") @db.Timestamptz(3)

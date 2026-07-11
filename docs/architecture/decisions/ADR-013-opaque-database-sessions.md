@@ -5,7 +5,7 @@
 
 ## Context
 
-@Ride uses passwordless email OTP, one account across Guilds, and server-authoritative platform, Guild, and ride roles. Privileged access must disappear immediately after a role is revoked or a session is terminated. The initial hobby deployment should also avoid adding an authentication dependency that does not simplify this specific flow.
+@Ride uses Google OpenID Connect and passwordless email OTP, one account across Guilds, and server-authoritative platform, Guild, and ride roles. Privileged access must disappear immediately after a role is revoked or a session is terminated. The initial hobby deployment should also avoid adding an authentication dependency that does not simplify this specific flow.
 
 ## Decision
 
@@ -13,7 +13,7 @@ Use application-owned opaque sessions backed by PostgreSQL. After a valid OTP is
 
 Every protected request resolves the active session and current role assignments from authoritative data. Session records have an expiry and revocation timestamp. OTP codes are never stored as plaintext: a challenge-bound HMAC is stored with expiry, resend-cooldown, attempt, and one-time-consumption controls.
 
-The architecture keeps identity and permission services behind application modules so a maintained authentication framework can be adopted later without changing tenant or authorization policies.
+External identity proofs link to the same user record and issue the same opaque session. The architecture keeps identity and permission services behind application modules so a maintained authentication framework can be adopted later without changing tenant or authorization policies.
 
 ## Consequences
 
