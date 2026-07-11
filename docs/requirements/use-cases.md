@@ -186,11 +186,14 @@ It can render public details plus protected participant panels. Operational acti
 - Edit profile and home city
 - Add bikes or other supported vehicles to a vehicle garage
 - Maintain emergency contact
+- Optionally maintain a self-reported blood group for emergency reference
 - Maintain dietary/accessibility preferences
 - Configure notification preferences
 - View memberships, bookings, and waiver history
 
 Sensitive fields must be purpose-limited and access-controlled.
+
+Blood group is optional, self-reported, never public, and visible to authorized ride staff only through an active participant relationship. It is reference information for communicating with emergency responders and must never replace clinical blood typing, antibody screening, or compatibility testing.
 
 ## 5. Community and staff management
 

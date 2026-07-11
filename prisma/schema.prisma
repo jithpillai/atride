@@ -229,6 +229,7 @@ model ParticipantProfile {
   emergencyContactPhone String?   @map("emergency_contact_phone") @db.VarChar(24)
   emergencyRelationship String?   @map("emergency_relationship") @db.VarChar(80)
   dietaryPreference     String?   @map("dietary_preference") @db.VarChar(120)
+  bloodGroup            String?   @map("blood_group") @db.VarChar(20)
   accessibilityNotes    String?   @map("accessibility_notes") @db.Text
   termsAcceptedAt       DateTime? @map("terms_accepted_at") @db.Timestamptz(3)
   privacyAcceptedAt     DateTime? @map("privacy_accepted_at") @db.Timestamptz(3)

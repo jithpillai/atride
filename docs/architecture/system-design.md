@@ -217,7 +217,7 @@ Role badges in the projection are presentation data. Opening a ride invokes fres
 
 ### 5.8 Participant profile and vehicle garage
 
-The global participant profile is private by default and is not a public social profile. It stores home location, an explicitly unverified operational phone, emergency contact, and ride-relevant dietary or accessibility notes. A Guild may receive these fields only through an eligible ride relationship and an authorized operational use case.
+The global participant profile is private by default and is not a public social profile. It stores home location, an explicitly unverified operational phone, emergency contact, canonical relationship/dietary values, optional self-reported blood group, and ride-relevant accessibility or medical notes. A Guild may receive these fields only through an eligible ride relationship and an authorized operational use case. Blood group is labelled unverified emergency-reference data and never substitutes for clinical blood typing or compatibility testing.
 
 The vehicle garage is global to the participant and vehicle-neutral, with `BIKE` selected by default. The initial profile stores only the final two to four registration characters for recognition; a full registration identifier is deferred until field-level encryption and a concrete booking or verification purpose exist. Only one vehicle may be primary, enforced by a database partial unique index.
 
