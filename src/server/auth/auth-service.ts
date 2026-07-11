@@ -59,7 +59,7 @@ export async function requestEmailOtp(emailValue: string, ipAddress?: string) {
 
   let provider: ReturnType<typeof getEmailProvider>;
   try {
-    provider = getEmailProvider();
+    provider = getEmailProvider(email);
     await provider.sendOtp({ to: email, code, expiresInMinutes: OTP_TTL_SECONDS / 60 });
   } catch (error) {
     await db.otpChallenge.deleteMany({ where: { id, consumedAt: null } });
@@ -146,5 +146,10 @@ export async function verifyEmailOtp(emailValue: string, code: string) {
     return account;
   });
 
-  return { user, token, expiresAt };
+  const profile = await db.participantProfile.findUnique({
+    where: { userId: user.id },
+    select: { onboardingCompletedAt: true },
+  });
+
+  return { user, token, expiresAt, onboardingRequired: !profile?.onboardingCompletedAt };
 }

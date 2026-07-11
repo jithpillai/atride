@@ -17,6 +17,7 @@ export async function getSessionByToken(token?: string) {
       user: {
         include: {
           contacts: { where: { isPrimary: true } },
+          profile: true,
           platformRoles: true,
           communityMemberships: {
             where: { status: "ACTIVE" },

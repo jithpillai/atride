@@ -42,9 +42,9 @@ export function MockEmailLogin({ returnTo = "/account" }: { returnTo?: string })
         headers: { "content-type": "application/json" },
         body: JSON.stringify({ email, code: otp }),
       });
-      const result = await response.json() as { ok: boolean; message?: string };
+      const result = await response.json() as { ok: boolean; message?: string; onboardingRequired?: boolean };
       if (!response.ok || !result.ok) throw new Error(result.message ?? "Unable to verify the code.");
-      window.location.assign(returnTo);
+      window.location.assign(result.onboardingRequired ? "/onboarding" : returnTo);
     } catch (verifyError) {
       setError(verifyError instanceof Error ? verifyError.message : "Unable to verify the code.");
     } finally {

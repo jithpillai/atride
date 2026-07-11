@@ -20,10 +20,11 @@ const prisma = new PrismaClient({
 });
 
 async function main() {
-  const [communityCount, rideCount, userCount, listedGuilds, privateGuild, platformAdmin, captain, postgis] = await Promise.all([
+  const [communityCount, rideCount, userCount, completedProfileCount, listedGuilds, privateGuild, platformAdmin, captain, postgis] = await Promise.all([
     prisma.community.count(),
     prisma.ride.count(),
     prisma.user.count(),
+    prisma.participantProfile.count({ where: { onboardingCompletedAt: { not: null } } }),
     prisma.community.findMany({
       where: {
         status: "ACTIVE",
@@ -65,6 +66,10 @@ async function main() {
 
   if (userCount < 4) {
     throw new Error(`Expected at least 4 seeded identities, found ${userCount}.`);
+  }
+
+  if (completedProfileCount < 4) {
+    throw new Error(`Expected at least 4 completed demonstration profiles, found ${completedProfileCount}.`);
   }
 
   if (!platformAdmin?.user.platformRoles.some(({ role }) => role === "PLATFORM_ADMIN")) {

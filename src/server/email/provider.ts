@@ -12,7 +12,10 @@ const mockProvider: EmailProvider = {
   },
 };
 
-export function getEmailProvider(): EmailProvider {
+export function getEmailProvider(destination?: string): EmailProvider {
+  if (process.env.NODE_ENV !== "production" && destination?.toLowerCase().endsWith(".test")) {
+    return mockProvider;
+  }
   const provider = process.env.EMAIL_PROVIDER?.trim().toLowerCase();
   if (provider === "mock") return mockProvider;
   if (provider === "ses") return new SesHttpEmailProvider();

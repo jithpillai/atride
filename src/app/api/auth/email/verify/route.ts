@@ -12,7 +12,11 @@ export async function POST(request: Request) {
       typeof body.email === "string" ? body.email : "",
       typeof body.code === "string" ? body.code : "",
     );
-    const response = NextResponse.json({ ok: true, user: { id: result.user.id, displayName: result.user.displayName } });
+    const response = NextResponse.json({
+      ok: true,
+      user: { id: result.user.id, displayName: result.user.displayName },
+      onboardingRequired: result.onboardingRequired,
+    });
     response.cookies.set(getSessionCookieName(), result.token, {
       httpOnly: true,
       sameSite: "lax",
