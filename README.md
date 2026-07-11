@@ -115,7 +115,7 @@ PostgreSQL     Redis           External services
 | Database | PostgreSQL with PostGIS |
 | ORM/migrations | Prisma ORM |
 | Cache, distributed throttling, and queue | Redis with BullMQ when required by scale |
-| Authentication | Application-owned email OTP and opaque PostgreSQL sessions |
+| Authentication | Google OpenID Connect plus email OTP and opaque PostgreSQL sessions |
 | Images and media | Cloudinary initially |
 | Maps and geocoding | Google Maps Platform |
 | Online payments | Per-community Razorpay integration |
@@ -166,7 +166,7 @@ The detailed documents are authoritative for their subjects. The root README int
 
 ## Delivery status
 
-Development is active on the `develop` branch, and `atride.in` is live on Vercel. Phase 1 provides a populated marketplace, city filters, path-based public and private Guild pages, ride detail pages, SEO routes, and a health endpoint. Phase 2 includes database-backed email OTP, secure opaque sessions, logout, first-login onboarding, private participant profiles, a bike-first vehicle garage, and protected platform/Guild role boundaries. Discovery pages read through tenant-scoped Prisma repositories backed by Neon PostgreSQL/PostGIS, with migrations, database constraints, and repeatable demonstration seeds in place.
+Development is active on the `develop` branch, and `atride.in` is live on Vercel. Phase 1 provides a populated marketplace, city filters, path-based public and private Guild pages, ride detail pages, SEO routes, and a health endpoint. Phase 2 includes Google OpenID Connect and email OTP sign-in, secure opaque sessions, logout, first-login onboarding, private participant profiles, a bike-first vehicle garage, and protected platform/Guild role boundaries. Discovery pages read through tenant-scoped Prisma repositories backed by Neon PostgreSQL/PostGIS, with migrations, database constraints, and repeatable demonstration seeds in place.
 
 Amazon SES domain authentication and sandbox access are configured; production-access approval is pending. Email OTP delivery supports a local mock and an SES v2 HTTPS adapter with narrowly scoped credentials. The remaining Phase 0 foundation work is CI and operational hardening. Provider-backed SMS, maps, media, Redis workers, and payments remain deliberately deferred behind development flows.
 

@@ -12,7 +12,7 @@ Current infrastructure status:
 - SES production-access approval has been requested and is pending.
 - The SES email adapter and branded OTP template are implemented; both the mailbox-simulator smoke test and real OTP delivery to a verified sandbox recipient have passed.
 - SMS is explicitly outside the launch critical path and is deferred to an optional final phase. Maps, media uploads, Redis workers, and payments remain deferred to their delivery phases.
-- Phase 2 is in progress: database-backed email OTP, opaque sessions, account/logout, first-login onboarding, private participant profiles, a vehicle garage, seeded roles, and protected platform/Guild authorization boundaries are implemented. Invitations, personalized upcoming rides, audit events, and distributed abuse controls remain in this phase.
+- Phase 2 is in progress: Google OpenID Connect plus email OTP, opaque sessions, account/logout, first-login onboarding, private participant profiles, a vehicle garage, seeded roles, and protected platform/Guild authorization boundaries are implemented. Invitations, personalized upcoming rides, audit events, and distributed abuse controls remain in this phase.
 
 Related documents:
 

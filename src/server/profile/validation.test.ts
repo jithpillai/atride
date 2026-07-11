@@ -33,7 +33,7 @@ describe("participant profile validation", () => {
       homeState: "Karnataka",
       operationalPhone: "123",
       emergencyContactName: "Divya",
-      emergencyContactPhone: "9741118340",
+      emergencyContactPhone: "9000000002",
       emergencyRelationship: "SPOUSE_PARTNER",
       dietaryPreference: "NON_VEGETARIAN",
       bloodGroup: "B_POSITIVE",
@@ -47,17 +47,17 @@ describe("participant profile validation", () => {
     const result = parseProfileInput(form({
       displayName: "Jith Pillai",
       homeCity: "Bengaluru",
-      operationalPhone: "9595333556",
+      operationalPhone: "9000000001",
       emergencyContactName: "Divya",
-      emergencyContactPhone: "9741118340",
+      emergencyContactPhone: "9000000002",
       emergencyRelationship: "SPOUSE_PARTNER",
       dietaryPreference: "NON_VEGETARIAN",
       bloodGroup: "B_POSITIVE",
     }));
 
     expect(result?.profile).toMatchObject({
-      operationalPhone: "+919595333556",
-      emergencyContactPhone: "+919741118340",
+      operationalPhone: "+919000000001",
+      emergencyContactPhone: "+919000000002",
       emergencyRelationship: "SPOUSE_PARTNER",
       dietaryPreference: "NON_VEGETARIAN",
       bloodGroup: "B_POSITIVE",

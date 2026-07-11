@@ -53,13 +53,13 @@ export default async function HomePage() {
               alt="AtRide.in"
               width={1536}
               height={1024}
-              className="mb-3 mt-5 block h-auto w-full max-w-[15rem] sm:max-w-[17rem] lg:max-w-[19rem]"
+              className="mb-8 mt-5 block h-auto w-full max-w-[15rem] sm:max-w-[17rem] lg:max-w-[19rem]"
               priority
             />
             <h1 className="max-w-xl font-black leading-[1.02] tracking-[-.045em] text-white">
-              <span className="block text-4xl sm:text-[2.5rem] lg:text-[2.75rem]">Find your crew.</span>
-              <span className="block text-4xl sm:text-[2.5rem] lg:text-[2.75rem]">Choose the route.</span>
-              <span className="mt-2 block text-4xl text-orange-500 sm:text-5xl lg:text-6xl">Ride together.</span>
+              <span className="block text-[2rem] sm:text-[2.2rem] lg:text-[2.45rem]">Find your Guild.</span>
+              <span className="block text-[2rem] sm:text-[2.2rem] lg:text-[2.45rem]">Choose the route.</span>
+              <span className="mt-2 block text-[2rem] text-orange-500 sm:text-[2.7rem] lg:text-[3.45rem]">Ride together.</span>
             </h1>
             <p className="mt-5 max-w-xl text-lg leading-8 text-zinc-300">
               Discover trusted riding communities, reserve a place on their next adventure, and keep every mile organized in one shared home.
