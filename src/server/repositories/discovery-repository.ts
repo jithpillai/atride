@@ -5,12 +5,16 @@ import { cache } from "react";
 import type { GuildView, ResolvedGuild, RideView, TenantContext } from "@/domain/discovery";
 import type { Prisma } from "@/generated/prisma/client";
 import { db } from "@/lib/db";
+import { cloudinaryImageUrl } from "@/server/media/cloudinary";
 
 const guildInclude = {
   locations: {
     orderBy: [{ isHome: "desc" }, { city: "asc" }],
   },
   visibility: true,
+  logoAsset: true,
+  coverAsset: true,
+  mediaAssets: { where: { purpose: "GUILD_GALLERY" }, orderBy: [{ sortOrder: "asc" }, { createdAt: "asc" }] },
 } satisfies Prisma.CommunityInclude;
 
 const rideInclude = {
@@ -43,6 +47,9 @@ function toGuildView(guild: GuildRecord): GuildView {
     accent: guild.accentColor,
     gradient: guild.heroGradient,
     specialties: guild.specialties,
+    logoUrl: guild.logoAsset ? cloudinaryImageUrl(guild.logoAsset) : null,
+    coverUrl: guild.coverAsset ? cloudinaryImageUrl(guild.coverAsset) : null,
+    galleryUrls: guild.mediaAssets.map((asset) => cloudinaryImageUrl(asset)),
   };
 }
 

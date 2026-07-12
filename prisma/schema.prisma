@@ -86,6 +86,22 @@ enum PhoneVerificationStatus {
   FAILED
 }
 
+enum MediaPurpose {
+  USER_AVATAR
+  GUILD_LOGO
+  GUILD_COVER
+  GUILD_GALLERY
+  RIDE_COVER
+  RIDE_GALLERY
+  PAYMENT_PROOF
+}
+
+enum MediaAccess {
+  PUBLIC
+  AUTHENTICATED
+  PRIVATE
+}
+
 enum OtpPurpose {
   SIGN_IN
   ACCOUNT_RECOVERY
@@ -136,6 +152,8 @@ model Community {
   accentColor    String          @map("accent_color") @db.VarChar(16)
   heroGradient   String          @map("hero_gradient") @db.Text
   specialties    String[]        @default([])
+  logoAssetId    String?         @unique @map("logo_asset_id") @db.Uuid
+  coverAssetId   String?         @unique @map("cover_asset_id") @db.Uuid
   createdAt      DateTime        @default(now()) @map("created_at") @db.Timestamptz(3)
   updatedAt      DateTime        @updatedAt @map("updated_at") @db.Timestamptz(3)
 
@@ -144,6 +162,9 @@ model Community {
   rides                Ride[]
   memberships          CommunityMembership[]
   rideStaffAssignments RideStaffAssignment[]
+  mediaAssets          MediaAsset[]          @relation("CommunityMedia")
+  logoAsset            MediaAsset?           @relation("CommunityLogo", fields: [logoAssetId], references: [id], onDelete: SetNull)
+  coverAsset           MediaAsset?           @relation("CommunityCover", fields: [coverAssetId], references: [id], onDelete: SetNull)
 
   @@map("communities")
 }
@@ -229,6 +250,7 @@ model User {
   vehicles                    Vehicle[]
   externalIdentities          ExternalIdentity[]
   phoneVerificationChallenges PhoneVerificationChallenge[]
+  uploadedMedia               MediaAsset[]                 @relation("MediaUploader")
 
   @@map("users")
 }
@@ -258,6 +280,7 @@ model ParticipantProfile {
   operationalPhone          String?                    @map("operational_phone") @db.VarChar(24)
   phoneVerifiedAt           DateTime?                  @map("phone_verified_at") @db.Timestamptz(3)
   phoneVerificationProvider PhoneVerificationProvider? @map("phone_verification_provider")
+  avatarAssetId             String?                    @unique @map("avatar_asset_id") @db.Uuid
   emergencyContactName      String?                    @map("emergency_contact_name") @db.VarChar(120)
   emergencyContactPhone     String?                    @map("emergency_contact_phone") @db.VarChar(24)
   emergencyRelationship     String?                    @map("emergency_relationship") @db.VarChar(80)
@@ -270,10 +293,41 @@ model ParticipantProfile {
   createdAt                 DateTime                   @default(now()) @map("created_at") @db.Timestamptz(3)
   updatedAt                 DateTime                   @updatedAt @map("updated_at") @db.Timestamptz(3)
 
-  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+  user        User        @relation(fields: [userId], references: [id], onDelete: Cascade)
+  avatarAsset MediaAsset? @relation("ParticipantAvatar", fields: [avatarAssetId], references: [id], onDelete: SetNull)
 
   @@index([homeCity])
   @@map("participant_profiles")
+}
+
+model MediaAsset {
+  id             String       @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  uploaderUserId String       @map("uploader_user_id") @db.Uuid
+  communityId    String?      @map("community_id") @db.Uuid
+  purpose        MediaPurpose
+  access         MediaAccess  @default(PUBLIC)
+  provider       String       @default("CLOUDINARY") @db.VarChar(32)
+  publicId       String       @unique @map("public_id") @db.VarChar(500)
+  version        Int
+  resourceType   String       @default("image") @map("resource_type") @db.VarChar(32)
+  deliveryType   String       @default("upload") @map("delivery_type") @db.VarChar(32)
+  format         String       @db.VarChar(24)
+  width          Int?
+  height         Int?
+  bytes          Int?
+  sortOrder      Int          @default(0) @map("sort_order")
+  createdAt      DateTime     @default(now()) @map("created_at") @db.Timestamptz(3)
+  updatedAt      DateTime     @updatedAt @map("updated_at") @db.Timestamptz(3)
+
+  uploader  User                @relation("MediaUploader", fields: [uploaderUserId], references: [id], onDelete: Restrict)
+  community Community?          @relation("CommunityMedia", fields: [communityId], references: [id], onDelete: Cascade)
+  avatarFor ParticipantProfile? @relation("ParticipantAvatar")
+  logoFor   Community?          @relation("CommunityLogo")
+  coverFor  Community?          @relation("CommunityCover")
+
+  @@index([communityId, purpose, sortOrder])
+  @@index([uploaderUserId, purpose])
+  @@map("media_assets")
 }
 
 model PhoneVerificationChallenge {

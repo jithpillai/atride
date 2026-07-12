@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import Image from "next/image";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 
@@ -43,7 +44,7 @@ export default async function GuildPage({ params }: Props) {
     return (
       <section className="mx-auto flex min-h-[70vh] max-w-3xl items-center px-5 py-20">
         <div className="w-full rounded-[2rem] border border-violet-400/20 p-9 text-center" style={{ background: guild.gradient }}>
-          <div className="mx-auto grid size-16 place-items-center rounded-2xl border border-white/20 bg-black/25 text-xl font-black">{guild.shortName}</div>
+          {guild.logoUrl ? <Image src={guild.logoUrl} alt={`${guild.name} logo`} width={80} height={80} className="mx-auto size-20 rounded-2xl object-cover" /> : <div className="mx-auto grid size-16 place-items-center rounded-2xl border border-white/20 bg-black/25 text-xl font-black">{guild.shortName}</div>}
           <p className="mt-7 text-xs font-bold uppercase tracking-[.18em] text-violet-200">Private Guild Hall</p>
           <h1 className="mt-3 text-4xl font-black">{guild.name}</h1>
           <p className="mx-auto mt-4 max-w-lg text-sm leading-7 text-white/70">This Guild is unlisted and invite-only. Sign in with an invited account to view its rides and member information.</p>
@@ -58,9 +59,10 @@ export default async function GuildPage({ params }: Props) {
   return (
     <>
       <section className="relative overflow-hidden border-b border-white/10" style={{ background: guild.gradient }}>
+        {guild.coverUrl && <Image src={guild.coverUrl} alt="" fill priority className="object-cover opacity-45" />}
         <div className="absolute inset-0 bg-gradient-to-r from-black/75 via-black/35 to-transparent" />
         <div className="relative mx-auto max-w-7xl px-5 py-24 lg:px-8">
-          <div className="grid size-16 place-items-center rounded-2xl border border-white/25 bg-black/25 text-xl font-black backdrop-blur">{guild.shortName}</div>
+          {guild.logoUrl ? <Image src={guild.logoUrl} alt={`${guild.name} logo`} width={72} height={72} className="size-[4.5rem] rounded-2xl object-cover" /> : <div className="grid size-16 place-items-center rounded-2xl border border-white/25 bg-black/25 text-xl font-black backdrop-blur">{guild.shortName}</div>}
           <p className="mt-8 text-xs font-bold uppercase tracking-[.18em] text-orange-200">Guild Hall · {guild.homeCity}</p>
           <h1 className="mt-3 max-w-3xl text-5xl font-black tracking-[-.05em] sm:text-6xl">{guild.name}</h1>
           <p className="mt-5 max-w-2xl text-lg leading-8 text-white/75">{guild.tagline}</p>
@@ -93,6 +95,8 @@ export default async function GuildPage({ params }: Props) {
           </div>
         </div>
       </section>
+
+      {!!guild.galleryUrls.length && <section className="mx-auto max-w-7xl px-5 pb-16 lg:px-8"><p className="eyebrow">From the road</p><h2 className="mt-3 text-3xl font-black">Guild gallery</h2><div className="mt-6 grid gap-4 sm:grid-cols-2 lg:grid-cols-3">{guild.galleryUrls.map((url, index) => <Image key={url} src={url} alt={`${guild.name} gallery image ${index + 1}`} width={800} height={600} className="aspect-[4/3] w-full rounded-3xl object-cover" />)}</div></section>}
     </>
   );
 }
