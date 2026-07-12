@@ -1,8 +1,8 @@
 "use client";
 
-import Image from "next/image";
 import { useRef, useState } from "react";
 
+import { ImageWithFallback } from "@/components/image-with-fallback";
 import { PendingOverlay } from "@/components/pending-feedback";
 import type { SupportedMediaPurpose } from "@/server/media/policy";
 
@@ -18,6 +18,7 @@ export function MediaUploader({
   label,
   help,
   removeOnly = false,
+  fallbackUrl,
 }: {
   purpose: SupportedMediaPurpose;
   communitySlug?: string;
@@ -25,11 +26,17 @@ export function MediaUploader({
   label: string;
   help: string;
   removeOnly?: boolean;
+  fallbackUrl?: string;
 }) {
   const inputRef = useRef<HTMLInputElement>(null);
   const [busy, setBusy] = useState(false);
   const [busyLabel, setBusyLabel] = useState("Uploading image…");
   const [error, setError] = useState("");
+  const previewClass = purpose === "USER_AVATAR" || purpose === "GUILD_LOGO"
+    ? "aspect-square w-40"
+    : purpose === "GUILD_COVER"
+      ? "aspect-[16/6] w-full max-w-xl"
+      : "aspect-[4/3] w-64 max-w-full";
 
   async function upload() {
     const file = inputRef.current?.files?.[0];
@@ -99,7 +106,7 @@ export function MediaUploader({
       <PendingOverlay show={busy} label={busyLabel} />
       <p className="text-sm font-black text-white">{label}</p>
       <p className="mt-1 text-xs leading-5 text-zinc-500">{help}</p>
-      {currentAsset && <Image src={currentAsset.url} alt={label} width={640} height={360} className="mt-4 max-h-52 w-full rounded-2xl object-cover" />}
+      {(currentAsset?.url || fallbackUrl) && <ImageWithFallback src={currentAsset?.url ?? fallbackUrl!} fallbackSrc={fallbackUrl ?? "/defaults/guild-avatar.png"} alt={currentAsset ? label : `Default ${label.toLowerCase()}`} width={640} height={360} className={`mt-4 rounded-2xl bg-white/[.035] object-contain ${previewClass}`} />}
       {!removeOnly && <input ref={inputRef} type="file" accept="image/jpeg,image/png,image/webp" className="mt-4 block w-full text-xs text-zinc-400 file:mr-3 file:rounded-full file:border-0 file:bg-white/10 file:px-4 file:py-2 file:font-bold file:text-white" />}
       <div className="mt-4 flex flex-wrap gap-2">
         {!removeOnly && <button type="button" onClick={upload} disabled={busy} className="rounded-full bg-orange-500 px-4 py-2 text-xs font-black text-white disabled:opacity-50">{currentAsset ? "Replace image" : "Upload image"}</button>}

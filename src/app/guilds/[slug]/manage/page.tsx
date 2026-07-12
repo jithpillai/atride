@@ -67,8 +67,8 @@ export default async function GuildManagePage({ params, searchParams }: Props) {
 
         <div className="mt-10"><p className="eyebrow">Brand media</p><h2 className="mt-3 text-2xl font-black">Logo, cover, and gallery</h2>
           <div className="mt-6 grid gap-5 md:grid-cols-2">
-            <MediaUploader purpose="GUILD_LOGO" communitySlug={guild.slug} label="Guild logo" help="Square JPEG, PNG, or WebP up to 5 MB." currentAsset={guild.logoAsset ? { id: guild.logoAsset.id, url: cloudinaryImageUrl(guild.logoAsset) } : null} />
-            <MediaUploader purpose="GUILD_COVER" communitySlug={guild.slug} label="Guild cover" help="A wide 16:9 image works best. Up to 10 MB." currentAsset={guild.coverAsset ? { id: guild.coverAsset.id, url: cloudinaryImageUrl(guild.coverAsset) } : null} />
+            <MediaUploader purpose="GUILD_LOGO" communitySlug={guild.slug} label="Guild logo" help="Square JPEG, PNG, or WebP up to 5 MB." fallbackUrl="/defaults/guild-avatar.png" currentAsset={guild.logoAsset ? { id: guild.logoAsset.id, url: cloudinaryImageUrl(guild.logoAsset) } : null} />
+            <MediaUploader purpose="GUILD_COVER" communitySlug={guild.slug} label="Guild cover" help="A wide 16:9 image works best. Up to 10 MB." fallbackUrl="/defaults/guild-hall-cover.png" currentAsset={guild.coverAsset ? { id: guild.coverAsset.id, url: cloudinaryImageUrl(guild.coverAsset) } : null} />
           </div>
           <div className="mt-5"><MediaUploader purpose="GUILD_GALLERY" communitySlug={guild.slug} label="Add gallery image" help="Up to 12 images, 10 MB each." /></div>
           {!!guild.mediaAssets.length && <div className="mt-5 grid gap-4 sm:grid-cols-2 lg:grid-cols-3">{guild.mediaAssets.map((asset, index) => <MediaUploader key={asset.id} purpose="GUILD_GALLERY" communitySlug={guild.slug} label={`Gallery image ${index + 1}`} help="Published in this Guild Hall." currentAsset={{ id: asset.id, url: cloudinaryImageUrl(asset) }} removeOnly />)}</div>}

@@ -2,7 +2,7 @@ import { redirect } from "next/navigation";
 import Link from "next/link";
 
 import { LogoutButton } from "@/components/logout-button";
-import Image from "next/image";
+import { ImageWithFallback } from "@/components/image-with-fallback";
 import { getCurrentSession } from "@/server/auth/session";
 import { cloudinaryImageUrl } from "@/server/media/cloudinary";
 
@@ -21,7 +21,7 @@ export default async function AccountPage() {
         <div>
           <p className="eyebrow">Your AtRide account</p>
           <div className="mt-3 flex items-center gap-4">
-            {session.user.profile.avatarAsset ? <Image src={cloudinaryImageUrl(session.user.profile.avatarAsset)} alt="" width={64} height={64} className="size-16 rounded-2xl object-cover" /> : <div aria-hidden="true" className="grid size-16 place-items-center rounded-2xl bg-orange-500/15 text-xl font-black text-orange-300">{session.user.displayName.slice(0, 1).toUpperCase()}</div>}
+            <ImageWithFallback src={session.user.profile.avatarAsset ? cloudinaryImageUrl(session.user.profile.avatarAsset) : "/defaults/user-avatar.png"} fallbackSrc="/defaults/user-avatar.png" alt="" width={64} height={64} className="size-16 rounded-2xl object-cover" />
             <h1 className="text-4xl font-black tracking-tight text-white">Welcome, {session.user.displayName}</h1>
           </div>
           <div className="mt-2 flex flex-wrap items-center gap-2 text-sm text-zinc-400">

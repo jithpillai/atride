@@ -29,6 +29,7 @@ export default async function ProfilePage({ searchParams }: Props) {
           purpose="USER_AVATAR"
           label="Profile image"
           help="Optional and private by default. JPEG, PNG, or WebP up to 5 MB."
+          fallbackUrl="/defaults/user-avatar.png"
           currentAsset={profile.avatarAsset ? { id: profile.avatarAsset.id, url: cloudinaryImageUrl(profile.avatarAsset, "f_auto,q_auto") } : null}
         />
       </div>
