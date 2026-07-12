@@ -83,6 +83,7 @@ export default async function GuildPage({ params }: Props) {
             <div className="rounded-2xl border border-white/10 p-4"><p className="text-xl font-black">{guild.completedRides}</p><p className="mt-1 text-xs text-zinc-500">Completed</p></div>
             <div className="rounded-2xl border border-white/10 p-4"><p className="text-xl font-black">{guild.foundedYear}</p><p className="mt-1 text-xs text-zinc-500">Founded</p></div>
           </div>
+          {(guild.websiteUrl || guild.instagramUrl || guild.whatsappUrl) && <div className="mt-6 flex flex-wrap gap-3">{guild.websiteUrl && <a href={guild.websiteUrl} target="_blank" rel="noreferrer" className="rounded-full border border-white/15 px-4 py-2 text-xs font-bold">Website</a>}{guild.instagramUrl && <a href={guild.instagramUrl} target="_blank" rel="noreferrer" className="rounded-full border border-white/15 px-4 py-2 text-xs font-bold">Instagram</a>}{guild.whatsappUrl && <a href={guild.whatsappUrl} target="_blank" rel="noreferrer" className="rounded-full border border-white/15 px-4 py-2 text-xs font-bold">WhatsApp</a>}</div>}
         </div>
         <div>
           <div className="flex items-end justify-between"><div><p className="eyebrow">Ride calendar</p><h2 className="mt-2 text-3xl font-black">Upcoming with {guild.shortName}</h2></div><span className="text-sm text-zinc-500">{guildRides.length} published</span></div>

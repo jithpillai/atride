@@ -4,8 +4,9 @@ import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 
 import { db } from "@/lib/db";
-import { requireGuildAdmin, requirePlatformAdmin } from "@/server/auth/authorization";
-import { normalizeEmail } from "@/server/auth/crypto";
+import { requireGuildAdmin, requirePlatformAdmin, requireSession } from "@/server/auth/authorization";
+import { isEmail, normalizeEmail } from "@/server/auth/crypto";
+import { isStaffRole, normalizeOptionalHttpsUrl, parseOperatingCities, type StaffRole } from "@/server/guild/validation";
 
 const RESERVED_SLUGS = new Set(["admin", "api", "account", "login", "onboarding", "rides", "guilds", "www", "support"]);
 
@@ -19,6 +20,10 @@ function validSlug(slug: string) {
 
 function gradient(accent: string) {
   return `linear-gradient(135deg, #101419 0%, ${accent} 58%, #0b0e12 100%)`;
+}
+
+function optionalUrl(formData: FormData, name: string) {
+  return normalizeOptionalHttpsUrl(value(formData, name, 500));
 }
 
 export async function createGuild(formData: FormData) {
@@ -77,7 +82,7 @@ export async function setGuildStatus(formData: FormData) {
 
 export async function updateGuildProfile(formData: FormData) {
   const slug = value(formData, "slug", 80);
-  await requireGuildAdmin(slug);
+  const { session } = await requireGuildAdmin(slug);
   const name = value(formData, "name", 160);
   const shortName = value(formData, "shortName", 12).toUpperCase();
   const tagline = value(formData, "tagline", 240);
@@ -89,6 +94,19 @@ export async function updateGuildProfile(formData: FormData) {
   const specialties = value(formData, "specialties", 500).split(",").map((item) => item.trim()).filter(Boolean).slice(0, 8);
   const directoryVisibility = value(formData, "directoryVisibility", 20);
   const guildHallAccess = value(formData, "guildHallAccess", 30);
+  const operatingCities = parseOperatingCities(value(formData, "operatingCities", 1000), homeCity);
+  let websiteUrl: string | null;
+  let instagramUrl: string | null;
+  let whatsappUrl: string | null;
+  try {
+    websiteUrl = optionalUrl(formData, "websiteUrl");
+    instagramUrl = optionalUrl(formData, "instagramUrl");
+    whatsappUrl = optionalUrl(formData, "whatsappUrl");
+  } catch {
+    redirect(`/guilds/${slug}/manage?error=invalid`);
+  }
+  const newcomerDisplayEnabled = formData.get("newcomerDisplayEnabled") === "on";
+  const awardsDisplayEnabled = formData.get("awardsDisplayEnabled") === "on";
   if (name.length < 3 || shortName.length < 2 || tagline.length < 5 || description.length < 20 || homeCity.length < 2 || !/^#[0-9a-f]{6}$/i.test(accentColor)) redirect(`/guilds/${slug}/manage?error=invalid`);
   if (foundedYear !== null && (!Number.isInteger(foundedYear) || foundedYear < 1900 || foundedYear > new Date().getFullYear())) redirect(`/guilds/${slug}/manage?error=invalid`);
   if (!new Set(["LISTED", "UNLISTED"]).has(directoryVisibility) || !new Set(["PUBLIC", "VERIFIED_USERS", "GUILD_MEMBERS", "INVITE_ONLY"]).has(guildHallAccess)) redirect(`/guilds/${slug}/manage?error=invalid`);
@@ -98,7 +116,7 @@ export async function updateGuildProfile(formData: FormData) {
   await db.$transaction([
     db.community.update({
       where: { id: community.id },
-      data: { name, shortName, tagline, description, foundedYear, accentColor, heroGradient: gradient(accentColor), specialties },
+      data: { name, shortName, tagline, description, foundedYear, accentColor, heroGradient: gradient(accentColor), specialties, websiteUrl, instagramUrl, whatsappUrl, newcomerDisplayEnabled, awardsDisplayEnabled },
     }),
     community.locations[0]
       ? db.communityLocation.update({ where: { id: community.locations[0].id }, data: { city: homeCity, countryCode: "IN", isHome: true } })
@@ -111,9 +129,103 @@ export async function updateGuildProfile(formData: FormData) {
         searchIndexing: directoryVisibility === "LISTED" && guildHallAccess === "PUBLIC" ? "INDEXABLE" : "NOINDEX",
       },
     }),
+    db.communityLocation.deleteMany({ where: { communityId: community.id, isHome: false } }),
+    ...operatingCities.filter((city) => city.toLowerCase() !== homeCity.toLowerCase()).map((city) => db.communityLocation.create({ data: { communityId: community.id, city, countryCode: "IN", isHome: false } })),
+    db.communityAuditEvent.create({ data: { communityId: community.id, actorUserId: session.userId, action: "GUILD_PROFILE_UPDATED", metadata: { directoryVisibility, guildHallAccess } } }),
   ]);
   revalidatePath(`/guilds/${slug}`);
   revalidatePath(`/guilds/${slug}/manage`);
   revalidatePath("/");
   redirect(`/guilds/${slug}/manage?saved=1`);
+}
+
+export async function inviteGuildStaff(formData: FormData) {
+  const slug = value(formData, "slug", 80);
+  const { session } = await requireGuildAdmin(slug);
+  const invitedEmail = normalizeEmail(value(formData, "email", 320));
+  const role = value(formData, "role", 30);
+  if (!isEmail(invitedEmail) || !isStaffRole(role)) redirect(`/guilds/${slug}/manage?staffError=invalid#staff`);
+  const guild = await db.community.findUnique({ where: { slug }, select: { id: true } });
+  if (!guild) redirect("/account?access=denied");
+  const expiresAt = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000);
+  const pending = await db.communityInvitation.findFirst({ where: { communityId: guild.id, invitedEmail, role, status: "PENDING" } });
+  await db.$transaction(async (tx) => {
+    if (pending) await tx.communityInvitation.update({ where: { id: pending.id }, data: { expiresAt, invitedById: session.userId } });
+    else await tx.communityInvitation.create({ data: { communityId: guild.id, invitedEmail, role, invitedById: session.userId, expiresAt } });
+    await tx.communityAuditEvent.create({ data: { communityId: guild.id, actorUserId: session.userId, action: "STAFF_INVITED", metadata: { invitedEmail, role } } });
+  });
+  revalidatePath(`/guilds/${slug}/manage`);
+  redirect(`/guilds/${slug}/manage?staffSaved=invited#staff`);
+}
+
+export async function revokeGuildInvitation(formData: FormData) {
+  const slug = value(formData, "slug", 80);
+  const { session } = await requireGuildAdmin(slug);
+  const invitationId = value(formData, "invitationId", 36);
+  const invitation = await db.communityInvitation.findFirst({ where: { id: invitationId, community: { slug }, status: "PENDING" }, select: { id: true, communityId: true, invitedEmail: true, role: true } });
+  if (!invitation) redirect(`/guilds/${slug}/manage?staffError=missing#staff`);
+  await db.$transaction([
+    db.communityInvitation.update({ where: { id: invitation.id }, data: { status: "REVOKED", revokedAt: new Date() } }),
+    db.communityAuditEvent.create({ data: { communityId: invitation.communityId, actorUserId: session.userId, action: "INVITATION_REVOKED", metadata: { invitedEmail: invitation.invitedEmail, role: invitation.role } } }),
+  ]);
+  revalidatePath(`/guilds/${slug}/manage`);
+  redirect(`/guilds/${slug}/manage?staffSaved=revoked#staff`);
+}
+
+export async function acceptGuildInvitation(formData: FormData) {
+  const session = await requireSession("/account");
+  const invitationId = value(formData, "invitationId", 36);
+  const email = session.user.contacts.find((contact) => contact.type === "EMAIL" && contact.verifiedAt)?.normalizedValue;
+  if (!email) redirect("/account?inviteError=identity#invitations");
+  const invitation = await db.communityInvitation.findFirst({ where: { id: invitationId, invitedEmail: email, status: "PENDING", expiresAt: { gt: new Date() } }, include: { community: { select: { id: true, slug: true } } } });
+  if (!invitation) redirect("/account?inviteError=invalid#invitations");
+  await db.$transaction(async (tx) => {
+    const membership = await tx.communityMembership.upsert({
+      where: { communityId_userId: { communityId: invitation.communityId, userId: session.userId } },
+      create: { communityId: invitation.communityId, userId: session.userId, status: "ACTIVE", joinedAt: new Date() },
+      update: { status: "ACTIVE", joinedAt: new Date() },
+    });
+    await tx.communityRoleAssignment.upsert({ where: { membershipId_role: { membershipId: membership.id, role: invitation.role } }, create: { membershipId: membership.id, role: invitation.role }, update: {} });
+    await tx.communityInvitation.update({ where: { id: invitation.id }, data: { status: "ACCEPTED", acceptedAt: new Date() } });
+    await tx.communityAuditEvent.create({ data: { communityId: invitation.communityId, actorUserId: session.userId, targetUserId: session.userId, action: "STAFF_INVITATION_ACCEPTED", metadata: { role: invitation.role } } });
+  });
+  revalidatePath("/account");
+  redirect(`/account?inviteAccepted=${encodeURIComponent(invitation.community.slug)}#invitations`);
+}
+
+export async function updateGuildMemberRole(formData: FormData) {
+  const slug = value(formData, "slug", 80);
+  const { session } = await requireGuildAdmin(slug);
+  const membershipId = value(formData, "membershipId", 36);
+  const role = value(formData, "role", 30);
+  const operation = value(formData, "operation", 10);
+  if (!isStaffRole(role) || !new Set(["grant", "revoke"]).has(operation)) redirect(`/guilds/${slug}/manage?staffError=invalid#staff`);
+  const membership = await db.communityMembership.findFirst({ where: { id: membershipId, community: { slug }, status: "ACTIVE" }, include: { roles: true } });
+  if (!membership) redirect(`/guilds/${slug}/manage?staffError=missing#staff`);
+  const typedRole: StaffRole = role;
+  await db.$transaction(async (tx) => {
+    if (operation === "grant") await tx.communityRoleAssignment.upsert({ where: { membershipId_role: { membershipId, role: typedRole } }, create: { membershipId, role: typedRole }, update: {} });
+    else await tx.communityRoleAssignment.deleteMany({ where: { membershipId, role: typedRole } });
+    await tx.communityAuditEvent.create({ data: { communityId: membership.communityId, actorUserId: session.userId, targetUserId: membership.userId, action: operation === "grant" ? "STAFF_ROLE_GRANTED" : "STAFF_ROLE_REVOKED", metadata: { role } } });
+  });
+  revalidatePath(`/guilds/${slug}/manage`);
+  revalidatePath("/account");
+  redirect(`/guilds/${slug}/manage?staffSaved=role#staff`);
+}
+
+export async function updateGuildMemberStatus(formData: FormData) {
+  const slug = value(formData, "slug", 80);
+  const { session } = await requireGuildAdmin(slug);
+  const membershipId = value(formData, "membershipId", 36);
+  const status = value(formData, "status", 20);
+  if (!new Set(["ACTIVE", "SUSPENDED"]).has(status)) redirect(`/guilds/${slug}/manage?staffError=invalid#staff`);
+  const membership = await db.communityMembership.findFirst({ where: { id: membershipId, community: { slug } }, include: { roles: true } });
+  if (!membership || membership.userId === session.userId || membership.roles.some(({ role }) => role === "OWNER")) redirect(`/guilds/${slug}/manage?staffError=protected#staff`);
+  await db.$transaction([
+    db.communityMembership.update({ where: { id: membership.id }, data: { status: status as "ACTIVE" | "SUSPENDED" } }),
+    db.communityAuditEvent.create({ data: { communityId: membership.communityId, actorUserId: session.userId, targetUserId: membership.userId, action: status === "ACTIVE" ? "MEMBER_REACTIVATED" : "MEMBER_SUSPENDED" } }),
+  ]);
+  revalidatePath(`/guilds/${slug}/manage`);
+  revalidatePath("/account");
+  redirect(`/guilds/${slug}/manage?staffSaved=status#staff`);
 }

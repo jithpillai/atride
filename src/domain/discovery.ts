@@ -19,6 +19,9 @@ export type GuildView = {
   logoUrl: string | null;
   coverUrl: string | null;
   galleryUrls: string[];
+  websiteUrl: string | null;
+  instagramUrl: string | null;
+  whatsappUrl: string | null;
 };
 
 export type RideView = {
