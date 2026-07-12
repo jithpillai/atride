@@ -3,7 +3,6 @@ import { getAuthSecret } from "@/server/auth/config";
 import { createSessionToken, hashNetworkValue, hashSessionToken } from "@/server/auth/crypto";
 import { AuthError } from "@/server/auth/auth-service";
 import { normalizePhone } from "@/server/profile/validation";
-import { getFirebaseAdminAuth } from "./firebase-admin";
 import { isSupportedIndianMobile, verifiedFirebasePhone } from "./claims";
 
 const CHALLENGE_TTL_MS = 10 * 60 * 1000;
@@ -86,6 +85,7 @@ export async function confirmPhoneVerification(userId: string, challengeToken: s
 
   let verifiedPhone: string | null = null;
   try {
+    const { getFirebaseAdminAuth } = await import("./firebase-admin");
     const claims = await getFirebaseAdminAuth().verifyIdToken(idToken, true);
     verifiedPhone = verifiedFirebasePhone(claims);
   } catch {
