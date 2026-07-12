@@ -129,6 +129,13 @@ enum CommunityRole {
   MEMBER_MANAGER
 }
 
+enum CommunityInvitationStatus {
+  PENDING
+  ACCEPTED
+  REVOKED
+  EXPIRED
+}
+
 enum RideStaffRole {
   LEAD_CAPTAIN
   CAPTAIN
@@ -139,28 +146,35 @@ enum RideStaffRole {
 }
 
 model Community {
-  id             String          @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
-  slug           String          @unique @db.VarChar(80)
-  name           String          @db.VarChar(160)
-  shortName      String          @map("short_name") @db.VarChar(12)
-  tagline        String          @db.VarChar(240)
-  description    String          @db.Text
-  foundedYear    Int?            @map("founded_year") @db.SmallInt
-  memberCount    Int             @default(0) @map("member_count")
-  completedRides Int             @default(0) @map("completed_rides")
-  status         CommunityStatus @default(DRAFT)
-  accentColor    String          @map("accent_color") @db.VarChar(16)
-  heroGradient   String          @map("hero_gradient") @db.Text
-  specialties    String[]        @default([])
-  logoAssetId    String?         @unique @map("logo_asset_id") @db.Uuid
-  coverAssetId   String?         @unique @map("cover_asset_id") @db.Uuid
-  createdAt      DateTime        @default(now()) @map("created_at") @db.Timestamptz(3)
-  updatedAt      DateTime        @updatedAt @map("updated_at") @db.Timestamptz(3)
+  id                     String          @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  slug                   String          @unique @db.VarChar(80)
+  name                   String          @db.VarChar(160)
+  shortName              String          @map("short_name") @db.VarChar(12)
+  tagline                String          @db.VarChar(240)
+  description            String          @db.Text
+  foundedYear            Int?            @map("founded_year") @db.SmallInt
+  memberCount            Int             @default(0) @map("member_count")
+  completedRides         Int             @default(0) @map("completed_rides")
+  status                 CommunityStatus @default(DRAFT)
+  accentColor            String          @map("accent_color") @db.VarChar(16)
+  heroGradient           String          @map("hero_gradient") @db.Text
+  specialties            String[]        @default([])
+  websiteUrl             String?         @map("website_url") @db.VarChar(500)
+  instagramUrl           String?         @map("instagram_url") @db.VarChar(500)
+  whatsappUrl            String?         @map("whatsapp_url") @db.VarChar(500)
+  newcomerDisplayEnabled Boolean         @default(false) @map("newcomer_display_enabled")
+  awardsDisplayEnabled   Boolean         @default(false) @map("awards_display_enabled")
+  logoAssetId            String?         @unique @map("logo_asset_id") @db.Uuid
+  coverAssetId           String?         @unique @map("cover_asset_id") @db.Uuid
+  createdAt              DateTime        @default(now()) @map("created_at") @db.Timestamptz(3)
+  updatedAt              DateTime        @updatedAt @map("updated_at") @db.Timestamptz(3)
 
   locations            CommunityLocation[]
   visibility           CommunityVisibility?
   rides                Ride[]
   memberships          CommunityMembership[]
+  invitations          CommunityInvitation[]
+  auditEvents          CommunityAuditEvent[]
   rideStaffAssignments RideStaffAssignment[]
   mediaAssets          MediaAsset[]          @relation("CommunityMedia")
   logoAsset            MediaAsset?           @relation("CommunityLogo", fields: [logoAssetId], references: [id], onDelete: SetNull)
@@ -251,6 +265,8 @@ model User {
   externalIdentities          ExternalIdentity[]
   phoneVerificationChallenges PhoneVerificationChallenge[]
   uploadedMedia               MediaAsset[]                 @relation("MediaUploader")
+  sentCommunityInvitations    CommunityInvitation[]        @relation("CommunityInvitationSender")
+  communityAuditEvents        CommunityAuditEvent[]        @relation("CommunityAuditActor")
 
   @@map("users")
 }
@@ -465,6 +481,43 @@ model CommunityRoleAssignment {
 
   @@unique([membershipId, role])
   @@map("community_role_assignments")
+}
+
+model CommunityInvitation {
+  id           String                    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  communityId  String                    @map("community_id") @db.Uuid
+  invitedEmail String                    @map("invited_email") @db.VarChar(320)
+  role         CommunityRole
+  status       CommunityInvitationStatus @default(PENDING)
+  invitedById  String                    @map("invited_by_id") @db.Uuid
+  expiresAt    DateTime                  @map("expires_at") @db.Timestamptz(3)
+  acceptedAt   DateTime?                 @map("accepted_at") @db.Timestamptz(3)
+  revokedAt    DateTime?                 @map("revoked_at") @db.Timestamptz(3)
+  createdAt    DateTime                  @default(now()) @map("created_at") @db.Timestamptz(3)
+  updatedAt    DateTime                  @updatedAt @map("updated_at") @db.Timestamptz(3)
+
+  community Community @relation(fields: [communityId], references: [id], onDelete: Cascade)
+  invitedBy User      @relation("CommunityInvitationSender", fields: [invitedById], references: [id], onDelete: Restrict)
+
+  @@index([communityId, invitedEmail, role, status])
+  @@index([invitedEmail, status, expiresAt])
+  @@map("community_invitations")
+}
+
+model CommunityAuditEvent {
+  id           String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  communityId  String   @map("community_id") @db.Uuid
+  actorUserId  String   @map("actor_user_id") @db.Uuid
+  action       String   @db.VarChar(80)
+  targetUserId String?  @map("target_user_id") @db.Uuid
+  metadata     Json     @default("{}")
+  createdAt    DateTime @default(now()) @map("created_at") @db.Timestamptz(3)
+
+  community Community @relation(fields: [communityId], references: [id], onDelete: Cascade)
+  actor     User      @relation("CommunityAuditActor", fields: [actorUserId], references: [id], onDelete: Restrict)
+
+  @@index([communityId, createdAt])
+  @@map("community_audit_events")
 }
 
 model RideStaffAssignment {

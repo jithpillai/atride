@@ -11,8 +11,9 @@ Current infrastructure status:
 - The `atride.in` identity is configured in Amazon SES and sandbox access is available.
 - SES production-access approval has been requested and is pending.
 - The SES email adapter and branded OTP template are implemented; both the mailbox-simulator smoke test and real OTP delivery to a verified sandbox recipient have passed.
-- SMS is explicitly outside the launch critical path and is deferred to an optional final phase. Maps, media uploads, Redis workers, and payments remain deferred to their delivery phases.
-- Phase 2 is in progress: Google OpenID Connect plus email OTP, opaque sessions, account/logout, first-login onboarding, private participant profiles, a vehicle garage, seeded roles, and protected platform/Guild authorization boundaries are implemented. Invitations, personalized upcoming rides, audit events, and distributed abuse controls remain in this phase.
+- SMS is explicitly outside the launch critical path and is deferred to an optional final phase. Cloudinary media uploads are active; maps, Redis workers, and payments remain deferred to their delivery phases.
+- Phase 2 foundations are implemented: Google OpenID Connect plus email OTP, opaque sessions, account/logout, first-login onboarding, private participant profiles, a vehicle garage, seeded roles, optional Firebase phone verification, and protected platform/Guild authorization boundaries. Personalized upcoming rides and distributed abuse controls remain scheduled with their dependent phases.
+- Phase 3A and the first testable Phase 3B staff-management slice are implemented. Platform administrators can onboard Guilds; Owners/Admins can manage branding, visibility, official links, operating cities, member status, staff invitations and roles, and inspect tenant-scoped audit history.
 
 Related documents:
 
@@ -140,7 +141,7 @@ External accounts needed:
 
 ### Phase 3 — Community administration
 
-Phase 3A foundation implemented: platform administrators can create a draft Guild for an existing verified account, assign its first Owner, approve/suspend it, and Guild Owners/Admins can maintain identity, visibility, logo, cover, and gallery media. Participants can maintain an optional private Cloudinary avatar. Staff invitation acceptance, broader member management, configurable social links, award/newcomer preferences, widgets, and full audit history remain in the rest of Phase 3.
+Phase 3A and the initial Phase 3B administration slice are implemented: platform administrators can create a draft Guild for an existing verified account, assign its first Owner, approve/suspend it, and Guild Owners/Admins can maintain identity, operating cities, official links, visibility, logo, cover, and gallery media. They can invite account-bound staff roles, revoke pending invitations, grant/revoke delegated roles, suspend/reactivate non-Owner memberships, configure newcomer/award presentation switches, and inspect recent audit history. Participants can maintain an optional private Cloudinary avatar. Broader member search, invitation email delivery, public widgets, and advanced audit filtering/export remain in the rest of Phase 3.
 
 Build:
 

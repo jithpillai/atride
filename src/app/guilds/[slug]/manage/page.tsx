@@ -5,16 +5,16 @@ import { FormPendingSubmit } from "@/components/pending-feedback";
 import { MediaUploader } from "@/components/media-uploader";
 import { db } from "@/lib/db";
 import { requireGuildManager } from "@/server/auth/authorization";
-import { updateGuildProfile } from "@/server/guild/actions";
+import { inviteGuildStaff, revokeGuildInvitation, updateGuildMemberRole, updateGuildMemberStatus, updateGuildProfile } from "@/server/guild/actions";
 import { cloudinaryImageUrl } from "@/server/media/cloudinary";
 
-type Props = { params: Promise<{ slug: string }>; searchParams: Promise<{ saved?: string; error?: string }> };
+type Props = { params: Promise<{ slug: string }>; searchParams: Promise<{ saved?: string; error?: string; staffSaved?: string; staffError?: string }> };
 
 export const metadata = { title: "Manage Guild", robots: { index: false, follow: false } };
 
 export default async function GuildManagePage({ params, searchParams }: Props) {
   const { slug } = await params;
-  const { membership } = await requireGuildManager(slug);
+  const { session, membership } = await requireGuildManager(slug);
   const [guild, state] = await Promise.all([db.community.findUnique({
     where: { slug },
     include: {
@@ -23,6 +23,12 @@ export default async function GuildManagePage({ params, searchParams }: Props) {
       logoAsset: true,
       coverAsset: true,
       mediaAssets: { where: { purpose: "GUILD_GALLERY" }, orderBy: [{ sortOrder: "asc" }, { createdAt: "asc" }] },
+      memberships: {
+        orderBy: { createdAt: "asc" },
+        include: { roles: { orderBy: { role: "asc" } }, user: { select: { id: true, displayName: true, contacts: { where: { type: "EMAIL", isPrimary: true }, take: 1 } } } },
+      },
+      invitations: { where: { status: "PENDING" }, orderBy: { createdAt: "desc" }, take: 20 },
+      auditEvents: { orderBy: { createdAt: "desc" }, take: 30, include: { actor: { select: { displayName: true } } } },
       _count: { select: { memberships: true, rides: true } },
       rides: {
         orderBy: { startsAt: "asc" },
@@ -34,6 +40,7 @@ export default async function GuildManagePage({ params, searchParams }: Props) {
   if (!guild) notFound();
   const canAdminister = membership.roles.some(({ role }) => role === "OWNER" || role === "ADMIN");
   const homeCity = guild.locations.find((location) => location.isHome)?.city ?? guild.locations[0]?.city ?? "";
+  const operatingCities = guild.locations.filter((location) => !location.isHome).map((location) => location.city).join(", ");
 
   return (
     <section className="mx-auto min-h-[70vh] max-w-6xl px-5 py-16 lg:px-8">
@@ -42,6 +49,8 @@ export default async function GuildManagePage({ params, searchParams }: Props) {
       <p className="mt-3 text-zinc-400">Your access: {membership.roles.map(({ role }) => role.replaceAll("_", " ")).join(" · ")}</p>
       {state.saved === "1" && <p className="mt-6 rounded-2xl border border-emerald-400/20 bg-emerald-400/10 px-4 py-3 text-sm font-semibold text-emerald-300">Guild profile saved.</p>}
       {state.error && <p role="alert" className="mt-6 rounded-2xl border border-red-400/20 bg-red-400/10 px-4 py-3 text-sm font-semibold text-red-300">Check the highlighted Guild details and try again.</p>}
+      {state.staffSaved && <p className="mt-6 rounded-2xl border border-emerald-400/20 bg-emerald-400/10 px-4 py-3 text-sm font-semibold text-emerald-300">Guild staff settings updated.</p>}
+      {state.staffError && <p role="alert" className="mt-6 rounded-2xl border border-red-400/20 bg-red-400/10 px-4 py-3 text-sm font-semibold text-red-300">That staff change could not be completed. Protected Owner and self-access rules may apply.</p>}
       <div className="mt-10 grid gap-4 sm:grid-cols-2">
         <article className="rounded-3xl border border-white/10 bg-white/[.025] p-7"><p className="text-4xl font-black">{guild._count.rides}</p><p className="mt-2 text-sm text-zinc-500">Rides</p></article>
         <article className="rounded-3xl border border-white/10 bg-white/[.025] p-7"><p className="text-4xl font-black">{guild._count.memberships}</p><p className="mt-2 text-sm text-zinc-500">Members</p></article>
@@ -56,11 +65,17 @@ export default async function GuildManagePage({ params, searchParams }: Props) {
             <label className="text-sm font-semibold sm:col-span-2">Tagline<input required minLength={5} maxLength={240} name="tagline" defaultValue={guild.tagline} className="mt-2 w-full rounded-2xl border border-white/10 bg-black/20 px-4 py-3 outline-none focus:border-orange-500" /></label>
             <label className="text-sm font-semibold sm:col-span-2">Description<textarea required minLength={20} maxLength={5000} rows={5} name="description" defaultValue={guild.description} className="mt-2 w-full rounded-2xl border border-white/10 bg-black/20 px-4 py-3 outline-none focus:border-orange-500" /></label>
             <label className="text-sm font-semibold">Home city<input required minLength={2} maxLength={120} name="homeCity" defaultValue={homeCity} className="mt-2 w-full rounded-2xl border border-white/10 bg-black/20 px-4 py-3 outline-none focus:border-orange-500" /></label>
+            <label className="text-sm font-semibold">Other operating cities<input maxLength={1000} name="operatingCities" defaultValue={operatingCities} placeholder="Bengaluru, Coimbatore, Erode" className="mt-2 w-full rounded-2xl border border-white/10 bg-black/20 px-4 py-3 outline-none focus:border-orange-500" /><span className="mt-1 block text-xs font-normal text-zinc-600">Comma-separated, up to 12 cities.</span></label>
             <label className="text-sm font-semibold">Founded year<input type="number" min="1900" max={new Date().getFullYear()} name="foundedYear" defaultValue={guild.foundedYear ?? ""} className="mt-2 w-full rounded-2xl border border-white/10 bg-black/20 px-4 py-3 outline-none focus:border-orange-500" /></label>
             <label className="text-sm font-semibold">Accent color<input type="color" name="accentColor" defaultValue={guild.accentColor} className="mt-2 h-12 w-full rounded-2xl border border-white/10 bg-black/20 px-2 py-2" /></label>
             <label className="text-sm font-semibold">Specialties<input maxLength={500} name="specialties" defaultValue={guild.specialties.join(", ")} placeholder="Touring, Breakfast rides, Off-road" className="mt-2 w-full rounded-2xl border border-white/10 bg-black/20 px-4 py-3 outline-none focus:border-orange-500" /></label>
             <label className="text-sm font-semibold">Directory listing<select name="directoryVisibility" defaultValue={guild.visibility.directoryVisibility} className="mt-2 w-full rounded-2xl border border-white/10 bg-[#101419] px-4 py-3"><option value="UNLISTED">Unlisted / private</option><option value="LISTED">Listed in marketplace</option></select></label>
             <label className="text-sm font-semibold">Guild Hall access<select name="guildHallAccess" defaultValue={guild.visibility.guildHallAccess} className="mt-2 w-full rounded-2xl border border-white/10 bg-[#101419] px-4 py-3"><option value="PUBLIC">Public</option><option value="VERIFIED_USERS">Verified AtRide users</option><option value="GUILD_MEMBERS">Guild members</option><option value="INVITE_ONLY">Invite only</option></select></label>
+            <label className="text-sm font-semibold">Website URL<input type="url" name="websiteUrl" defaultValue={guild.websiteUrl ?? ""} placeholder="https://example.com" className="mt-2 w-full rounded-2xl border border-white/10 bg-black/20 px-4 py-3 outline-none focus:border-orange-500" /></label>
+            <label className="text-sm font-semibold">Instagram URL<input type="url" name="instagramUrl" defaultValue={guild.instagramUrl ?? ""} placeholder="https://instagram.com/…" className="mt-2 w-full rounded-2xl border border-white/10 bg-black/20 px-4 py-3 outline-none focus:border-orange-500" /></label>
+            <label className="text-sm font-semibold sm:col-span-2">WhatsApp community/group URL<input type="url" name="whatsappUrl" defaultValue={guild.whatsappUrl ?? ""} placeholder="https://chat.whatsapp.com/…" className="mt-2 w-full rounded-2xl border border-white/10 bg-black/20 px-4 py-3 outline-none focus:border-orange-500" /></label>
+            <label className="flex items-center gap-3 text-sm font-semibold"><input type="checkbox" name="newcomerDisplayEnabled" defaultChecked={guild.newcomerDisplayEnabled} className="size-5 accent-orange-500" />Enable member-only newcomer display</label>
+            <label className="flex items-center gap-3 text-sm font-semibold"><input type="checkbox" name="awardsDisplayEnabled" defaultChecked={guild.awardsDisplayEnabled} className="size-5 accent-orange-500" />Enable member-only awards display</label>
           </div>
           <FormPendingSubmit idleLabel="Save Guild profile" pendingLabel="Saving…" overlayLabel="Saving Guild profile…" className="mt-7 rounded-full bg-orange-500 px-6 py-3 text-sm font-black text-white" />
         </form>
@@ -73,6 +88,25 @@ export default async function GuildManagePage({ params, searchParams }: Props) {
           <div className="mt-5"><MediaUploader purpose="GUILD_GALLERY" communitySlug={guild.slug} label="Add gallery image" help="Up to 12 images, 10 MB each." /></div>
           {!!guild.mediaAssets.length && <div className="mt-5 grid gap-4 sm:grid-cols-2 lg:grid-cols-3">{guild.mediaAssets.map((asset, index) => <MediaUploader key={asset.id} purpose="GUILD_GALLERY" communitySlug={guild.slug} label={`Gallery image ${index + 1}`} help="Published in this Guild Hall." currentAsset={{ id: asset.id, url: cloudinaryImageUrl(asset) }} removeOnly />)}</div>}
         </div>
+
+        <section id="staff" className="mt-10 scroll-mt-24">
+          <p className="eyebrow">People and permissions</p><h2 className="mt-3 text-2xl font-black">Members and Guild staff</h2>
+          <form action={inviteGuildStaff} className="relative mt-6 grid gap-4 rounded-3xl border border-white/10 bg-white/[.025] p-6 md:grid-cols-[1fr_220px_auto] md:items-end">
+            <input type="hidden" name="slug" value={guild.slug} />
+            <label className="text-sm font-semibold">Verified account email<input required type="email" name="email" placeholder="rider@example.com" className="mt-2 w-full rounded-2xl border border-white/10 bg-black/20 px-4 py-3 outline-none focus:border-orange-500" /></label>
+            <label className="text-sm font-semibold">Staff role<select name="role" className="mt-2 w-full rounded-2xl border border-white/10 bg-[#101419] px-4 py-3"><option value="RIDE_MANAGER">Ride manager</option><option value="ADMIN">Administrator</option><option value="FINANCE">Finance</option><option value="MEMBER_MANAGER">Member manager</option></select></label>
+            <FormPendingSubmit idleLabel="Send invitation" pendingLabel="Inviting…" overlayLabel="Creating Guild invitation…" className="rounded-full bg-orange-500 px-5 py-3 text-sm font-black text-white" />
+          </form>
+          {!!guild.invitations.length && <div className="mt-5 rounded-3xl border border-white/10 p-6"><h3 className="font-black">Pending invitations</h3><div className="mt-4 grid gap-3">{guild.invitations.map((invitation) => <div key={invitation.id} className="flex flex-col gap-3 rounded-2xl border border-white/8 p-4 sm:flex-row sm:items-center sm:justify-between"><div><p className="font-bold">{invitation.invitedEmail}</p><p className="mt-1 text-xs text-zinc-500">{invitation.role.replaceAll("_", " ")} · expires {invitation.expiresAt.toLocaleDateString("en-IN")}</p></div><form action={revokeGuildInvitation} className="relative"><input type="hidden" name="slug" value={guild.slug} /><input type="hidden" name="invitationId" value={invitation.id} /><FormPendingSubmit idleLabel="Revoke" pendingLabel="Revoking…" overlayLabel="Revoking invitation…" className="rounded-full border border-red-400/30 px-4 py-2 text-xs font-bold text-red-300" /></form></div>)}</div></div>}
+          <div className="mt-5 grid gap-4">{guild.memberships.map((member) => {
+            const owner = member.roles.some(({ role }) => role === "OWNER");
+            return <article key={member.id} className="rounded-3xl border border-white/10 bg-white/[.02] p-6"><div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between"><div><h3 className="font-black">{member.user.displayName}</h3><p className="mt-1 text-xs text-zinc-500">{member.user.contacts[0]?.displayValue ?? "No primary email"} · {member.status}</p><div className="mt-3 flex flex-wrap gap-2">{member.roles.length ? member.roles.map(({ role }) => <span key={role} className="rounded-full bg-orange-500/10 px-3 py-1 text-xs font-bold text-orange-300">{role.replaceAll("_", " ")}</span>) : <span className="text-xs text-zinc-600">Participant member</span>}</div></div>{!owner && member.user.id !== session.userId && <form action={updateGuildMemberStatus} className="relative"><input type="hidden" name="slug" value={guild.slug} /><input type="hidden" name="membershipId" value={member.id} /><input type="hidden" name="status" value={member.status === "ACTIVE" ? "SUSPENDED" : "ACTIVE"} /><FormPendingSubmit idleLabel={member.status === "ACTIVE" ? "Suspend" : "Reactivate"} pendingLabel="Updating…" overlayLabel="Updating membership…" className="rounded-full border border-white/15 px-4 py-2 text-xs font-bold" /></form>}</div>
+              {!owner && member.status === "ACTIVE" && <div className="mt-5 flex flex-wrap gap-2">{["ADMIN", "RIDE_MANAGER", "FINANCE", "MEMBER_MANAGER"].map((role) => { const assigned = member.roles.some((entry) => entry.role === role); return <form key={role} action={updateGuildMemberRole} className="relative"><input type="hidden" name="slug" value={guild.slug} /><input type="hidden" name="membershipId" value={member.id} /><input type="hidden" name="role" value={role} /><input type="hidden" name="operation" value={assigned ? "revoke" : "grant"} /><FormPendingSubmit idleLabel={`${assigned ? "Remove" : "Add"} ${role.replaceAll("_", " ")}`} pendingLabel="Updating…" overlayLabel="Updating Guild role…" className={`rounded-full px-3 py-2 text-xs font-bold ${assigned ? "border border-red-400/20 text-red-300" : "border border-white/15 text-zinc-300"}`} /></form>; })}</div>}
+            </article>;
+          })}</div>
+        </section>
+
+        <section className="mt-10"><p className="eyebrow">Security record</p><h2 className="mt-3 text-2xl font-black">Recent audit history</h2><div className="mt-5 overflow-hidden rounded-3xl border border-white/10">{guild.auditEvents.length ? guild.auditEvents.map((event) => <div key={event.id} className="flex flex-col gap-1 border-b border-white/8 px-5 py-4 last:border-0 sm:flex-row sm:items-center sm:justify-between"><div><p className="text-sm font-bold">{event.action.replaceAll("_", " ")}</p><p className="mt-1 text-xs text-zinc-600">by {event.actor.displayName}</p></div><time className="text-xs text-zinc-600">{event.createdAt.toLocaleString("en-IN")}</time></div>) : <p className="p-6 text-sm text-zinc-500">Privileged Guild changes will appear here.</p>}</div></section>
       </>}
       <div className="mt-10 rounded-3xl border border-white/10 p-7">
         <h2 className="text-2xl font-black">Ride workspace</h2>

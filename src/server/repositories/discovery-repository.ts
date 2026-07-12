@@ -50,6 +50,9 @@ function toGuildView(guild: GuildRecord): GuildView {
     logoUrl: guild.logoAsset ? cloudinaryImageUrl(guild.logoAsset) : null,
     coverUrl: guild.coverAsset ? cloudinaryImageUrl(guild.coverAsset) : null,
     galleryUrls: guild.mediaAssets.map((asset) => cloudinaryImageUrl(asset)),
+    websiteUrl: guild.websiteUrl,
+    instagramUrl: guild.instagramUrl,
+    whatsappUrl: guild.whatsappUrl,
   };
 }
 
