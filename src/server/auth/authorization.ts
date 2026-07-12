@@ -34,3 +34,11 @@ export async function requireGuildManager(slug: string) {
   }
   return { session, membership };
 }
+
+export async function requireGuildAdmin(slug: string) {
+  const result = await requireGuildManager(slug);
+  if (!result.membership.roles.some(({ role }) => role === "OWNER" || role === "ADMIN")) {
+    redirect("/account?access=denied");
+  }
+  return result;
+}

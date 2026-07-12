@@ -140,6 +140,8 @@ External accounts needed:
 
 ### Phase 3 — Community administration
 
+Phase 3A foundation implemented: platform administrators can create a draft Guild for an existing verified account, assign its first Owner, approve/suspend it, and Guild Owners/Admins can maintain identity, visibility, logo, cover, and gallery media. Participants can maintain an optional private Cloudinary avatar. Staff invitation acceptance, broader member management, configurable social links, award/newcomer preferences, widgets, and full audit history remain in the rest of Phase 3.
+
 Build:
 
 - Community application and approval

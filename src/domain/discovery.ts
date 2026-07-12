@@ -16,6 +16,9 @@ export type GuildView = {
   accent: string;
   gradient: string;
   specialties: string[];
+  logoUrl: string | null;
+  coverUrl: string | null;
+  galleryUrls: string[];
 };
 
 export type RideView = {

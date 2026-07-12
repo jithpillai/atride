@@ -1,6 +1,7 @@
 "use client";
 
 import Link from "next/link";
+import { ImageWithFallback } from "@/components/image-with-fallback";
 import { useMemo, useState } from "react";
 
 import type { GuildView, RideView } from "@/domain/discovery";
@@ -113,10 +114,11 @@ export function MarketplaceExplorer({ cities, guilds, rides }: Props) {
                 className="group relative min-h-80 overflow-hidden rounded-[2rem] border border-white/10 p-7 transition hover:-translate-y-1 hover:border-orange-500/40"
                 style={{ background: guild.gradient }}
               >
+                <ImageWithFallback src={guild.coverUrl ?? "/defaults/guild-hall-cover.png"} fallbackSrc="/defaults/guild-hall-cover.png" alt="" fill className="object-cover opacity-40" />
                 <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-black/15 to-transparent" />
                 <div className="relative flex h-full flex-col justify-between">
                   <div className="flex items-center justify-between">
-                    <div className="grid size-14 place-items-center rounded-2xl border border-white/25 bg-black/25 text-lg font-black text-white backdrop-blur">{guild.shortName}</div>
+                    <ImageWithFallback src={guild.logoUrl ?? "/defaults/guild-avatar.png"} fallbackSrc="/defaults/guild-avatar.png" alt={`${guild.name} logo`} width={56} height={56} className="size-14 rounded-2xl object-cover" />
                     <span className="rounded-full border border-white/25 bg-black/20 px-3 py-1 text-xs font-bold text-white/80">{guild.homeCity}</span>
                   </div>
                   <div className="mt-24">
