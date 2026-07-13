@@ -21,10 +21,18 @@ describe("Firebase phone verification claims", () => {
     }, now)).toBeNull();
   });
 
-  it("rejects stale authentication and unsupported numbers", () => {
+  it("accepts authentication throughout the ten-minute challenge window", () => {
     expect(verifiedFirebasePhone({
       phone_number: "+919000000001",
-      auth_time: now - 301,
+      auth_time: now - 9 * 60,
+      firebase: { sign_in_provider: "phone" },
+    }, now)).toBe("+919000000001");
+  });
+
+  it("rejects authentication older than the challenge and unsupported numbers", () => {
+    expect(verifiedFirebasePhone({
+      phone_number: "+919000000001",
+      auth_time: now - 601,
       firebase: { sign_in_provider: "phone" },
     }, now)).toBeNull();
     expect(isSupportedIndianMobile("+14155552671")).toBe(false);

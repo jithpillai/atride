@@ -14,9 +14,10 @@ export function verifiedFirebasePhone(claims: {
   phone_number?: string;
   auth_time?: number;
   firebase?: { sign_in_provider?: string };
-}, nowSeconds = Math.floor(Date.now() / 1000)) {
+}, nowSeconds = Math.floor(Date.now() / 1000), maxAgeSeconds = FIREBASE_PHONE_AUTH_MAX_AGE_SECONDS) {
   const phone = normalizePhone(claims.phone_number ?? "");
   if (claims.firebase?.sign_in_provider !== "phone") return null;
-  if (!claims.auth_time || nowSeconds - claims.auth_time > 5 * 60 || claims.auth_time > nowSeconds + 30) return null;
+  if (!claims.auth_time || nowSeconds - claims.auth_time > maxAgeSeconds || claims.auth_time > nowSeconds + 30) return null;
   return isSupportedIndianMobile(phone) ? phone : null;
 }
+export const FIREBASE_PHONE_AUTH_MAX_AGE_SECONDS = 10 * 60;
