@@ -2,6 +2,7 @@ import { PrismaPg } from "@prisma/adapter-pg";
 import { PrismaClient } from "../src/generated/prisma/client";
 import { guilds, rides } from "../src/data/sample-data";
 import { normalizePostgresUrl } from "../src/lib/postgres";
+import { DEFAULT_GUILD_RIDE_POLICIES } from "../src/server/guild/default-ride-policies";
 
 const connectionString = process.env.DIRECT_URL ?? process.env.DATABASE_URL;
 
@@ -68,7 +69,7 @@ async function main() {
       isHome: city === guild.homeCity,
     }));
 
-    await prisma.community.upsert({
+    const seededGuild = await prisma.community.upsert({
       where: { slug: guild.slug },
       create: {
         slug: guild.slug,
@@ -110,15 +111,23 @@ async function main() {
         },
       },
     });
+    for (const policy of DEFAULT_GUILD_RIDE_POLICIES) {
+      await prisma.communityRidePolicyTemplate.upsert({
+        where: { communityId_type: { communityId: seededGuild.id, type: policy.type } },
+        create: { communityId: seededGuild.id, type: policy.type, title: policy.title, content: policy.content },
+        update: {},
+      });
+    }
   }
 
   for (const ride of rides) {
-    await prisma.ride.upsert({
+    const seededRide = await prisma.ride.upsert({
       where: { slug: ride.slug },
       create: {
         slug: ride.slug,
         title: ride.title,
         summary: ride.summary,
+        description: `${ride.summary} This demonstration package shows the structured itinerary, stay, meals, inclusions, exclusions, and organizer policies available in the AtRide Ride Studio.`,
         originCity: ride.city,
         destination: ride.destination,
         startsAt: new Date(ride.startDate),
@@ -127,6 +136,7 @@ async function main() {
         totalSlots: ride.totalSlots,
         bookedSlots: ride.bookedSlots,
         vehicleType: "BIKE",
+        vehicleRequirements: "Road-legal motorcycle in safe touring condition; full-face helmet and appropriate riding gear are mandatory.",
         difficulty: ride.difficulty.toUpperCase() as "EASY" | "MODERATE" | "CHALLENGING",
         status: "PUBLISHED",
         visibility: "PUBLIC",
@@ -138,6 +148,7 @@ async function main() {
       update: {
         title: ride.title,
         summary: ride.summary,
+        description: `${ride.summary} This demonstration package shows the structured itinerary, stay, meals, inclusions, exclusions, and organizer policies available in the AtRide Ride Studio.`,
         originCity: ride.city,
         destination: ride.destination,
         startsAt: new Date(ride.startDate),
@@ -146,6 +157,7 @@ async function main() {
         totalSlots: ride.totalSlots,
         bookedSlots: ride.bookedSlots,
         vehicleType: "BIKE",
+        vehicleRequirements: "Road-legal motorcycle in safe touring condition; full-face helmet and appropriate riding gear are mandatory.",
         difficulty: ride.difficulty.toUpperCase() as "EASY" | "MODERATE" | "CHALLENGING",
         status: "PUBLISHED",
         visibility: "PUBLIC",
@@ -155,6 +167,33 @@ async function main() {
         community: { connect: { slug: ride.guildSlug } },
       },
     });
+
+    const [originCount, dayCount, stayCount, itemCount, policyCount] = await Promise.all([
+      prisma.rideOrigin.count({ where: { rideId: seededRide.id } }),
+      prisma.rideItineraryDay.count({ where: { rideId: seededRide.id } }),
+      prisma.rideAccommodation.count({ where: { rideId: seededRide.id } }),
+      prisma.ridePackageItem.count({ where: { rideId: seededRide.id } }),
+      prisma.ridePolicy.count({ where: { rideId: seededRide.id } }),
+    ]);
+    const start = new Date(ride.startDate);
+    if (!originCount) await prisma.rideOrigin.create({ data: { rideId: seededRide.id, city: ride.city, meetingPoint: `${ride.city} designated assembly point`, departureAt: start, capacity: ride.totalSlots, mergePoint: "Main highway regroup point", routeSummary: `${ride.city} to ${ride.destination} through organizer-approved regrouping stops.` } });
+    if (!dayCount) {
+      const days = Math.max(1, Math.ceil((new Date(ride.endDate).getTime() - start.getTime()) / 86400000));
+      await prisma.rideItineraryDay.createMany({ data: Array.from({ length: days }, (_, index) => ({ rideId: seededRide.id, dayNumber: index + 1, date: new Date(start.getTime() + index * 86400000), title: index === 0 ? "Departure and arrival" : index === days - 1 ? "Breakfast and return" : "Explore the destination", summary: index === 0 ? "Rider briefing, planned regroup stops, arrival, check-in, and dinner." : index === days - 1 ? "Breakfast, checkout, and a coordinated return ride." : "Guided local sightseeing, free time, meals, and evening crew activities." })) });
+    }
+    if (!stayCount) await prisma.rideAccommodation.create({ data: { rideId: seededRide.id, propertyName: `${ride.destination} Trail Resort`, locality: ride.destination, checkInAt: new Date(start.getTime() + 12 * 3600000), checkOutAt: new Date(ride.endDate), roomSummary: "Shared rooms allocated by the organizer, with separate accommodation arrangements where required.", amenities: ["Secure parking", "Hot water", "Campfire area", "Dining hall"], participantNote: "Final allocation and exact location are shared with confirmed participants.", exactLocationRestricted: true } });
+    if (!itemCount) await prisma.ridePackageItem.createMany({ data: [
+      { rideId: seededRide.id, type: "INCLUSION", title: "Night accommodation", description: "Shared accommodation for the published ride dates.", sortOrder: 0 },
+      { rideId: seededRide.id, type: "INCLUSION", title: "Included meals", description: "Breakfast and dinner as listed in the itinerary.", sortOrder: 1 },
+      { rideId: seededRide.id, type: "EXCLUSION", title: "Fuel and personal expenses", description: "Participants manage fuel, tolls, and personal purchases.", sortOrder: 0 },
+      { rideId: seededRide.id, type: "MEAL", dayNumber: 1, title: "Dinner", description: "Vegetarian and non-vegetarian buffet", sortOrder: 0 },
+      { rideId: seededRide.id, type: "ACTIVITY", dayNumber: 1, title: "Crew briefing", description: "Safety briefing and next-day ride plan", sortOrder: 0 },
+    ] });
+    if (!policyCount) await prisma.ridePolicy.createMany({ data: [
+      { rideId: seededRide.id, type: "SAFETY", title: "Safety and ride rules", content: "Full-face helmet and appropriate riding gear are mandatory. Follow the assigned road formation, traffic rules, hand signals, captains, and marshals. Racing, rash driving, illegal drugs, and drink-and-drive are prohibited.", version: 1 },
+      { rideId: seededRide.id, type: "PAYMENT", title: "Payment rules", content: "A slot is confirmed only after the organizer verifies the required confirmation payment. Remaining balance must be paid by the published due date.", version: 1 },
+      { rideId: seededRide.id, type: "CANCELLATION", title: "Cancellation and refund policy", content: "Confirmation payments and late cancellations may be non-refundable when property and activity commitments have already been paid by the organizer.", version: 1 },
+    ] });
   }
 
   const [platformAdmin, ravanasAdmin, wildGearCaptain, rider] = await Promise.all([

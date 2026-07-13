@@ -6,15 +6,19 @@ import {
   listMarketplaceCities,
   listMarketplaceGuilds,
   listMarketplaceRides,
+  listUpcomingStaffRides,
 } from "@/server/repositories/discovery-repository";
+import { getCurrentSession } from "@/server/auth/session";
 
 export const revalidate = 300;
 
 export default async function HomePage() {
-  const [cities, guilds, rides] = await Promise.all([
+  const session = await getCurrentSession();
+  const [cities, guilds, rides, staffRides] = await Promise.all([
     listMarketplaceCities(),
     listMarketplaceGuilds(),
     listMarketplaceRides(),
+    session ? listUpcomingStaffRides(session.userId) : Promise.resolve([]),
   ]);
   const heroRide = rides[0];
   const heroRideDuration = heroRide
@@ -122,11 +126,12 @@ export default async function HomePage() {
         <div className="rounded-[2rem] border border-orange-500/20 bg-gradient-to-r from-orange-500/10 to-transparent p-7 md:flex md:items-center md:justify-between">
           <div>
             <p className="eyebrow">Your upcoming rides</p>
-            <h2 className="mt-2 text-2xl font-black text-white">Your roadbook will appear here</h2>
-            <p className="mt-2 max-w-2xl text-sm leading-6 text-zinc-400">Booked as a rider or assigned as a captain, sweep, or marshal—every upcoming ride will appear in one role-aware view.</p>
+            <h2 className="mt-2 text-2xl font-black text-white">{session ? staffRides.length ? "Your assigned roadbook" : "No assigned upcoming rides" : "Your roadbook will appear here"}</h2>
+            <p className="mt-2 max-w-2xl text-sm leading-6 text-zinc-400">Booked rides will join this view in Phase 5. For now, explicitly assigned captain, sweep, marshal, and volunteer roles appear here; general Guild administration alone does not add every Guild ride.</p>
           </div>
-          <Link href="/login" className="mt-5 inline-flex rounded-full bg-white px-5 py-3 text-sm font-black text-black transition hover:bg-orange-100 md:mt-0">Sign in to preview</Link>
+          {!session && <Link href="/login" className="mt-5 inline-flex rounded-full bg-white px-5 py-3 text-sm font-black text-black transition hover:bg-orange-100 md:mt-0">Sign in to preview</Link>}
         </div>
+        {!!staffRides.length && <div className="mt-5 grid gap-4 md:grid-cols-2 xl:grid-cols-3">{staffRides.map((ride) => <Link key={ride.slug} href={`/rides/${ride.slug}`} className="rounded-3xl border border-white/10 bg-white/[.025] p-6 transition hover:-translate-y-1 hover:border-orange-400/35"><p className="text-xs font-bold uppercase tracking-widest text-orange-400">{ride.guildName}</p><h3 className="mt-2 text-xl font-black">{ride.title}</h3><p className="mt-2 text-sm text-zinc-500">{ride.city} → {ride.destination}</p><div className="mt-4 flex flex-wrap gap-2">{ride.assignments.map((assignment, index) => <span key={`${assignment.role}-${assignment.originCity}-${index}`} className="rounded-full border border-white/10 px-3 py-1.5 text-xs font-bold">{assignment.role.replaceAll("_", " ")}{assignment.originCity ? ` · ${assignment.originCity}` : ""}</span>)}</div></Link>)}</div>}
       </section>
 
       <MarketplaceExplorer cities={cities} guilds={guilds} rides={rides} />

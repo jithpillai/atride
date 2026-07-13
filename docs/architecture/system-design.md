@@ -496,7 +496,14 @@ PostgreSQL/PostGIS is authoritative. Redis stores only short-lived or recomputab
 - `ride_addons`
 - `ride_rule_sets`
 - `ride_policy_versions`
+- `community_ride_policy_templates` (Guild defaults copied into new ride policy versions)
 - `ride_status_history`
+- `ride_ai_generations` (usage/status metadata only; no persisted prompt or response content)
+- `ride_announcements` (regenerable canonical-data export snapshots)
+
+Guild policy templates are authoring defaults, not live references. Creating a ride copies the current Guild templates into that ride’s independently editable versioned policies. Later Guild-template edits affect only future rides and never silently rewrite published rides or booking-policy snapshots.
+
+The Ride Assistant is an optional server-side adapter around Gemini structured output. Browser code never receives the provider key. The API repeats tenant and ride-scoped authorization, applies common PII/source filtering, requests a strict JSON schema, normalizes bounded output into the existing editor formats, records only model/status/token metadata, and enforces daily user/ride generation limits. Generated content remains an unsaved proposal until a human selects and applies it. External Gemini is only a clipboard/open fallback and has no callback into @Ride.
 
 ### 10.4 Bookings and payments
 

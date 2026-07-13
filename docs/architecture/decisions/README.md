@@ -27,6 +27,7 @@ Architecture Decision Records (ADRs) capture important choices, their context, a
 | [ADR-012](ADR-012-cloudinary-media.md) | Cloudinary as initial media provider behind an adapter | Accepted |
 | [ADR-013](ADR-013-opaque-database-sessions.md) | Application-owned opaque PostgreSQL sessions | Accepted |
 | [ADR-014](ADR-014-firebase-phone-verification.md) | Firebase for one-time phone ownership verification | Accepted |
+| [ADR-015](ADR-015-review-before-apply-ai-authoring.md) | Review-before-apply AI ride authoring | Accepted |
 
 ## Adding a decision
 

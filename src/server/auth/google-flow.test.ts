@@ -27,7 +27,9 @@ describe("Google OAuth flow protection", () => {
     vi.stubEnv("AUTH_SECRET", "test-auth-secret-containing-at-least-thirty-two-characters");
     const encrypted = encryptGoogleOAuthFlow(createGoogleOAuthFlow("/account"));
 
-    expect(decryptGoogleOAuthFlow(`${encrypted.slice(0, -1)}x`)).toBeNull();
+    const tamperIndex = Math.floor(encrypted.length / 2);
+    const tampered = `${encrypted.slice(0, tamperIndex)}${encrypted[tamperIndex] === "x" ? "y" : "x"}${encrypted.slice(tamperIndex + 1)}`;
+    expect(decryptGoogleOAuthFlow(tampered)).toBeNull();
     expect(sanitizeReturnTo("//attacker.example")).toBe("/account");
     expect(sanitizeReturnTo("https://attacker.example")).toBe("/account");
   });

@@ -60,7 +60,7 @@ export default async function GuildPage({ params }: Props) {
   return (
     <>
       <section className="relative overflow-hidden border-b border-white/10" style={{ background: guild.gradient }}>
-        <ImageWithFallback src={guild.coverUrl ?? "/defaults/guild-hall-cover.png"} fallbackSrc="/defaults/guild-hall-cover.png" alt="" fill priority className="object-cover opacity-45" />
+        <ImageWithFallback src={guild.coverUrl ?? "/defaults/guild-hall-cover.png"} fallbackSrc="/defaults/guild-hall-cover.png" alt="" fill sizes="100vw" priority className="object-cover opacity-45" />
         <div className="absolute inset-0 bg-gradient-to-r from-black/75 via-black/35 to-transparent" />
         <div className="relative mx-auto max-w-7xl px-5 py-24 lg:px-8">
           <ImageWithFallback src={guild.logoUrl ?? "/defaults/guild-avatar.png"} fallbackSrc="/defaults/guild-avatar.png" alt={`${guild.name} logo`} width={72} height={72} className="size-[4.5rem] rounded-2xl object-cover" />

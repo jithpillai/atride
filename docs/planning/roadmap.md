@@ -14,6 +14,7 @@ Current infrastructure status:
 - SMS is explicitly outside the launch critical path and is deferred to an optional final phase. Cloudinary media uploads are active; maps, Redis workers, and payments remain deferred to their delivery phases.
 - Phase 2 foundations are implemented: Google OpenID Connect plus email OTP, opaque sessions, account/logout, first-login onboarding, private participant profiles, a vehicle garage, seeded roles, optional Firebase phone verification, and protected platform/Guild authorization boundaries. Personalized upcoming rides and distributed abuse controls remain scheduled with their dependent phases.
 - Phase 3A and the first testable Phase 3B staff-management slice are implemented. Platform administrators can onboard Guilds; Owners/Admins can manage branding, visibility, official links, operating cities, member status, staff invitations and roles, and inspect tenant-scoped audit history.
+- Phase 4 and Phase 4B are implemented for the current non-map scope: authorized Guild Ride Managers and explicitly assigned lead/captain/vice-captain staff can manage only permitted ride drafts, flexible multi-origin routes, itinerary, accommodation, package items, vehicle requirements, linked commercial dates, versioned Guild-derived policies, origin-specific crew, cover/gallery media, controlled publication states, PII-filtered organizer exports, approved-origin public widgets, and personalized assigned rides. The optional Gemini-backed Ride Assistant produces a reviewable structured draft with per-section regeneration, explicit missing-fact warnings, selective application, usage limits, and an external copy/open-Gemini fallback. Structured map checkpoints remain scheduled with the map/operations capability rather than blocking publication.
 
 Related documents:
 
@@ -176,6 +177,10 @@ External accounts needed:
 
 ### Phase 4 — Ride creation and publication
 
+Phase 4 and its Phase 4B authoring-assistance increment are implemented for the current non-map scope. The protected Ride Studio persists a canonical trip package and keeps browser drafts through validation failures. Total capacity belongs to the destination/stay; origin allocations remain optional hints. Origin records carry independent meeting/departure/merge/route details and staff assignments. Guild policy templates snapshot into versioned ride policies. Ride media supports immediate previews and multi-select galleries. Publishing uses explicit state transitions and completeness checks; public rendering, assigned-staff landing cards, approved-origin widget data, and PII-filtered WhatsApp-ready exports all derive from canonical data.
+
+The optional server-side Ride Assistant uses Gemini structured output. It sanitizes common phone, email, payment-handle, private-link, and participant-list patterns before provider calls; never sends infrastructure or session credentials; records provider usage without storing prompt content; enforces daily per-user/per-ride limits; flags missing facts; and never applies or saves suggestions without organizer review. Organizers can regenerate one section, edit the result, select sections to apply to the unsaved form, or use a copy/open-Gemini fallback. Google Maps-backed coordinates and operational checkpoints remain deferred because restricted Maps keys are not configured yet.
+
 Build:
 
 - Ride drafts
@@ -219,7 +224,8 @@ Acceptance tests:
 External accounts needed:
 
 - Cloudinary
-- Google Maps test project and restricted development keys
+- Gemini API key only when the optional in-product authoring assistant is enabled
+- Google Maps test project and restricted development keys for the later structured map/checkpoint increment
 
 ### Phase 5 — Booking and offline payments
 

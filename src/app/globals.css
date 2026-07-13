@@ -52,6 +52,22 @@ input {
   line-height: 1.7;
 }
 
+.field {
+  display: block;
+  width: 100%;
+  margin-top: 0.5rem;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 1rem;
+  background-color: rgba(0, 0, 0, 0.2);
+  padding: 0.75rem 1rem;
+  color: white;
+  outline: none;
+}
+
+.field:focus {
+  border-color: #f97316;
+}
+
 ::selection {
   background: rgba(255, 90, 24, 0.75);
   color: white;

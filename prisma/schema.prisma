@@ -61,6 +61,23 @@ enum RideDifficulty {
   CHALLENGING
 }
 
+enum RidePackageItemType {
+  INCLUSION
+  EXCLUSION
+  ADD_ON
+  MEAL
+  ACTIVITY
+}
+
+enum RidePolicyType {
+  SAFETY
+  PAYMENT
+  CANCELLATION
+  REPLACEMENT
+  PROPERTY_CONDUCT
+  WAIVER
+}
+
 enum UserStatus {
   ACTIVE
   SUSPENDED
@@ -175,10 +192,12 @@ model Community {
   memberships          CommunityMembership[]
   invitations          CommunityInvitation[]
   auditEvents          CommunityAuditEvent[]
+  ridePolicyTemplates  CommunityRidePolicyTemplate[]
   rideStaffAssignments RideStaffAssignment[]
-  mediaAssets          MediaAsset[]          @relation("CommunityMedia")
-  logoAsset            MediaAsset?           @relation("CommunityLogo", fields: [logoAssetId], references: [id], onDelete: SetNull)
-  coverAsset           MediaAsset?           @relation("CommunityCover", fields: [coverAssetId], references: [id], onDelete: SetNull)
+  embedOrigins         CommunityEmbedOrigin[]
+  mediaAssets          MediaAsset[]                  @relation("CommunityMedia")
+  logoAsset            MediaAsset?                   @relation("CommunityLogo", fields: [logoAssetId], references: [id], onDelete: SetNull)
+  coverAsset           MediaAsset?                   @relation("CommunityCover", fields: [coverAssetId], references: [id], onDelete: SetNull)
 
   @@map("communities")
 }
@@ -214,31 +233,59 @@ model CommunityVisibility {
   @@map("community_visibility_settings")
 }
 
+model CommunityEmbedOrigin {
+  id          String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  communityId String   @map("community_id") @db.Uuid
+  origin      String   @db.VarChar(255)
+  createdAt   DateTime @default(now()) @map("created_at") @db.Timestamptz(3)
+
+  community Community @relation(fields: [communityId], references: [id], onDelete: Cascade)
+
+  @@unique([communityId, origin])
+  @@map("community_embed_origins")
+}
+
 model Ride {
-  id           String         @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
-  communityId  String         @map("community_id") @db.Uuid
-  slug         String         @unique @db.VarChar(100)
-  title        String         @db.VarChar(180)
-  summary      String         @db.Text
-  originCity   String         @map("origin_city") @db.VarChar(120)
-  destination  String         @db.VarChar(160)
-  startsAt     DateTime       @map("starts_at") @db.Timestamptz(3)
-  endsAt       DateTime       @map("ends_at") @db.Timestamptz(3)
-  pricePaise   Int            @map("price_paise")
-  totalSlots   Int            @map("total_slots")
-  bookedSlots  Int            @default(0) @map("booked_slots")
-  vehicleType  VehicleType    @default(BIKE) @map("vehicle_type")
-  difficulty   RideDifficulty
-  status       RideStatus     @default(DRAFT)
-  visibility   RideVisibility @default(PUBLIC)
-  featured     Boolean        @default(false)
-  heroGradient String         @map("hero_gradient") @db.Text
-  distanceKm   Int            @map("distance_km")
-  createdAt    DateTime       @default(now()) @map("created_at") @db.Timestamptz(3)
-  updatedAt    DateTime       @updatedAt @map("updated_at") @db.Timestamptz(3)
+  id                       String         @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  communityId              String         @map("community_id") @db.Uuid
+  slug                     String         @unique @db.VarChar(100)
+  title                    String         @db.VarChar(180)
+  summary                  String         @db.Text
+  description              String         @default("") @db.Text
+  originCity               String         @map("origin_city") @db.VarChar(120)
+  destination              String         @db.VarChar(160)
+  startsAt                 DateTime       @map("starts_at") @db.Timestamptz(3)
+  endsAt                   DateTime       @map("ends_at") @db.Timestamptz(3)
+  pricePaise               Int            @map("price_paise")
+  confirmationDepositPaise Int            @default(0) @map("confirmation_deposit_paise")
+  balanceDueAt             DateTime?      @map("balance_due_at") @db.Timestamptz(3)
+  registrationClosesAt     DateTime?      @map("registration_closes_at") @db.Timestamptz(3)
+  totalSlots               Int            @map("total_slots")
+  bufferSlots              Int            @default(0) @map("buffer_slots")
+  bookedSlots              Int            @default(0) @map("booked_slots")
+  vehicleType              VehicleType    @default(BIKE) @map("vehicle_type")
+  vehicleRequirements      String         @default("") @map("vehicle_requirements") @db.Text
+  difficulty               RideDifficulty
+  status                   RideStatus     @default(DRAFT)
+  visibility               RideVisibility @default(PUBLIC)
+  featured                 Boolean        @default(false)
+  heroGradient             String         @map("hero_gradient") @db.Text
+  distanceKm               Int            @map("distance_km")
+  coverAssetId             String?        @unique @map("cover_asset_id") @db.Uuid
+  createdAt                DateTime       @default(now()) @map("created_at") @db.Timestamptz(3)
+  updatedAt                DateTime       @updatedAt @map("updated_at") @db.Timestamptz(3)
 
   community        Community             @relation(fields: [communityId], references: [id], onDelete: Restrict)
   staffAssignments RideStaffAssignment[]
+  origins          RideOrigin[]
+  itineraryDays    RideItineraryDay[]
+  accommodations   RideAccommodation[]
+  packageItems     RidePackageItem[]
+  policies         RidePolicy[]
+  mediaAssets      MediaAsset[]          @relation("RideMedia")
+  coverAsset       MediaAsset?           @relation("RideCover", fields: [coverAssetId], references: [id], onDelete: SetNull)
+  aiGenerations    RideAiGeneration[]
+  announcements   RideAnnouncement[]
 
   @@unique([communityId, slug])
   @@unique([id, communityId])
@@ -246,6 +293,103 @@ model Ride {
   @@index([originCity, status, startsAt])
   @@index([featured, status, startsAt])
   @@map("rides")
+}
+
+model RideOrigin {
+  id             String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  rideId         String   @map("ride_id") @db.Uuid
+  city           String   @db.VarChar(120)
+  meetingPoint   String   @map("meeting_point") @db.VarChar(240)
+  departureAt    DateTime @map("departure_at") @db.Timestamptz(3)
+  capacity       Int?
+  bufferCapacity Int      @default(0) @map("buffer_capacity")
+  mergePoint     String?  @map("merge_point") @db.VarChar(240)
+  routeSummary   String?  @map("route_summary") @db.Text
+  sortOrder      Int      @default(0) @map("sort_order")
+
+  ride Ride @relation(fields: [rideId], references: [id], onDelete: Cascade)
+  staffAssignments RideStaffAssignment[]
+
+  @@index([rideId, sortOrder])
+  @@map("ride_origins")
+}
+
+model CommunityRidePolicyTemplate {
+  id          String         @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  communityId String         @map("community_id") @db.Uuid
+  type        RidePolicyType
+  title       String         @db.VarChar(180)
+  content     String         @db.Text
+  updatedAt   DateTime       @updatedAt @map("updated_at") @db.Timestamptz(3)
+  createdAt   DateTime       @default(now()) @map("created_at") @db.Timestamptz(3)
+
+  community Community @relation(fields: [communityId], references: [id], onDelete: Cascade)
+
+  @@unique([communityId, type])
+  @@map("community_ride_policy_templates")
+}
+
+model RideItineraryDay {
+  id        String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  rideId    String   @map("ride_id") @db.Uuid
+  dayNumber Int      @map("day_number")
+  date      DateTime @db.Date
+  title     String   @db.VarChar(180)
+  summary   String   @db.Text
+
+  ride Ride @relation(fields: [rideId], references: [id], onDelete: Cascade)
+
+  @@unique([rideId, dayNumber])
+  @@map("ride_itinerary_days")
+}
+
+model RideAccommodation {
+  id                      String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  rideId                  String   @map("ride_id") @db.Uuid
+  propertyName            String   @map("property_name") @db.VarChar(180)
+  locality                String   @db.VarChar(180)
+  checkInAt               DateTime @map("check_in_at") @db.Timestamptz(3)
+  checkOutAt              DateTime @map("check_out_at") @db.Timestamptz(3)
+  roomSummary             String   @map("room_summary") @db.Text
+  amenities               String[] @default([])
+  participantNote         String?  @map("participant_note") @db.Text
+  exactLocationRestricted Boolean  @default(true) @map("exact_location_restricted")
+
+  ride Ride @relation(fields: [rideId], references: [id], onDelete: Cascade)
+
+  @@index([rideId, checkInAt])
+  @@map("ride_accommodations")
+}
+
+model RidePackageItem {
+  id          String              @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  rideId      String              @map("ride_id") @db.Uuid
+  type        RidePackageItemType
+  dayNumber   Int?                @map("day_number")
+  title       String              @db.VarChar(180)
+  description String?             @db.Text
+  pricePaise  Int?                @map("price_paise")
+  sortOrder   Int                 @default(0) @map("sort_order")
+
+  ride Ride @relation(fields: [rideId], references: [id], onDelete: Cascade)
+
+  @@index([rideId, type, sortOrder])
+  @@map("ride_package_items")
+}
+
+model RidePolicy {
+  id        String         @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  rideId    String         @map("ride_id") @db.Uuid
+  type      RidePolicyType
+  title     String         @db.VarChar(180)
+  content   String         @db.Text
+  version   Int            @default(1)
+  sortOrder Int            @default(0) @map("sort_order")
+
+  ride Ride @relation(fields: [rideId], references: [id], onDelete: Cascade)
+
+  @@unique([rideId, type, version])
+  @@map("ride_policies")
 }
 
 model User {
@@ -267,6 +411,8 @@ model User {
   uploadedMedia               MediaAsset[]                 @relation("MediaUploader")
   sentCommunityInvitations    CommunityInvitation[]        @relation("CommunityInvitationSender")
   communityAuditEvents        CommunityAuditEvent[]        @relation("CommunityAuditActor")
+  rideAiGenerations           RideAiGeneration[]
+  rideAnnouncements           RideAnnouncement[]
 
   @@map("users")
 }
@@ -320,6 +466,7 @@ model MediaAsset {
   id             String       @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
   uploaderUserId String       @map("uploader_user_id") @db.Uuid
   communityId    String?      @map("community_id") @db.Uuid
+  rideId         String?      @map("ride_id") @db.Uuid
   purpose        MediaPurpose
   access         MediaAccess  @default(PUBLIC)
   provider       String       @default("CLOUDINARY") @db.VarChar(32)
@@ -335,13 +482,16 @@ model MediaAsset {
   createdAt      DateTime     @default(now()) @map("created_at") @db.Timestamptz(3)
   updatedAt      DateTime     @updatedAt @map("updated_at") @db.Timestamptz(3)
 
-  uploader  User                @relation("MediaUploader", fields: [uploaderUserId], references: [id], onDelete: Restrict)
-  community Community?          @relation("CommunityMedia", fields: [communityId], references: [id], onDelete: Cascade)
-  avatarFor ParticipantProfile? @relation("ParticipantAvatar")
-  logoFor   Community?          @relation("CommunityLogo")
-  coverFor  Community?          @relation("CommunityCover")
+  uploader     User                @relation("MediaUploader", fields: [uploaderUserId], references: [id], onDelete: Restrict)
+  community    Community?          @relation("CommunityMedia", fields: [communityId], references: [id], onDelete: Cascade)
+  avatarFor    ParticipantProfile? @relation("ParticipantAvatar")
+  logoFor      Community?          @relation("CommunityLogo")
+  coverFor     Community?          @relation("CommunityCover")
+  ride         Ride?               @relation("RideMedia", fields: [rideId], references: [id], onDelete: Cascade)
+  rideCoverFor Ride?               @relation("RideCover")
 
   @@index([communityId, purpose, sortOrder])
+  @@index([rideId, purpose, sortOrder])
   @@index([uploaderUserId, purpose])
   @@map("media_assets")
 }
@@ -525,14 +675,52 @@ model RideStaffAssignment {
   communityId String        @map("community_id") @db.Uuid
   rideId      String        @map("ride_id") @db.Uuid
   userId      String        @map("user_id") @db.Uuid
+  originId    String?       @map("origin_id") @db.Uuid
   role        RideStaffRole
   createdAt   DateTime      @default(now()) @map("created_at") @db.Timestamptz(3)
 
   community Community @relation(fields: [communityId], references: [id], onDelete: Cascade)
   ride      Ride      @relation(fields: [rideId, communityId], references: [id, communityId], onDelete: Cascade)
   user      User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  origin    RideOrigin? @relation(fields: [originId], references: [id], onDelete: SetNull)
 
   @@unique([rideId, userId, role])
   @@index([communityId, userId])
+  @@index([rideId, originId])
   @@map("ride_staff_assignments")
+}
+
+model RideAiGeneration {
+  id           String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  rideId       String   @map("ride_id") @db.Uuid
+  userId       String   @map("user_id") @db.Uuid
+  model        String   @db.VarChar(120)
+  status       String   @db.VarChar(24)
+  inputTokens  Int?     @map("input_tokens")
+  outputTokens Int?     @map("output_tokens")
+  sections     String[] @default([])
+  errorCode    String?  @map("error_code") @db.VarChar(80)
+  createdAt    DateTime @default(now()) @map("created_at") @db.Timestamptz(3)
+
+  ride Ride @relation(fields: [rideId], references: [id], onDelete: Cascade)
+  user User @relation(fields: [userId], references: [id], onDelete: Restrict)
+
+  @@index([rideId, createdAt])
+  @@index([userId, createdAt])
+  @@map("ride_ai_generations")
+}
+
+model RideAnnouncement {
+  id           String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  rideId       String   @map("ride_id") @db.Uuid
+  createdById  String   @map("created_by_id") @db.Uuid
+  content      String   @db.Text
+  sourceVersion DateTime @map("source_version") @db.Timestamptz(3)
+  createdAt    DateTime @default(now()) @map("created_at") @db.Timestamptz(3)
+
+  ride      Ride @relation(fields: [rideId], references: [id], onDelete: Cascade)
+  createdBy User @relation(fields: [createdById], references: [id], onDelete: Restrict)
+
+  @@index([rideId, createdAt])
+  @@map("ride_announcements")
 }

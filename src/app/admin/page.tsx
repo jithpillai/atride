@@ -4,6 +4,7 @@ import { FormPendingSubmit } from "@/components/pending-feedback";
 import { db } from "@/lib/db";
 import { requirePlatformAdmin } from "@/server/auth/authorization";
 import { createGuild, setGuildStatus } from "@/server/guild/actions";
+import { DEFAULT_GUILD_RIDE_POLICIES } from "@/server/guild/default-ride-policies";
 
 type Props = { searchParams: Promise<{ guildCreated?: string; guildError?: string }> };
 
@@ -59,6 +60,7 @@ export default async function PlatformAdminPage({ searchParams }: Props) {
           <label className="text-sm font-semibold text-zinc-200">Owner’s verified email<input required type="email" maxLength={320} name="ownerEmail" placeholder="owner@example.com" className="mt-2 w-full rounded-2xl border border-white/10 bg-black/20 px-4 py-3 text-white outline-none focus:border-orange-500" /></label>
           <label className="text-sm font-semibold text-zinc-200">Home city<input required minLength={2} maxLength={120} name="homeCity" placeholder="Bengaluru" className="mt-2 w-full rounded-2xl border border-white/10 bg-black/20 px-4 py-3 text-white outline-none focus:border-orange-500" /></label>
         </div>
+        <details className="mt-6 rounded-2xl border border-white/10 p-5" open><summary className="cursor-pointer font-black">Default ride rules and policies</summary><p className="mt-2 text-sm leading-6 text-zinc-500">These become editable defaults for the Guild. Every new ride receives its own snapshot, so later Guild changes do not silently rewrite published ride rules.</p><div className="mt-5 grid gap-5 lg:grid-cols-2">{DEFAULT_GUILD_RIDE_POLICIES.map((policy) => <label key={policy.type} className="text-sm font-semibold text-zinc-200">{policy.title}<textarea required minLength={10} rows={6} name={policy.field} defaultValue={policy.content} className="field text-xs leading-6" /></label>)}</div></details>
         <FormPendingSubmit idleLabel="Create draft Guild" pendingLabel="Creating…" overlayLabel="Creating Guild and assigning Owner…" className="mt-6 rounded-full bg-orange-500 px-6 py-3 text-sm font-black text-white" />
       </form>
 
