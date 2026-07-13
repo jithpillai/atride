@@ -53,7 +53,34 @@ async function upsertIdentity({ email, displayName }: SeedIdentity) {
   });
 }
 
+async function ensureWildGearDemoAdmin() {
+  const user = await upsertIdentity({ email: "wildgear.admin@atride.test", displayName: "Wild Gear Admin" });
+  const acceptedAt = new Date();
+  await prisma.participantProfile.upsert({
+    where: { userId: user.id },
+    create: { userId: user.id, homeCity: "Bengaluru", homeState: "Karnataka", termsAcceptedAt: acceptedAt, privacyAcceptedAt: acceptedAt, onboardingCompletedAt: acceptedAt },
+    update: { homeCity: "Bengaluru", homeState: "Karnataka", termsAcceptedAt: acceptedAt, privacyAcceptedAt: acceptedAt, onboardingCompletedAt: acceptedAt },
+  });
+  const community = await prisma.community.findUniqueOrThrow({ where: { slug: "wild-gear" } });
+  const membership = await prisma.communityMembership.upsert({
+    where: { communityId_userId: { communityId: community.id, userId: user.id } },
+    create: { communityId: community.id, userId: user.id, status: "ACTIVE", joinedAt: acceptedAt },
+    update: { status: "ACTIVE", joinedAt: acceptedAt },
+  });
+  await prisma.communityRoleAssignment.upsert({
+    where: { membershipId_role: { membershipId: membership.id, role: "ADMIN" } },
+    create: { membershipId: membership.id, role: "ADMIN" },
+    update: {},
+  });
+  return user;
+}
+
 async function main() {
+  if (process.argv.includes("--wildgear-admin-only")) {
+    const user = await ensureWildGearDemoAdmin();
+    console.log(`Ensured Wild Gear demo administrator ${user.id}.`);
+    return;
+  }
   for (const guild of guilds) {
     const visibility = {
       directoryVisibility: guild.directoryVisibility,
@@ -196,9 +223,10 @@ async function main() {
     ] });
   }
 
-  const [platformAdmin, ravanasAdmin, wildGearCaptain, rider] = await Promise.all([
+  const [platformAdmin, ravanasAdmin, wildGearAdmin, wildGearCaptain, rider] = await Promise.all([
     upsertIdentity({ email: "platform.admin@atride.test", displayName: "AtRide Platform Admin" }),
     upsertIdentity({ email: "ravanas.admin@atride.test", displayName: "Royal Ravanas Admin" }),
+    ensureWildGearDemoAdmin(),
     upsertIdentity({ email: "wildgear.captain@atride.test", displayName: "Wild Gear Captain" }),
     upsertIdentity({ email: "rider@atride.test", displayName: "Demo Rider" }),
   ]);
@@ -206,6 +234,7 @@ async function main() {
   const seededProfiles = [
     { user: platformAdmin, homeCity: "Bengaluru", homeState: "Karnataka" },
     { user: ravanasAdmin, homeCity: "Chennai", homeState: "Tamil Nadu" },
+    { user: wildGearAdmin, homeCity: "Bengaluru", homeState: "Karnataka" },
     { user: wildGearCaptain, homeCity: "Bengaluru", homeState: "Karnataka" },
     { user: rider, homeCity: "Coimbatore", homeState: "Tamil Nadu" },
   ];
