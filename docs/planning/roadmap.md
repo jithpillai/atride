@@ -15,7 +15,7 @@ Current infrastructure status:
 - Phase 2 foundations are implemented: Google OpenID Connect plus email OTP, opaque sessions, account/logout, first-login onboarding, private participant profiles, a vehicle garage, seeded roles, optional Firebase phone verification, and protected platform/Guild authorization boundaries. Personalized upcoming rides and distributed abuse controls remain scheduled with their dependent phases.
 - Phase 3A and the first testable Phase 3B staff-management slice are implemented. Platform administrators can onboard Guilds; Owners/Admins can manage branding, visibility, official links, operating cities, member status, staff invitations and roles, and inspect tenant-scoped audit history.
 - Phase 4 and Phase 4B are implemented for the current non-map scope: authorized Guild Ride Managers and explicitly assigned lead/captain/vice-captain staff can manage only permitted ride drafts, flexible multi-origin routes, itinerary, accommodation, package items, vehicle requirements, linked commercial dates, versioned Guild-derived policies, origin-specific crew, cover/gallery media, controlled publication states, PII-filtered organizer exports, approved-origin public widgets, and personalized assigned rides. The optional Gemini-backed Ride Assistant produces a reviewable structured draft with per-section regeneration, explicit missing-fact warnings, selective application, usage limits, and an external copy/open-Gemini fallback. Structured map checkpoints remain scheduled with the map/operations capability rather than blocking publication.
-- Phase 5 has started with a complete offline-booking vertical slice. A signed-in participant can reserve one seat with an origin, occupant role, vehicle, preferences, add-ons, consent, and an immutable ride/package/policy snapshot. PostgreSQL row locking prevents overselling, sold-out rides expose a waitlist path, and protected Cloudinary proofs plus UPI/bank references can be submitted. Confirmation advances and balances are separate dated obligations; Guild Owner/Admin/Finance roles receive durable event-driven review notifications and only those roles can confirm payment. Participant bookings and staff duties are merged into one personalized upcoming-rides roadbook. Dynamic UPI intent/QR generation, automated expiry processing, transfer/replacement, richer party/accommodation pricing, and newcomer presentation remain Phase 5 increments.
+- Phase 5 has started with a complete offline-booking vertical slice. A signed-in participant can reserve one seat with an origin, occupant role, vehicle, preferences, add-ons, consent, and an immutable ride/package/policy snapshot. PostgreSQL row locking prevents overselling, sold-out rides expose a waitlist path, and protected Cloudinary proofs plus UPI/bank references can be submitted. Confirmation advances and balances are separate dated obligations; Guild Owner/Admin/Finance roles receive durable event-driven review notifications and only those roles can confirm payment. Guild-owned assisted UPI now provides immutable recipient snapshots, exact-amount mobile intents, and local desktop QR rendering. Participant bookings and staff duties are merged into one personalized upcoming-rides roadbook. Automated expiry processing, transfer/replacement, richer party/accommodation pricing, and newcomer presentation remain Phase 5 increments.
 
 Related documents:
 
@@ -231,7 +231,7 @@ External accounts needed:
 
 ### Phase 5 — Booking and offline payments
 
-Implementation status: **in progress**. The reservation, one-account/one-seat participant flow, waitlist, consent snapshot, separate advance/balance obligations, offline UPI/bank/cash selection, transaction-reference capture, private proof upload, finance confirmation/rejection, durable payment email outbox, audit trail, and personalized upcoming-rides integration are implemented. Remaining work includes Dynamic UPI intent/QR generation, scheduled expiry processing, party/multi-occupant bookings, richer accommodation pricing, replacement/transfer, and newcomer presentation.
+Implementation status: **in progress**. The reservation, one-account/one-seat participant flow, waitlist, consent snapshot, separate advance/balance obligations, offline UPI/bank/cash selection, Guild-level UPI configuration, immutable recipient snapshots, exact-amount UPI intents/local QR, transaction-reference capture, private proof upload, finance confirmation/rejection, durable payment email outbox, audit trail, and personalized upcoming-rides integration are implemented. Remaining work includes scheduled expiry processing, party/multi-occupant bookings, richer accommodation pricing, replacement/transfer, and newcomer presentation.
 
 Build:
 
@@ -265,6 +265,8 @@ Acceptance tests:
 - Simultaneous requests cannot oversell the final slot.
 - Unpaid reservations expire and release capacity.
 - A participant uploads offline payment proof.
+- A participant can open a mobile UPI app or scan a locally rendered desktop QR containing the snapshotted Guild recipient and exact obligation amount.
+- Changing the Guild UPI configuration does not rewrite an already-issued payment obligation.
 - Authorized finance staff confirms or rejects it.
 - A captain without finance permission cannot mark it paid.
 - Every manual payment change has an audit record.

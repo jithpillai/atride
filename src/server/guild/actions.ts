@@ -8,6 +8,7 @@ import { requireGuildAdmin, requirePlatformAdmin, requireSession } from "@/serve
 import { isEmail, normalizeEmail } from "@/server/auth/crypto";
 import { isStaffRole, normalizeOptionalHttpsUrl, parseOperatingCities, type StaffRole } from "@/server/guild/validation";
 import { DEFAULT_GUILD_RIDE_POLICIES, policyContent } from "@/server/guild/default-ride-policies";
+import { isValidUpiVpa, normalizeUpiVpa } from "@/lib/upi";
 
 const RESERVED_SLUGS = new Set(["admin", "api", "account", "login", "onboarding", "rides", "guilds", "www", "support"]);
 
@@ -112,6 +113,64 @@ export async function updateGuildEmbedOrigins(formData: FormData) {
   ]);
   revalidatePath(`/guilds/${slug}/manage`);
   redirect(`/guilds/${slug}/manage?section=settings&embedSaved=1#embed-origins`);
+}
+
+export async function updateGuildPaymentSettings(formData: FormData) {
+  const slug = value(formData, "slug", 80);
+  const { session } = await requireGuildAdmin(slug);
+  const upiEnabled = formData.get("upiEnabled") === "on";
+  const upiVpa = normalizeUpiVpa(value(formData, "upiVpa", 130));
+  const upiPayeeName = value(formData, "upiPayeeName", 120);
+  const participantInstructions = value(formData, "participantInstructions", 2000) || null;
+  if (upiEnabled && (!isValidUpiVpa(upiVpa) || upiPayeeName.length < 2)) {
+    redirect(`/guilds/${slug}/manage?section=finance&upiError=invalid#upi-settings`);
+  }
+  const guild = await db.community.findUnique({ where: { slug }, select: { id: true } });
+  if (!guild) redirect("/account?access=denied");
+  await db.$transaction(async (tx) => {
+    await tx.communityPaymentSettings.upsert({
+      where: { communityId: guild.id },
+      create: {
+        communityId: guild.id,
+        upiEnabled,
+        upiVpa: upiVpa || null,
+        upiPayeeName: upiPayeeName || null,
+        participantInstructions,
+      },
+      update: {
+        upiEnabled,
+        upiVpa: upiVpa || null,
+        upiPayeeName: upiPayeeName || null,
+        participantInstructions,
+      },
+    });
+    if (upiEnabled) {
+      await tx.bookingPayment.updateMany({
+        where: {
+          method: "UPI",
+          status: { in: ["PENDING", "REJECTED"] },
+          payeeVpaSnapshot: null,
+          booking: { communityId: guild.id },
+        },
+        data: {
+          payeeVpaSnapshot: upiVpa,
+          payeeNameSnapshot: upiPayeeName,
+          payeeInstructionsSnapshot: participantInstructions,
+        },
+      });
+    }
+    await tx.communityAuditEvent.create({
+      data: {
+        communityId: guild.id,
+        actorUserId: session.userId,
+        action: "GUILD_UPI_SETTINGS_UPDATED",
+        metadata: { upiEnabled, configured: Boolean(upiVpa && upiPayeeName) },
+      },
+    });
+  });
+  revalidatePath(`/guilds/${slug}/manage`);
+  revalidatePath("/");
+  redirect(`/guilds/${slug}/manage?section=finance&upiSaved=1#upi-settings`);
 }
 
 export async function setGuildStatus(formData: FormData) {

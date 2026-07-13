@@ -23,7 +23,7 @@ export type ReserveRideInput = {
 };
 
 const bookingRideInclude = {
-  community: { select: { id: true, slug: true, name: true } },
+  community: { select: { id: true, slug: true, name: true, paymentSettings: true } },
   origins: { orderBy: { sortOrder: "asc" as const } },
   itineraryDays: { orderBy: { sortOrder: "asc" as const } },
   accommodations: { orderBy: { checkInAt: "asc" as const } },
@@ -85,6 +85,16 @@ export async function reserveRide(input: ReserveRideInput) {
     const expiresAt = hasCapacity ? reservationExpiry(now, ride.registrationClosesAt) : null;
     if (expiresAt && expiresAt <= now) throw new AuthError("REGISTRATION_CLOSED", "Registration for this ride has closed.", 409);
     const snapshot = buildBookingSnapshot(ride);
+    const upiRecipient = ride.community.paymentSettings?.upiEnabled && ride.community.paymentSettings.upiVpa && ride.community.paymentSettings.upiPayeeName
+      ? {
+          payeeVpaSnapshot: ride.community.paymentSettings.upiVpa,
+          payeeNameSnapshot: ride.community.paymentSettings.upiPayeeName,
+          payeeInstructionsSnapshot: ride.community.paymentSettings.participantInstructions,
+        }
+      : null;
+    if (hasCapacity && input.paymentMethod === "UPI" && !upiRecipient) {
+      throw new AuthError("UPI_UNAVAILABLE", "This Guild has not enabled assisted UPI. Choose bank transfer or cash.", 409);
+    }
     const commonData = {
       communityId: ride.communityId,
       originId: origin.id,
@@ -130,6 +140,7 @@ export async function reserveRide(input: ReserveRideInput) {
               method: input.paymentMethod,
               amountPaise: depositPaise,
               dueAt: expiresAt,
+              ...(input.paymentMethod === "UPI" ? upiRecipient! : {}),
             },
             ...(balanceDuePaise > 0 ? [{
               bookingId: booking.id,
@@ -137,6 +148,7 @@ export async function reserveRide(input: ReserveRideInput) {
               method: input.paymentMethod,
               amountPaise: balanceDuePaise,
               dueAt: ride.balanceDueAt ?? ride.registrationClosesAt ?? ride.startsAt,
+              ...(input.paymentMethod === "UPI" ? upiRecipient! : {}),
             }] : []),
           ]
         : [{
@@ -145,6 +157,7 @@ export async function reserveRide(input: ReserveRideInput) {
             method: input.paymentMethod,
             amountPaise: totalPricePaise,
             dueAt: expiresAt,
+            ...(input.paymentMethod === "UPI" ? upiRecipient! : {}),
           }];
       await tx.bookingPayment.createMany({ data: payments });
     }

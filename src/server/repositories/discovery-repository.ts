@@ -238,7 +238,7 @@ export const findPublicRidePackageBySlug = cache(async (slug: string) => db.ride
     community: { status: "ACTIVE", visibility: { guildHallAccess: "PUBLIC" } },
   },
   include: {
-    community: { select: { slug: true, name: true, shortName: true } },
+    community: { select: { slug: true, name: true, shortName: true, paymentSettings: { select: { upiEnabled: true } } } },
     origins: { orderBy: { sortOrder: "asc" } }, itineraryDays: { orderBy: { sortOrder: "asc" } },
     accommodations: { orderBy: { checkInAt: "asc" } }, packageItems: { orderBy: [{ type: "asc" }, { sortOrder: "asc" }] },
     policies: { orderBy: [{ type: "asc" }, { version: "desc" }] },

@@ -240,6 +240,7 @@ model Community {
 
   locations            CommunityLocation[]
   visibility           CommunityVisibility?
+  paymentSettings      CommunityPaymentSettings?
   rides                Ride[]
   memberships          CommunityMembership[]
   invitations          CommunityInvitation[]
@@ -298,6 +299,21 @@ model CommunityEmbedOrigin {
 
   @@unique([communityId, origin])
   @@map("community_embed_origins")
+}
+
+model CommunityPaymentSettings {
+  id                      String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  communityId             String   @unique @map("community_id") @db.Uuid
+  upiEnabled              Boolean  @default(false) @map("upi_enabled")
+  upiVpa                  String?  @map("upi_vpa") @db.VarChar(130)
+  upiPayeeName            String?  @map("upi_payee_name") @db.VarChar(120)
+  participantInstructions String?  @map("participant_instructions") @db.Text
+  createdAt               DateTime @default(now()) @map("created_at") @db.Timestamptz(3)
+  updatedAt               DateTime @updatedAt @map("updated_at") @db.Timestamptz(3)
+
+  community Community @relation(fields: [communityId], references: [id], onDelete: Cascade)
+
+  @@map("community_payment_settings")
 }
 
 model Ride {
@@ -870,22 +886,25 @@ model BookingAddOn {
 }
 
 model BookingPayment {
-  id              String                @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
-  bookingId       String                @map("booking_id") @db.Uuid
-  purpose         BookingPaymentPurpose
-  method          BookingPaymentMethod
-  status          BookingPaymentStatus  @default(PENDING)
-  amountPaise     Int                   @map("amount_paise")
-  dueAt           DateTime?             @map("due_at") @db.Timestamptz(3)
-  submittedAt     DateTime?             @map("submitted_at") @db.Timestamptz(3)
-  payerReference  String?               @map("payer_reference") @db.VarChar(180)
-  participantNote String?               @map("participant_note") @db.Text
-  proofAssetId    String?               @unique @map("proof_asset_id") @db.Uuid
-  reviewedById    String?               @map("reviewed_by_id") @db.Uuid
-  reviewedAt      DateTime?             @map("reviewed_at") @db.Timestamptz(3)
-  rejectionReason String?               @map("rejection_reason") @db.Text
-  createdAt       DateTime              @default(now()) @map("created_at") @db.Timestamptz(3)
-  updatedAt       DateTime              @updatedAt @map("updated_at") @db.Timestamptz(3)
+  id                        String                @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  bookingId                 String                @map("booking_id") @db.Uuid
+  purpose                   BookingPaymentPurpose
+  method                    BookingPaymentMethod
+  status                    BookingPaymentStatus  @default(PENDING)
+  amountPaise               Int                   @map("amount_paise")
+  dueAt                     DateTime?             @map("due_at") @db.Timestamptz(3)
+  submittedAt               DateTime?             @map("submitted_at") @db.Timestamptz(3)
+  payerReference            String?               @map("payer_reference") @db.VarChar(180)
+  participantNote           String?               @map("participant_note") @db.Text
+  payeeVpaSnapshot          String?               @map("payee_vpa_snapshot") @db.VarChar(130)
+  payeeNameSnapshot         String?               @map("payee_name_snapshot") @db.VarChar(120)
+  payeeInstructionsSnapshot String?               @map("payee_instructions_snapshot") @db.Text
+  proofAssetId              String?               @unique @map("proof_asset_id") @db.Uuid
+  reviewedById              String?               @map("reviewed_by_id") @db.Uuid
+  reviewedAt                DateTime?             @map("reviewed_at") @db.Timestamptz(3)
+  rejectionReason           String?               @map("rejection_reason") @db.Text
+  createdAt                 DateTime              @default(now()) @map("created_at") @db.Timestamptz(3)
+  updatedAt                 DateTime              @updatedAt @map("updated_at") @db.Timestamptz(3)
 
   booking            RideBooking               @relation(fields: [bookingId], references: [id], onDelete: Cascade)
   proofAsset         MediaAsset?               @relation("BookingPaymentProof", fields: [proofAssetId], references: [id], onDelete: SetNull)

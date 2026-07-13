@@ -8,6 +8,8 @@ export type PaymentEmailPayload = {
   paymentPurpose: string;
   paymentMethod: string;
   payerReference?: string | null;
+  payeeVpa?: string | null;
+  payeeName?: string | null;
   submittedAt?: string | null;
   rejectionReason?: string | null;
   reviewUrl: string;
@@ -49,6 +51,7 @@ export function renderPaymentEventEmail(eventType: NotificationEventType, recipi
     `Payment: ${purpose}`,
     `Method: ${method}`,
     `Amount: ${amount}`,
+    payload.payeeVpa ? `Requested recipient: ${payload.payeeName || "Guild payee"} · ${payload.payeeVpa}` : null,
     payload.payerReference ? `Reference: ${payload.payerReference}` : null,
     payload.rejectionReason ? `Reason: ${payload.rejectionReason}` : null,
   ].filter(Boolean) as string[];
