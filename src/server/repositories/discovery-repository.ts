@@ -116,6 +116,24 @@ export const listMarketplaceRides = cache(async (): Promise<RideView[]> => {
   return rides.map(toRideView);
 });
 
+export const listUpcomingStaffRides = cache(async (userId: string) => {
+  const rides = await db.ride.findMany({
+    where: {
+      startsAt: { gte: new Date() },
+      status: { in: ["PUBLISHED", "CLOSED", "POSTPONED"] },
+      staffAssignments: { some: { userId } },
+    },
+    include: { community: { select: { slug: true, name: true } }, staffAssignments: { where: { userId }, include: { origin: { select: { city: true } } } } },
+    orderBy: { startsAt: "asc" },
+    take: 6,
+  });
+  return rides.map((ride) => ({
+    ...toRideView(ride),
+    guildName: ride.community.name,
+    assignments: ride.staffAssignments.map((assignment) => ({ role: assignment.role, originCity: assignment.origin?.city ?? null })),
+  }));
+});
+
 export const listMarketplaceCities = cache(async (): Promise<string[]> => {
   const locations = await db.communityLocation.findMany({
     where: {
@@ -186,7 +204,7 @@ export const findPublicRideBySlug = cache(async (slug: string): Promise<RideView
 
 export const findPublicRidePackageBySlug = cache(async (slug: string) => db.ride.findFirst({
   where: {
-    slug, status: "PUBLISHED", visibility: "PUBLIC",
+    slug, status: { in: ["PUBLISHED", "CLOSED", "POSTPONED", "CANCELLED", "COMPLETED"] }, visibility: "PUBLIC",
     community: { status: "ACTIVE", visibility: { guildHallAccess: "PUBLIC" } },
   },
   include: {
@@ -195,7 +213,7 @@ export const findPublicRidePackageBySlug = cache(async (slug: string) => db.ride
     accommodations: { orderBy: { checkInAt: "asc" } }, packageItems: { orderBy: [{ type: "asc" }, { sortOrder: "asc" }] },
     policies: { orderBy: [{ type: "asc" }, { version: "desc" }] },
     coverAsset: true, mediaAssets: { where: { purpose: "RIDE_GALLERY" }, orderBy: [{ sortOrder: "asc" }, { createdAt: "asc" }] },
-    staffAssignments: { include: { user: { select: { displayName: true } } }, orderBy: { role: "asc" } },
+    staffAssignments: { include: { user: { select: { displayName: true } }, origin: { select: { city: true } } }, orderBy: { role: "asc" } },
   },
 }));
 
@@ -210,7 +228,7 @@ export const listStaticGuildSlugs = cache(async (): Promise<string[]> => {
 export const listPublicRideSlugs = cache(async (): Promise<string[]> => {
   const rides = await db.ride.findMany({
     where: {
-      status: "PUBLISHED",
+      status: { in: ["PUBLISHED", "CLOSED", "POSTPONED", "CANCELLED", "COMPLETED"] },
       visibility: "PUBLIC",
       community: {
         status: "ACTIVE",

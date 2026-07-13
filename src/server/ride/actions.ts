@@ -4,12 +4,22 @@ import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 
 import { db } from "@/lib/db";
-import { requireRideManager } from "@/server/auth/authorization";
+import { requireRideEditor, requireRideManager } from "@/server/auth/authorization";
 import { moneyToPaise, optionalDate, parseDayItems, parseItinerary, parseOrigins, parseSimpleItems, positiveInteger, requiredDate, validRideSlug } from "@/server/ride/validation";
 import { DEFAULT_GUILD_RIDE_POLICIES } from "@/server/guild/default-ride-policies";
+import { generateAnnouncementText } from "@/server/ride/announcement";
+import { isRideStatusTransitionAllowed } from "@/server/ride/status";
 
 function value(formData: FormData, name: string, max = 5000) {
   return String(formData.get(name) ?? "").trim().slice(0, max);
+}
+
+function integerValue(formData: FormData, name: string, minimum = 0) {
+  try {
+    return positiveInteger(value(formData, name, 8), minimum);
+  } catch {
+    throw new Error(`Invalid integer:${name}`);
+  }
 }
 
 function editor(slug: string, rideId: string, error?: string) {
@@ -18,7 +28,12 @@ function editor(slug: string, rideId: string, error?: string) {
 
 function rideEditorErrorCode(error: unknown) {
   if (!(error instanceof Error)) return "server";
+  if (error.message.startsWith("Invalid origin capacity:")) return `origin-capacity-${error.message.split(":")[1]}`;
+  if (error.message.startsWith("Invalid origin buffer:")) return `origin-buffer-${error.message.split(":")[1]}`;
+  if (error.message.startsWith("Invalid package day:")) return `package-day-${error.message.split(":")[1]}`;
+  if (error.message.startsWith("Invalid integer:")) return `integer-${error.message.split(":")[1]}`;
   if (error.message === "capacity") return "capacity";
+  if (error.message === "booked-capacity") return "booked-capacity";
   if (error.message === "stay") return "stay";
   if (error.message === "policy") return "policy";
   if (error.message === "Invalid origin row") return "origins";
@@ -72,9 +87,9 @@ export async function createRideDraft(_previousState: CreateRideDraftState, form
         data: {
           communityId: community.id, slug, title, summary, description: summary,
           originCity, destination, startsAt, endsAt, pricePaise: 0, totalSlots: 1,
-          vehicleType: "BIKE", difficulty: "MODERATE", status: "DRAFT", visibility: "PUBLIC",
+          vehicleType: "BIKE", vehicleRequirements: "Road-legal motorcycle in safe touring condition; full-face helmet and required riding gear.", difficulty: "MODERATE", status: "DRAFT", visibility: "PUBLIC",
           heroGradient: "linear-gradient(135deg, #17212b 0%, #7c2d12 55%, #101419 100%)", distanceKm: 1,
-          origins: { create: { city: originCity, meetingPoint: "Meeting point to be confirmed", departureAt: startsAt } },
+          origins: { create: { city: originCity, meetingPoint: "Meeting point to be confirmed", departureAt: startsAt, routeSummary: `${originCity} to ${destination}` } },
           policies: { create: policyTemplates.map((policy) => ({ type: policy.type, title: policy.title, content: policy.content, version: 1 })) },
         },
       });
@@ -92,8 +107,8 @@ export async function createRideDraft(_previousState: CreateRideDraftState, form
 export async function updateRidePackage(formData: FormData) {
   const guildSlug = value(formData, "guildSlug", 80);
   const rideId = value(formData, "rideId", 36);
-  const { session } = await requireRideManager(guildSlug);
-  const ride = await db.ride.findFirst({ where: { id: rideId, community: { slug: guildSlug } }, include: { policies: { orderBy: { version: "desc" } } } });
+  const { session } = await requireRideEditor(guildSlug, rideId);
+  const ride = await db.ride.findFirst({ where: { id: rideId, community: { slug: guildSlug } }, include: { origins: true, policies: { orderBy: { version: "desc" } } } });
   if (!ride) redirect("/account?access=denied");
   try {
     const title = value(formData, "title", 180);
@@ -104,10 +119,11 @@ export async function updateRidePackage(formData: FormData) {
     const endsAt = requiredDate(value(formData, "endsAt", 40));
     const pricePaise = moneyToPaise(value(formData, "price", 20));
     const confirmationDepositPaise = moneyToPaise(value(formData, "confirmationDeposit", 20));
-    const totalSlots = positiveInteger(value(formData, "totalSlots", 8), 1);
-    const bufferSlots = positiveInteger(value(formData, "bufferSlots", 8));
-    const distanceKm = positiveInteger(value(formData, "distanceKm", 8), 1);
+    const totalSlots = integerValue(formData, "totalSlots", 1);
+    const bufferSlots = integerValue(formData, "bufferSlots");
+    const distanceKm = integerValue(formData, "distanceKm", 1);
     const vehicleType = value(formData, "vehicleType", 20);
+    const vehicleRequirements = value(formData, "vehicleRequirements", 3_000);
     const difficulty = value(formData, "difficulty", 20);
     const visibility = value(formData, "visibility", 30);
     const origins = parseOrigins(value(formData, "origins"));
@@ -117,7 +133,8 @@ export async function updateRidePackage(formData: FormData) {
     const addOns = parseSimpleItems(value(formData, "addOns"));
     const meals = parseDayItems(value(formData, "meals"));
     const activities = parseDayItems(value(formData, "activities"));
-    if (title.length < 5 || summary.length < 20 || description.length < 20 || destination.length < 2 || endsAt <= startsAt || confirmationDepositPaise > pricePaise || origins.length < 1 || itineraryDays.length < 1) throw new Error("invalid");
+    if (title.length < 5 || summary.length < 20 || description.length < 20 || destination.length < 2 || vehicleRequirements.length < 10 || endsAt <= startsAt || confirmationDepositPaise > pricePaise || origins.length < 1 || itineraryDays.length < 1) throw new Error("invalid");
+    if (totalSlots + bufferSlots < ride.bookedSlots) throw new Error("booked-capacity");
     if (!new Set(["BIKE", "CAR", "SUV", "JEEP", "OTHER"]).has(vehicleType) || !new Set(["EASY", "MODERATE", "CHALLENGING"]).has(difficulty) || !new Set(["PUBLIC", "VERIFIED_USERS", "GUILD_MEMBERS", "INVITE_ONLY"]).has(visibility)) throw new Error("invalid");
 
     const propertyName = value(formData, "propertyName", 180);
@@ -142,14 +159,24 @@ export async function updateRidePackage(formData: FormData) {
         title, summary, description, originCity: origins[0].city, destination, startsAt, endsAt,
         pricePaise, confirmationDepositPaise, balanceDueAt: optionalDate(value(formData, "balanceDueAt", 40)),
         registrationClosesAt: optionalDate(value(formData, "registrationClosesAt", 40)), totalSlots, bufferSlots,
-        vehicleType: vehicleType as "BIKE" | "CAR" | "SUV" | "JEEP" | "OTHER", difficulty: difficulty as "EASY" | "MODERATE" | "CHALLENGING",
+        vehicleType: vehicleType as "BIKE" | "CAR" | "SUV" | "JEEP" | "OTHER", vehicleRequirements, difficulty: difficulty as "EASY" | "MODERATE" | "CHALLENGING",
         visibility: visibility as "PUBLIC" | "VERIFIED_USERS" | "GUILD_MEMBERS" | "INVITE_ONLY", distanceKm,
       } });
       await Promise.all([
-        tx.rideOrigin.deleteMany({ where: { rideId: ride.id } }), tx.rideItineraryDay.deleteMany({ where: { rideId: ride.id } }),
+        tx.rideItineraryDay.deleteMany({ where: { rideId: ride.id } }),
         tx.rideAccommodation.deleteMany({ where: { rideId: ride.id } }), tx.ridePackageItem.deleteMany({ where: { rideId: ride.id } }),
       ]);
-      await tx.rideOrigin.createMany({ data: origins.map((origin) => ({ ...origin, rideId: ride.id })) });
+      const unusedOriginIds = new Set(ride.origins.map((origin) => origin.id));
+      for (const origin of origins) {
+        const existing = ride.origins.find((candidate) => unusedOriginIds.has(candidate.id) && candidate.city.toLocaleLowerCase("en-IN") === origin.city.toLocaleLowerCase("en-IN"));
+        if (existing) {
+          await tx.rideOrigin.update({ where: { id: existing.id }, data: origin });
+          unusedOriginIds.delete(existing.id);
+        } else {
+          await tx.rideOrigin.create({ data: { ...origin, rideId: ride.id } });
+        }
+      }
+      if (unusedOriginIds.size) await tx.rideOrigin.deleteMany({ where: { id: { in: Array.from(unusedOriginIds) }, rideId: ride.id } });
       await tx.rideItineraryDay.createMany({ data: itineraryDays.map((day) => ({ ...day, rideId: ride.id })) });
       if (propertyName && checkInAt && checkOutAt) await tx.rideAccommodation.create({ data: { rideId: ride.id, propertyName, locality, checkInAt, checkOutAt, roomSummary, amenities, participantNote: value(formData, "participantNote", 3000) || null, exactLocationRestricted: formData.get("exactLocationRestricted") === "on" } });
       const packageData = [
@@ -181,11 +208,12 @@ export async function setRideStatus(formData: FormData) {
   const guildSlug = value(formData, "guildSlug", 80);
   const rideId = value(formData, "rideId", 36);
   const requestedStatus = value(formData, "status", 20);
-  const { session } = await requireRideManager(guildSlug);
+  const { session } = await requireRideEditor(guildSlug, rideId);
   const ride = await db.ride.findFirst({ where: { id: rideId, community: { slug: guildSlug } }, include: { origins: true, itineraryDays: true, packageItems: true, policies: true } });
   if (!ride || !new Set(["DRAFT", "PUBLISHED", "CLOSED", "POSTPONED", "CANCELLED", "COMPLETED"]).has(requestedStatus)) redirect("/account?access=denied");
+  if (!isRideStatusTransitionAllowed(ride.status, requestedStatus)) redirect(editor(guildSlug, ride.id, "transition"));
   if (requestedStatus === "PUBLISHED" && (ride.origins.length < 1 || ride.itineraryDays.length < 1 || ride.packageItems.length < 2 || new Set(ride.policies.map((policy) => policy.type)).size < 3 || ride.description.length < 20)) redirect(editor(guildSlug, ride.id, "incomplete"));
-  if (ride.communityId && requestedStatus === "DRAFT" && ride.bookedSlots > 0) redirect(editor(guildSlug, ride.id, "bookings"));
+  if (requestedStatus === "DRAFT" && ride.bookedSlots > 0) redirect(editor(guildSlug, ride.id, "bookings"));
   await db.$transaction([
     db.ride.update({ where: { id: ride.id }, data: { status: requestedStatus as "DRAFT" | "PUBLISHED" | "CLOSED" | "POSTPONED" | "CANCELLED" | "COMPLETED" } }),
     db.communityAuditEvent.create({ data: { communityId: ride.communityId, actorUserId: session.userId, action: "RIDE_STATUS_CHANGED", metadata: { rideId: ride.id, from: ride.status, to: requestedStatus } } }),
@@ -202,16 +230,18 @@ export async function assignRideStaff(formData: FormData) {
   const rideId = value(formData, "rideId", 36);
   const membershipId = value(formData, "membershipId", 36);
   const role = value(formData, "role", 30);
-  const { session } = await requireRideManager(guildSlug);
+  const originId = value(formData, "originId", 36) || null;
+  const { session } = await requireRideEditor(guildSlug, rideId);
   if (!new Set(["LEAD_CAPTAIN", "CAPTAIN", "VICE_CAPTAIN", "SWEEP", "MARSHAL", "VOLUNTEER"]).has(role)) redirect(editor(guildSlug, rideId, "staff"));
-  const [ride, membership] = await Promise.all([
+  const [ride, membership, origin] = await Promise.all([
     db.ride.findFirst({ where: { id: rideId, community: { slug: guildSlug } } }),
     db.communityMembership.findFirst({ where: { id: membershipId, community: { slug: guildSlug }, status: "ACTIVE" } }),
+    originId ? db.rideOrigin.findFirst({ where: { id: originId, rideId } }) : Promise.resolve(null),
   ]);
-  if (!ride || !membership || ride.communityId !== membership.communityId) redirect("/account?access=denied");
+  if (!ride || !membership || ride.communityId !== membership.communityId || (originId && !origin)) redirect("/account?access=denied");
   await db.$transaction([
-    db.rideStaffAssignment.upsert({ where: { rideId_userId_role: { rideId, userId: membership.userId, role: role as "LEAD_CAPTAIN" | "CAPTAIN" | "VICE_CAPTAIN" | "SWEEP" | "MARSHAL" | "VOLUNTEER" } }, create: { rideId, communityId: ride.communityId, userId: membership.userId, role: role as "LEAD_CAPTAIN" | "CAPTAIN" | "VICE_CAPTAIN" | "SWEEP" | "MARSHAL" | "VOLUNTEER" }, update: {} }),
-    db.communityAuditEvent.create({ data: { communityId: ride.communityId, actorUserId: session.userId, targetUserId: membership.userId, action: "RIDE_STAFF_ASSIGNED", metadata: { rideId, role } } }),
+    db.rideStaffAssignment.upsert({ where: { rideId_userId_role: { rideId, userId: membership.userId, role: role as "LEAD_CAPTAIN" | "CAPTAIN" | "VICE_CAPTAIN" | "SWEEP" | "MARSHAL" | "VOLUNTEER" } }, create: { rideId, communityId: ride.communityId, userId: membership.userId, role: role as "LEAD_CAPTAIN" | "CAPTAIN" | "VICE_CAPTAIN" | "SWEEP" | "MARSHAL" | "VOLUNTEER", originId }, update: { originId } }),
+    db.communityAuditEvent.create({ data: { communityId: ride.communityId, actorUserId: session.userId, targetUserId: membership.userId, action: "RIDE_STAFF_ASSIGNED", metadata: { rideId, role, originId } } }),
   ]);
   revalidatePath(editor(guildSlug, rideId));
   redirect(`${editor(guildSlug, rideId)}?staffSaved=1#staff`);
@@ -221,7 +251,7 @@ export async function removeRideStaff(formData: FormData) {
   const guildSlug = value(formData, "guildSlug", 80);
   const rideId = value(formData, "rideId", 36);
   const assignmentId = value(formData, "assignmentId", 36);
-  const { session } = await requireRideManager(guildSlug);
+  const { session } = await requireRideEditor(guildSlug, rideId);
   const assignment = await db.rideStaffAssignment.findFirst({ where: { id: assignmentId, rideId, ride: { community: { slug: guildSlug } } } });
   if (!assignment) redirect("/account?access=denied");
   await db.$transaction([
@@ -230,4 +260,25 @@ export async function removeRideStaff(formData: FormData) {
   ]);
   revalidatePath(editor(guildSlug, rideId));
   redirect(`${editor(guildSlug, rideId)}?staffSaved=1#staff`);
+}
+
+export async function generateRideAnnouncement(formData: FormData) {
+  const guildSlug = value(formData, "guildSlug", 80);
+  const rideId = value(formData, "rideId", 36);
+  const { session } = await requireRideEditor(guildSlug, rideId);
+  const ride = await db.ride.findFirst({
+    where: { id: rideId, community: { slug: guildSlug } },
+    include: {
+      community: { select: { name: true } }, origins: { orderBy: { sortOrder: "asc" } }, itineraryDays: { orderBy: { dayNumber: "asc" } },
+      accommodations: { orderBy: { checkInAt: "asc" } }, packageItems: { orderBy: [{ type: "asc" }, { sortOrder: "asc" }] }, policies: { orderBy: [{ type: "asc" }, { version: "desc" }] },
+    },
+  });
+  if (!ride) redirect("/account?access=denied");
+  const content = generateAnnouncementText(ride, process.env.APP_URL || "https://atride.in");
+  await db.$transaction([
+    db.rideAnnouncement.create({ data: { rideId: ride.id, createdById: session.userId, content, sourceVersion: ride.updatedAt } }),
+    db.communityAuditEvent.create({ data: { communityId: ride.communityId, actorUserId: session.userId, action: "RIDE_ANNOUNCEMENT_GENERATED", metadata: { rideId: ride.id, sourceVersion: ride.updatedAt.toISOString() } } }),
+  ]);
+  revalidatePath(editor(guildSlug, ride.id));
+  redirect(`${editor(guildSlug, ride.id)}?announcementSaved=1#announcement`);
 }

@@ -136,6 +136,7 @@ async function main() {
         totalSlots: ride.totalSlots,
         bookedSlots: ride.bookedSlots,
         vehicleType: "BIKE",
+        vehicleRequirements: "Road-legal motorcycle in safe touring condition; full-face helmet and appropriate riding gear are mandatory.",
         difficulty: ride.difficulty.toUpperCase() as "EASY" | "MODERATE" | "CHALLENGING",
         status: "PUBLISHED",
         visibility: "PUBLIC",
@@ -156,6 +157,7 @@ async function main() {
         totalSlots: ride.totalSlots,
         bookedSlots: ride.bookedSlots,
         vehicleType: "BIKE",
+        vehicleRequirements: "Road-legal motorcycle in safe touring condition; full-face helmet and appropriate riding gear are mandatory.",
         difficulty: ride.difficulty.toUpperCase() as "EASY" | "MODERATE" | "CHALLENGING",
         status: "PUBLISHED",
         visibility: "PUBLIC",
@@ -174,7 +176,7 @@ async function main() {
       prisma.ridePolicy.count({ where: { rideId: seededRide.id } }),
     ]);
     const start = new Date(ride.startDate);
-    if (!originCount) await prisma.rideOrigin.create({ data: { rideId: seededRide.id, city: ride.city, meetingPoint: `${ride.city} designated assembly point`, departureAt: start, capacity: ride.totalSlots, mergePoint: "Main highway regroup point" } });
+    if (!originCount) await prisma.rideOrigin.create({ data: { rideId: seededRide.id, city: ride.city, meetingPoint: `${ride.city} designated assembly point`, departureAt: start, capacity: ride.totalSlots, mergePoint: "Main highway regroup point", routeSummary: `${ride.city} to ${ride.destination} through organizer-approved regrouping stops.` } });
     if (!dayCount) {
       const days = Math.max(1, Math.ceil((new Date(ride.endDate).getTime() - start.getTime()) / 86400000));
       await prisma.rideItineraryDay.createMany({ data: Array.from({ length: days }, (_, index) => ({ rideId: seededRide.id, dayNumber: index + 1, date: new Date(start.getTime() + index * 86400000), title: index === 0 ? "Departure and arrival" : index === days - 1 ? "Breakfast and return" : "Explore the destination", summary: index === 0 ? "Rider briefing, planned regroup stops, arrival, check-in, and dinner." : index === days - 1 ? "Breakfast, checkout, and a coordinated return ride." : "Guided local sightseeing, free time, meals, and evening crew activities." })) });

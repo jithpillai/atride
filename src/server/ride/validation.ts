@@ -36,7 +36,19 @@ function rows(value: string) {
 export function parseOrigins(value: string) {
   return rows(value).map((parts, sortOrder) => {
     if (parts.length < 3 || !parts[0] || !parts[1]) throw new Error("Invalid origin row");
-    return { city: parts[0], meetingPoint: parts[1], departureAt: requiredDate(parts[2]), capacity: parts[3] ? positiveInteger(parts[3], 1) : null, bufferCapacity: parts[4] ? positiveInteger(parts[4]) : 0, mergePoint: parts[5] || null, sortOrder };
+    let capacity: number | null = null;
+    let bufferCapacity = 0;
+    try {
+      capacity = parts[3] ? positiveInteger(parts[3], 1) : null;
+    } catch {
+      throw new Error(`Invalid origin capacity:${sortOrder + 1}`);
+    }
+    try {
+      bufferCapacity = parts[4] ? positiveInteger(parts[4]) : 0;
+    } catch {
+      throw new Error(`Invalid origin buffer:${sortOrder + 1}`);
+    }
+    return { city: parts[0], meetingPoint: parts[1], departureAt: requiredDate(parts[2]), capacity, bufferCapacity, mergePoint: parts[5] || null, routeSummary: parts.slice(6).join(" | ") || null, sortOrder };
   });
 }
 
@@ -57,6 +69,12 @@ export function parseSimpleItems(value: string) {
 export function parseDayItems(value: string) {
   return rows(value).map((parts, sortOrder) => {
     if (parts.length < 2 || !parts[1]) throw new Error("Invalid day package row");
-    return { dayNumber: positiveInteger(parts[0], 1), title: parts[1], description: parts.slice(2).join(" | ") || null, sortOrder };
+    let dayNumber: number;
+    try {
+      dayNumber = positiveInteger(parts[0], 1);
+    } catch {
+      throw new Error(`Invalid package day:${sortOrder + 1}`);
+    }
+    return { dayNumber, title: parts[1], description: parts.slice(2).join(" | ") || null, sortOrder };
   });
 }

@@ -21,15 +21,24 @@ export async function resolveMediaContext(session: NonNullable<SessionShape>, pu
   const membership = session.user.communityMemberships.find(({ community }) => community.slug === communitySlug);
   const ridePurpose = purpose === "RIDE_COVER" || purpose === "RIDE_GALLERY";
   const allowedRoles = ridePurpose ? RIDE_MEDIA_ROLES : GUILD_MEDIA_ROLES;
-  if (!membership || !membership.roles.some(({ role }) => allowedRoles.has(role))) {
+  if (!membership) {
     throw new AuthError("MEDIA_FORBIDDEN", "You cannot manage media for this Guild.", 403);
   }
   if (ridePurpose) {
     if (!rideId) throw new AuthError("RIDE_REQUIRED", "Select a ride for this upload.");
-    const ride = await db.ride.findFirst({ where: { id: rideId, communityId: membership.communityId }, select: { id: true } });
+    const managesAllGuildRides = membership.roles.some(({ role }) => allowedRoles.has(role));
+    const ride = await db.ride.findFirst({
+      where: {
+        id: rideId,
+        communityId: membership.communityId,
+        ...(managesAllGuildRides ? {} : { staffAssignments: { some: { userId: session.userId, role: { in: ["LEAD_CAPTAIN", "CAPTAIN", "VICE_CAPTAIN"] } } } }),
+      },
+      select: { id: true },
+    });
     if (!ride) throw new AuthError("MEDIA_FORBIDDEN", "You cannot manage media for this ride.", 403);
     return { communityId: membership.communityId, rideId: ride.id, publicIdPrefix: `${folderPrefix}/guilds/${membership.communityId}/rides/${ride.id}/${purpose === "RIDE_COVER" ? "cover" : "gallery"}` };
   }
+  if (!membership.roles.some(({ role }) => allowedRoles.has(role))) throw new AuthError("MEDIA_FORBIDDEN", "You cannot manage media for this Guild.", 403);
   const suffix = purpose === "GUILD_LOGO" ? "logo" : purpose === "GUILD_COVER" ? "cover" : "gallery";
   return {
     communityId: membership.communityId,
