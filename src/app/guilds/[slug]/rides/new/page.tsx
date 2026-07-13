@@ -20,6 +20,6 @@ export default async function NewRidePage({ params }: Props) {
     <Link href={`/guilds/${slug}/manage`} className="text-sm font-bold text-zinc-500 hover:text-white">← Guild workspace</Link>
     <p className="eyebrow mt-10">Phase 4 · Ride studio</p><h1 className="mt-3 text-4xl font-black tracking-tight">Create a ride draft</h1>
     <p className="mt-3 max-w-2xl text-sm leading-7 text-zinc-400">Start with the public identity and dates. The complete package, origins, accommodation, rules, and publishing checks follow in the editor.</p>
-    <CreateRideDraftForm guildSlug={slug} defaults={{ title: "", slug: "", summary: "", originCity: "", destination: "", startsAt: localDate(30, 5), endsAt: localDate(32, 20) }} />
+    <CreateRideDraftForm guildSlug={slug} defaults={{ title: "", slug: "", summary: "", originCity: "", destination: "", totalSlots: "", startsAt: localDate(30, 5), endsAt: localDate(32, 20) }} />
   </section>;
 }

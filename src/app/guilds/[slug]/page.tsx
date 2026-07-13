@@ -90,7 +90,7 @@ export default async function GuildPage({ params }: Props) {
           <div className="mt-6 grid gap-4">
             {guildRides.map((ride) => (
               <Link key={ride.slug} href={`/rides/${ride.slug}`} className="group grid overflow-hidden rounded-3xl border border-white/10 bg-[#13171d] sm:grid-cols-[12rem_1fr]">
-                <div className="min-h-44 p-5" style={{ background: ride.gradient }}><span className="rounded-full bg-black/30 px-3 py-1 text-xs font-bold">{ride.destination}</span></div>
+                <div className="relative min-h-44 overflow-hidden p-5" style={{ background: ride.gradient }}>{ride.coverUrl && <ImageWithFallback src={ride.coverUrl} fallbackSrc="/defaults/guild-hall-cover.png" alt="" fill sizes="12rem" className="object-cover" />}<div className="absolute inset-0 bg-gradient-to-t from-black/65 via-black/10 to-black/20" /><span className="relative rounded-full bg-black/50 px-3 py-1 text-xs font-bold backdrop-blur">{ride.destination}</span></div>
                 <div className="p-6"><div className="flex justify-between gap-4"><div><p className="text-xs font-bold uppercase tracking-[.14em] text-orange-400">{formatRideDate(ride.startDate)}</p><h3 className="mt-2 text-xl font-black group-hover:text-orange-300">{ride.title}</h3></div><p className="font-black">{formatMoney(ride.price)}</p></div><p className="mt-3 text-sm leading-6 text-zinc-400">{ride.summary}</p><p className="mt-4 text-xs font-bold text-emerald-400">{ride.totalSlots - ride.bookedSlots} slots available</p></div>
               </Link>
             ))}

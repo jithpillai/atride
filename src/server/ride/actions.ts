@@ -48,7 +48,7 @@ function rideEditorErrorCode(error: unknown) {
 
 export type CreateRideDraftState = {
   error?: string;
-  values?: { title: string; slug: string; summary: string; destination: string; originCity: string; startsAt: string; endsAt: string };
+  values?: { title: string; slug: string; summary: string; destination: string; originCity: string; totalSlots: string; startsAt: string; endsAt: string };
 };
 
 export async function createRideDraft(_previousState: CreateRideDraftState, formData: FormData): Promise<CreateRideDraftState> {
@@ -59,14 +59,17 @@ export async function createRideDraft(_previousState: CreateRideDraftState, form
   const summary = value(formData, "summary", 1000);
   const destination = value(formData, "destination", 160);
   const originCity = value(formData, "originCity", 120);
+  const totalSlotsValue = value(formData, "totalSlots", 8);
   const startsAtValue = value(formData, "startsAt", 40);
   const endsAtValue = value(formData, "endsAt", 40);
-  const values = { title, slug, summary, destination, originCity, startsAt: startsAtValue, endsAt: endsAtValue };
+  const values = { title, slug, summary, destination, originCity, totalSlots: totalSlotsValue, startsAt: startsAtValue, endsAt: endsAtValue };
   if (!validRideSlug(slug)) return { error: "Use 3–100 lowercase letters, numbers, and single hyphens for the URL slug.", values };
   if (title.length < 5) return { error: "Ride title must contain at least 5 characters.", values };
   if (summary.length < 20) return { error: "Short summary must contain at least 20 characters.", values };
   if (destination.length < 2) return { error: "Enter the ride destination.", values };
   if (originCity.length < 2) return { error: "Enter the primary starting city.", values };
+  let totalSlots: number;
+  try { totalSlots = positiveInteger(totalSlotsValue, 1); } catch { return { error: "Total slots must be a whole number of at least 1.", values }; }
   let startsAt: Date;
   let endsAt: Date;
   try {
@@ -86,7 +89,7 @@ export async function createRideDraft(_previousState: CreateRideDraftState, form
       const created = await tx.ride.create({
         data: {
           communityId: community.id, slug, title, summary, description: summary,
-          originCity, destination, startsAt, endsAt, pricePaise: 0, totalSlots: 1,
+          originCity, destination, startsAt, endsAt, pricePaise: 0, totalSlots,
           vehicleType: "BIKE", vehicleRequirements: "Road-legal motorcycle in safe touring condition; full-face helmet and required riding gear.", difficulty: "MODERATE", status: "DRAFT", visibility: "PUBLIC",
           heroGradient: "linear-gradient(135deg, #17212b 0%, #7c2d12 55%, #101419 100%)", distanceKm: 1,
           origins: { create: { city: originCity, meetingPoint: "Meeting point to be confirmed", departureAt: startsAt, routeSummary: `${originCity} to ${destination}` } },
@@ -269,7 +272,7 @@ export async function generateRideAnnouncement(formData: FormData) {
   const ride = await db.ride.findFirst({
     where: { id: rideId, community: { slug: guildSlug } },
     include: {
-      community: { select: { name: true } }, origins: { orderBy: { sortOrder: "asc" } }, itineraryDays: { orderBy: { dayNumber: "asc" } },
+      community: { select: { name: true } }, origins: { orderBy: { sortOrder: "asc" } }, itineraryDays: { orderBy: { sortOrder: "asc" } },
       accommodations: { orderBy: { checkInAt: "asc" } }, packageItems: { orderBy: [{ type: "asc" }, { sortOrder: "asc" }] }, policies: { orderBy: [{ type: "asc" }, { version: "desc" }] },
     },
   });

@@ -123,6 +123,8 @@ React Server Components render public pages and initial dashboard data. Client C
 
 Every user-initiated mutation must expose an immediate pending state. Server-action forms use the shared pending-submit primitive to disable repeat submission and mask the affected card or form until navigation or completion. Client API calls use the shared pending overlay plus a disabled initiating control. Pending copy describes the operation, remains accessible through `aria-live`/`aria-busy`, and is always followed by an explicit success, redirect, or retryable error state. New mutation UI is incomplete until this behavior is implemented and tested.
 
+Client-side route changes must also acknowledge the first click immediately with the shared full-page navigation indicator, including cached App Router transitions and browser history navigation. All enabled links, buttons, and button-like controls must expose the pointer cursor; disabled controls must expose a disabled or waiting cursor. These interaction affordances are part of the definition of done for every new screen.
+
 ### 5.2 HTTP/API
 
 Next.js route handlers expose JSON-over-HTTPS endpoints for web clients, provider callbacks, and a future mobile application. GraphQL is not required initially.
@@ -483,6 +485,7 @@ PostgreSQL/PostGIS is authoritative. Redis stores only short-lived or recomputab
 - `ride_route_segments`
 - `ride_checkpoints`
 - `ride_itinerary_days`
+- `ride_itinerary_days.date` is a timezone-invariant calendar date; `scheduled_at` is optional and stores the exact event time when known, allowing multiple ordered events on one ride date.
 - `ride_itinerary_items`
 - `ride_accommodations`
 - `ride_accommodation_amenities`

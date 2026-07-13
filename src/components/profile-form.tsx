@@ -7,7 +7,7 @@ import { ProfileFields } from "@/components/profile-fields";
 import { completeOnboarding, updateProfile } from "@/server/profile/actions";
 import type { ProfileFormState } from "@/server/profile/validation";
 
-export function ProfileForm({ mode, initialState, savedPhone, phoneVerifiedAt }: { mode: "onboarding" | "edit"; initialState: ProfileFormState; savedPhone?: string | null; phoneVerifiedAt?: Date | string | null }) {
+export function ProfileForm({ mode, initialState, savedPhone, phoneVerifiedAt, returnTo }: { mode: "onboarding" | "edit"; initialState: ProfileFormState; savedPhone?: string | null; phoneVerifiedAt?: Date | string | null; returnTo?: string }) {
   const action = mode === "onboarding" ? completeOnboarding : updateProfile;
   const [state, formAction] = useActionState(action, initialState);
   const formRef = useRef<HTMLFormElement>(null);
@@ -20,6 +20,7 @@ export function ProfileForm({ mode, initialState, savedPhone, phoneVerifiedAt }:
 
   return (
     <form ref={formRef} action={formAction} className="relative mt-8 overflow-hidden rounded-3xl border border-white/10 bg-white/[.025] p-6 sm:p-8">
+      {mode === "onboarding" && <input type="hidden" name="returnTo" value={returnTo ?? "/account?onboarding=complete"} />}
       {state.message && <p role="alert" className="mb-6 rounded-2xl border border-red-400/20 bg-red-400/10 px-4 py-3 text-sm font-semibold text-red-300">{state.message}</p>}
       <ProfileFields key={state.revision} values={state.values} errors={state.errors} mode={mode} savedPhone={savedPhone} phoneVerifiedAt={phoneVerifiedAt} />
       {mode === "onboarding" ? (

@@ -1,5 +1,7 @@
 import type { Metadata, Viewport } from "next";
+import { Suspense } from "react";
 
+import { NavigationFeedback } from "@/components/navigation-feedback";
 import { SiteFooter } from "@/components/site-footer";
 import { SiteHeader } from "@/components/site-header";
 
@@ -39,6 +41,7 @@ export default function RootLayout({ children }: Readonly<{ children: React.Reac
   return (
     <html lang="en">
       <body>
+        <Suspense fallback={null}><NavigationFeedback /></Suspense>
         <SiteHeader />
         <main>{children}</main>
         <SiteFooter />

@@ -40,6 +40,7 @@ export type RideView = {
   difficulty: "Easy" | "Moderate" | "Challenging";
   featured: boolean;
   gradient: string;
+  coverUrl: string | null;
   distanceKm: number;
 };
 

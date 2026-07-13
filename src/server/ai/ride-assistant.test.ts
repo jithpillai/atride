@@ -47,4 +47,19 @@ describe("normalizeStructuredDraft", () => {
     expect(result.itinerary).toContain("2026-08-13 | Yercaud ride plan");
     expect(result.missingFacts).toContain("Confirm the detailed itinerary, stops, meals, activities, and timing for 2026-08-13.");
   });
+
+  it("retains multiple timed itinerary events on the same date", () => {
+    const result = normalizeStructuredDraft({
+      itinerary: [
+        { date: "2026-08-12T05:00", title: "Departure", plan: "Leave Bengaluru" },
+        { date: "2026-08-12T09:00", title: "Breakfast", plan: "Group breakfast" },
+        { date: "2026-08-13", title: "Explore", plan: "Destination ride" },
+        { date: "2026-08-14T16:00", title: "Return", plan: "Return to Bengaluru" },
+      ],
+      missingFacts: [],
+    }, input);
+    expect(result.itinerary.split("\n")).toHaveLength(4);
+    expect(result.itinerary).toContain("2026-08-12T05:00 | Departure");
+    expect(result.itinerary).toContain("2026-08-12T09:00 | Breakfast");
+  });
 });

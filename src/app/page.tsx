@@ -1,6 +1,7 @@
 import Image from "next/image";
 import Link from "next/link";
 
+import { ImageWithFallback } from "@/components/image-with-fallback";
 import { MarketplaceExplorer } from "@/components/marketplace-explorer";
 import {
   listMarketplaceCities,
@@ -96,10 +97,12 @@ export default async function HomePage() {
                   aria-label={`View ${heroRide.title}`}
                   className="group mt-6 block overflow-hidden rounded-3xl border border-white/10 bg-[#11151a] outline-none transition duration-300 hover:-translate-y-1 hover:border-orange-400/50 hover:shadow-xl hover:shadow-orange-950/20 focus-visible:border-orange-400 focus-visible:ring-2 focus-visible:ring-orange-400/40"
                 >
-                  <div className="h-48 p-6" style={{ background: heroRide.gradient }}>
-                    <div className="flex justify-between"><span className="rounded-full bg-black/30 px-3 py-1 text-xs font-bold">{heroRide.city}</span><span className="rounded-full bg-orange-500 px-3 py-1 text-xs font-bold">{heroRide.totalSlots - heroRide.bookedSlots} slots left</span></div>
-                    <p className="mt-16 text-xs font-bold uppercase tracking-[.16em] text-white/60">Next adventure</p>
-                    <div className="mt-1 flex items-center justify-between gap-4">
+                  <div className="relative h-48 overflow-hidden p-6" style={{ background: heroRide.gradient }}>
+                    {heroRide.coverUrl && <ImageWithFallback src={heroRide.coverUrl} fallbackSrc="/defaults/guild-hall-cover.png" alt="" fill sizes="(min-width:1024px) 36rem, 100vw" className="object-cover" />}
+                    <div className="absolute inset-0 bg-gradient-to-t from-black/90 via-black/25 to-black/20" />
+                    <div className="relative flex justify-between"><span className="rounded-full bg-black/45 px-3 py-1 text-xs font-bold backdrop-blur">{heroRide.city}</span><span className="rounded-full bg-orange-500 px-3 py-1 text-xs font-bold">{heroRide.totalSlots - heroRide.bookedSlots} slots left</span></div>
+                    <p className="relative mt-16 text-xs font-bold uppercase tracking-[.16em] text-white/70">Next adventure</p>
+                    <div className="relative mt-1 flex items-center justify-between gap-4">
                       <p className="text-2xl font-black">{heroRide.title}</p>
                       <span aria-hidden="true" className="text-xl font-black transition-transform group-hover:translate-x-1">→</span>
                     </div>

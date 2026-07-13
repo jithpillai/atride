@@ -29,6 +29,23 @@ input {
   -webkit-tap-highlight-color: transparent;
 }
 
+a[href],
+button:not(:disabled),
+[role="button"]:not([aria-disabled="true"]),
+summary,
+label[for],
+input[type="button"],
+input[type="submit"],
+input[type="reset"] {
+  cursor: pointer;
+}
+
+button:disabled,
+input:disabled,
+[aria-disabled="true"] {
+  cursor: not-allowed;
+}
+
 .eyebrow {
   color: #fb923c;
   font-size: 0.75rem;

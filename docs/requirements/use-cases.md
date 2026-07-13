@@ -220,6 +220,25 @@ Detailed community activation is defined in [tenant-onboarding.md](tenant-onboar
 - Community roles apply only to the inviting community.
 - Administrators never create another user's password.
 
+### UC-06A: Join a Guild through a participant invitation link
+
+**Actor:** Guild Owner or Admin; participant
+
+**Flow:**
+
+1. An Owner or Admin creates an expiring, revocable link with an optional maximum join count.
+2. The Guild shares the link through its existing communication channels.
+3. A participant opens it and signs in or creates a common AtRide account.
+4. If needed, the participant completes onboarding and returns to the same invitation.
+5. AtRide activates ordinary Guild membership and records the acceptance in the tenant audit log.
+
+**Rules:**
+
+- A participant link can never grant a staff or platform role.
+- Expired, exhausted, and revoked links cannot be accepted.
+- Existing active members do not consume another use.
+- Link creation, revocation, and acceptance are tenant-scoped and audited.
+
 ### UC-07: Assign ride staff
 
 **Actor:** Community Admin, Ride Manager, or permitted Lead Captain
@@ -328,11 +347,11 @@ Rules, waivers, package details, and commercial policies are versioned. A confir
 
 Guild onboarding collects reusable safety, payment, cancellation, replacement, and property-conduct templates. Guild Owners/Admins may maintain them in Guild settings. A new ride receives a snapshot of the current templates and the Ride Manager reviews and edits that ride-specific copy before publication; templates are never a mechanism for retroactively changing existing rides.
 
-Total ride capacity represents destination, stay, or overall package capacity. Starting groups identify assembly/departure operations; per-origin capacity and buffer allocations are optional planning hints and are not required to sum to the total ride capacity unless a Guild explicitly chooses fixed origin allocations.
+Total ride capacity represents destination, stay, or overall package capacity and is captured when the draft is first created, so operational lists never substitute a placeholder or starting-group allocation for the canonical denominator. Starting groups identify assembly/departure operations; per-origin capacity and buffer allocations are optional planning hints and are not required to sum to the total ride capacity unless a Guild explicitly chooses fixed origin allocations.
 
 Where the initial editor requires structured line formats, it keeps examples visible while typing and may provide copyable prompts for external AI tools to transform an existing announcement. Such prompts instruct the tool not to invent missing facts, and the Ride Manager remains responsible for reviewing all generated structured data.
 
-The optional in-product Ride Assistant uses the saved and currently unsaved factual form fields plus a separately optional organizer announcement. Before a provider request, @Ride filters common participant-list rows, phone numbers, email addresses, payment identifiers, and private links. It returns structured suggestions and unresolved facts into a review panel. Nothing is applied automatically: the organizer can edit, select, apply, or discard each section, and must explicitly save the ride afterward. Per-section regeneration avoids repeating the whole task. Provider credentials remain server-only, daily per-user/per-ride limits bound cost, and prompt content is not stored in AI usage records. The copy/open-external-Gemini fallback carries the same no-invention and privacy instructions but requires manual paste and review. The itinerary contains one chronological row for every inclusive ride date: the application guarantees date coverage deterministically, while AI enriches each day and unresolved details remain visible for organizer confirmation.
+The optional in-product Ride Assistant uses the saved and currently unsaved factual form fields plus a separately optional organizer announcement. Before a provider request, @Ride filters common participant-list rows, phone numbers, email addresses, payment identifiers, and private links. It returns structured suggestions and unresolved facts into a review panel. Nothing is applied automatically: the organizer can edit, select, apply, or discard each section, and must explicitly save the ride afterward. Per-section regeneration avoids repeating the whole task. Provider credentials remain server-only, daily per-user/per-ride limits bound cost, and prompt content is not stored in AI usage records. The copy/open-external-Gemini fallback carries the same no-invention and privacy instructions but requires manual paste and review. The itinerary contains at least one chronological event for every inclusive ride date: the application guarantees date coverage deterministically, while AI enriches each day and unresolved details remain visible for organizer confirmation. Multiple events may share a calendar date, with an optional local time for time-specific departures, meals, activities, checkpoints, and return events.
 
 ### UC-09C: Generate organizer-ready announcements
 

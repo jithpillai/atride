@@ -40,7 +40,7 @@ export async function GET(request: NextRequest) {
 
     const result = await completeGoogleSignIn(code, flow);
     const { appUrl } = getGoogleOAuthConfig();
-    const destination = result.onboardingRequired ? "/onboarding" : flow.returnTo;
+    const destination = result.onboardingRequired ? `/onboarding?returnTo=${encodeURIComponent(flow.returnTo)}` : flow.returnTo;
     const response = NextResponse.redirect(new URL(destination, appUrl));
     response.cookies.set(getSessionCookieName(), result.token, {
       httpOnly: true,

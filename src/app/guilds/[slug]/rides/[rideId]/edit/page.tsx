@@ -30,7 +30,7 @@ export default async function EditRidePage({ params, searchParams }: Props) {
   const authorization = await requireRideEditor(slug, rideId);
   const [ride, state] = await Promise.all([
     db.ride.findFirst({ where: { id: rideId, community: { slug } }, include: {
-      origins: { orderBy: { sortOrder: "asc" } }, itineraryDays: { orderBy: { dayNumber: "asc" } },
+      origins: { orderBy: { sortOrder: "asc" } }, itineraryDays: { orderBy: { sortOrder: "asc" } },
       accommodations: { orderBy: { checkInAt: "asc" } }, packageItems: { orderBy: [{ type: "asc" }, { sortOrder: "asc" }] },
       policies: { orderBy: { version: "desc" } }, staffAssignments: { include: { user: { select: { displayName: true } }, origin: { select: { city: true, meetingPoint: true } } }, orderBy: { role: "asc" } },
       coverAsset: true, mediaAssets: { where: { purpose: "RIDE_GALLERY" }, orderBy: [{ sortOrder: "asc" }, { createdAt: "asc" }] },
@@ -73,13 +73,16 @@ export default async function EditRidePage({ params, searchParams }: Props) {
     server: "The database could not save this ride package. Your browser draft is preserved; check the local server log for the diagnostic.",
   } as Record<string, string>)[state.error] ?? "The ride package could not be saved. Your browser draft is preserved." : null;
   const origins = ride.origins.map((origin) => [origin.city, origin.meetingPoint, indiaLocal(origin.departureAt), origin.capacity ?? "", origin.bufferCapacity || "", origin.mergePoint ?? "", origin.routeSummary ?? ""].join(" | ")).join("\n");
-  const itinerary = ride.itineraryDays.map((day) => `${indiaDate(day.date)} | ${day.title} | ${day.summary}`).join("\n");
+  const itinerary = ride.itineraryDays.map((day) => `${day.scheduledAt ? indiaLocal(day.scheduledAt) : indiaDate(day.date)} | ${day.title} | ${day.summary}`).join("\n");
   const rideDayCount = Math.max(1, Math.ceil((ride.endsAt.getTime() - ride.startsAt.getTime()) / 86400000));
-  const sampleItinerary = Array.from({ length: rideDayCount }, (_, index) => {
+  const sampleRows = Array.from({ length: rideDayCount }, (_, index) => {
     const date = new Date(ride.startsAt.getTime() + index * 86400000);
     const title = index === 0 ? `${ride.origins[0]?.city ?? ride.originCity} to ${ride.destination}` : index === rideDayCount - 1 ? `Breakfast and return` : `${ride.destination} exploration`;
-    return `${indiaDate(date)} | ${title} | Add planned stops, meals, activities, and timing for Day ${index + 1}`;
-  }).join("\n");
+    const dateOrTime = index === 0 ? indiaLocal(ride.startsAt) : index === rideDayCount - 1 ? indiaLocal(ride.endsAt) : `${indiaDate(date)}T09:00`;
+    return `${dateOrTime} | ${title} | Add planned stops, meals, activities, and timing for Day ${index + 1}`;
+  });
+  if (rideDayCount === 1) sampleRows.push(`${indiaLocal(ride.endsAt)} | Breakfast and return | Add the breakfast location, return stops, and expected completion plan`);
+  const sampleItinerary = sampleRows.join("\n");
   const allowedStatuses = RIDE_STATUS_TRANSITIONS[ride.status];
   const exampleBox = "mt-3 block overflow-x-auto whitespace-pre-wrap rounded-xl border border-orange-400/15 bg-orange-400/[.035] p-3 font-mono text-[11px] leading-5 text-orange-200/80";
   return <section className="mx-auto min-h-[70vh] max-w-6xl px-5 py-16 lg:px-8">
@@ -120,7 +123,7 @@ export default async function EditRidePage({ params, searchParams }: Props) {
       <RideAiAssistant guildSlug={slug} rideId={ride.id} enabled={process.env.AI_ASSIST_ENABLED === "true" && Boolean(process.env.GEMINI_API_KEY)} />
 
       <div className="rounded-3xl border border-white/10 bg-white/[.025] p-7"><p className="eyebrow">5 · Starting groups</p><p className="mt-3 text-xs leading-6 text-zinc-500">One per line: City | Meeting point | departure date/time | optional planning capacity | optional buffer | merge point | route summary. Total ride slots belong to the destination/stay and do not need to be split across origins.</p><p className={exampleBox}>Flexible example based on this ride:{"\n"}{ride.originCity} | Confirmed meeting point | {indiaLocal(ride.startsAt)} |  |  | {ride.destination} | {ride.originCity} to {ride.destination} via confirmed regrouping stops{"\n\n"}Optional allocation example:{"\n"}{ride.originCity} | Confirmed meeting point | {indiaLocal(ride.startsAt)} | {ride.totalSlots} | {ride.bufferSlots} | {ride.destination} | {ride.originCity} to {ride.destination}</p><textarea required rows={6} name="origins" defaultValue={origins} className="field mt-4 font-mono text-xs" /></div>
-      <div className="rounded-3xl border border-white/10 bg-white/[.025] p-7"><p className="eyebrow">6 · Day-wise itinerary</p><p className="mt-3 text-xs text-zinc-500">One per line: YYYY-MM-DD | Day title | Plan and places covered</p><p className={exampleBox}>Example for this {rideDayCount}-day ride:{"\n"}{sampleItinerary}</p><textarea required rows={7} name="itinerary" defaultValue={itinerary} className="field mt-4 font-mono text-xs" /></div>
+      <div className="rounded-3xl border border-white/10 bg-white/[.025] p-7"><p className="eyebrow">6 · Day-wise itinerary</p><p className="mt-3 text-xs leading-6 text-zinc-500">One event per line: YYYY-MM-DDTHH:mm | Event title | Plan and places covered. Omit <span className="font-mono">THH:mm</span> when only the date is known. Multiple timed events may share the same date.</p><p className={exampleBox}>Example for this {rideDayCount}-day ride:{"\n"}{sampleItinerary}</p><textarea required rows={7} name="itinerary" defaultValue={itinerary} className="field mt-4 font-mono text-xs" /></div>
 
       <div className="rounded-3xl border border-white/10 bg-white/[.025] p-7"><p className="eyebrow">7 · Package</p><div className="mt-6 grid gap-6 lg:grid-cols-2">
         {[['inclusions','Inclusions','Accommodation | Shared stay for the published ride dates'],['exclusions','Exclusions','Fuel | Participants bear their own fuel expenses'],['addOns','Optional add-ons','Single-room upgrade | Subject to availability and added cost']].map(([name,label,sample]) => <label key={name} className="text-sm font-semibold">{label}<span className="ml-2 text-xs font-normal text-zinc-600">Title | detail</span><span className={exampleBox}>Example:{"\n"}{sample}</span><textarea rows={5} name={name} defaultValue={packageRows(packageOf(name === 'inclusions' ? 'INCLUSION' : name === 'exclusions' ? 'EXCLUSION' : 'ADD_ON'))} className="field font-mono text-xs" /></label>)}
