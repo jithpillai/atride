@@ -60,8 +60,8 @@ async function main() {
     prisma.$queryRaw<Array<{ version: string }>>`SELECT PostGIS_Version() AS version`,
   ]);
 
-  if (communityCount !== 3 || rideCount !== 5) {
-    throw new Error(`Unexpected seed counts: ${communityCount} Guilds and ${rideCount} rides.`);
+  if (communityCount < 3 || rideCount < 5) {
+    throw new Error(`Seed baseline is incomplete: ${communityCount} Guilds and ${rideCount} rides.`);
   }
 
   if (userCount < 4) {
@@ -80,7 +80,8 @@ async function main() {
     throw new Error("The seeded ride captain assignment is missing.");
   }
 
-  if (listedGuilds.length !== 2 || listedGuilds.some(({ slug }) => slug === "midnight-compass")) {
+  const listedSlugs = new Set(listedGuilds.map(({ slug }) => slug));
+  if (!listedSlugs.has("royal-ravanas") || !listedSlugs.has("wild-gear") || listedSlugs.has("midnight-compass")) {
     throw new Error("The marketplace visibility boundary is not working.");
   }
 

@@ -5,10 +5,11 @@ import { FormPendingSubmit } from "@/components/pending-feedback";
 import { MediaUploader } from "@/components/media-uploader";
 import { db } from "@/lib/db";
 import { requireGuildManager } from "@/server/auth/authorization";
-import { inviteGuildStaff, revokeGuildInvitation, updateGuildMemberRole, updateGuildMemberStatus, updateGuildProfile } from "@/server/guild/actions";
+import { inviteGuildStaff, revokeGuildInvitation, updateGuildMemberRole, updateGuildMemberStatus, updateGuildProfile, updateGuildRidePolicyTemplates } from "@/server/guild/actions";
+import { DEFAULT_GUILD_RIDE_POLICIES } from "@/server/guild/default-ride-policies";
 import { cloudinaryImageUrl } from "@/server/media/cloudinary";
 
-type Props = { params: Promise<{ slug: string }>; searchParams: Promise<{ saved?: string; error?: string; staffSaved?: string; staffError?: string }> };
+type Props = { params: Promise<{ slug: string }>; searchParams: Promise<{ saved?: string; error?: string; staffSaved?: string; staffError?: string; policySaved?: string }> };
 
 export const metadata = { title: "Manage Guild", robots: { index: false, follow: false } };
 
@@ -29,6 +30,7 @@ export default async function GuildManagePage({ params, searchParams }: Props) {
       },
       invitations: { where: { status: "PENDING" }, orderBy: { createdAt: "desc" }, take: 20 },
       auditEvents: { orderBy: { createdAt: "desc" }, take: 30, include: { actor: { select: { displayName: true } } } },
+      ridePolicyTemplates: true,
       _count: { select: { memberships: true, rides: true } },
       rides: {
         orderBy: { startsAt: "asc" },
@@ -51,6 +53,7 @@ export default async function GuildManagePage({ params, searchParams }: Props) {
       {state.error && <p role="alert" className="mt-6 rounded-2xl border border-red-400/20 bg-red-400/10 px-4 py-3 text-sm font-semibold text-red-300">Check the highlighted Guild details and try again.</p>}
       {state.staffSaved && <p className="mt-6 rounded-2xl border border-emerald-400/20 bg-emerald-400/10 px-4 py-3 text-sm font-semibold text-emerald-300">Guild staff settings updated.</p>}
       {state.staffError && <p role="alert" className="mt-6 rounded-2xl border border-red-400/20 bg-red-400/10 px-4 py-3 text-sm font-semibold text-red-300">That staff change could not be completed. Protected Owner and self-access rules may apply.</p>}
+      {state.policySaved && <p className="mt-6 rounded-2xl border border-emerald-400/20 bg-emerald-400/10 px-4 py-3 text-sm font-semibold text-emerald-300">Default ride rules saved. New rides will start with these policies.</p>}
       <div className="mt-10 grid gap-4 sm:grid-cols-2">
         <article className="rounded-3xl border border-white/10 bg-white/[.025] p-7"><p className="text-4xl font-black">{guild._count.rides}</p><p className="mt-2 text-sm text-zinc-500">Rides</p></article>
         <article className="rounded-3xl border border-white/10 bg-white/[.025] p-7"><p className="text-4xl font-black">{guild._count.memberships}</p><p className="mt-2 text-sm text-zinc-500">Members</p></article>
@@ -89,6 +92,8 @@ export default async function GuildManagePage({ params, searchParams }: Props) {
           {!!guild.mediaAssets.length && <div className="mt-5 grid gap-4 sm:grid-cols-2 lg:grid-cols-3">{guild.mediaAssets.map((asset, index) => <MediaUploader key={asset.id} purpose="GUILD_GALLERY" communitySlug={guild.slug} label={`Gallery image ${index + 1}`} help="Published in this Guild Hall." currentAsset={{ id: asset.id, url: cloudinaryImageUrl(asset) }} removeOnly />)}</div>}
         </div>
 
+        <section id="ride-policy-defaults" className="mt-10 scroll-mt-24"><p className="eyebrow">Ride Studio defaults</p><h2 className="mt-3 text-2xl font-black">Reusable rules and policies</h2><p className="mt-3 max-w-3xl text-sm leading-7 text-zinc-500">Set these once for the Guild. A new ride copies the current defaults into its own versioned policy snapshot, which Ride Managers can adjust without changing other rides.</p><form action={updateGuildRidePolicyTemplates} className="relative mt-6 grid gap-5 rounded-3xl border border-white/10 bg-white/[.025] p-7 lg:grid-cols-2"><input type="hidden" name="slug" value={guild.slug} />{DEFAULT_GUILD_RIDE_POLICIES.map((policy) => <label key={policy.type} className="text-sm font-semibold">{policy.title}<textarea required minLength={10} rows={7} name={policy.field} defaultValue={guild.ridePolicyTemplates.find((template) => template.type === policy.type)?.content ?? policy.content} className="field text-xs leading-6" /></label>)}<div className="lg:col-span-2"><FormPendingSubmit idleLabel="Save default ride policies" pendingLabel="Saving…" overlayLabel="Saving Guild ride defaults…" className="rounded-full bg-orange-500 px-6 py-3 text-sm font-black text-white" /></div></form></section>
+
         <section id="staff" className="mt-10 scroll-mt-24">
           <p className="eyebrow">People and permissions</p><h2 className="mt-3 text-2xl font-black">Members and Guild staff</h2>
           <form action={inviteGuildStaff} className="relative mt-6 grid gap-4 rounded-3xl border border-white/10 bg-white/[.025] p-6 md:grid-cols-[1fr_220px_auto] md:items-end">
@@ -109,12 +114,12 @@ export default async function GuildManagePage({ params, searchParams }: Props) {
         <section className="mt-10"><p className="eyebrow">Security record</p><h2 className="mt-3 text-2xl font-black">Recent audit history</h2><div className="mt-5 overflow-hidden rounded-3xl border border-white/10">{guild.auditEvents.length ? guild.auditEvents.map((event) => <div key={event.id} className="flex flex-col gap-1 border-b border-white/8 px-5 py-4 last:border-0 sm:flex-row sm:items-center sm:justify-between"><div><p className="text-sm font-bold">{event.action.replaceAll("_", " ")}</p><p className="mt-1 text-xs text-zinc-600">by {event.actor.displayName}</p></div><time className="text-xs text-zinc-600">{event.createdAt.toLocaleString("en-IN")}</time></div>) : <p className="p-6 text-sm text-zinc-500">Privileged Guild changes will appear here.</p>}</div></section>
       </>}
       <div className="mt-10 rounded-3xl border border-white/10 p-7">
-        <h2 className="text-2xl font-black">Ride workspace</h2>
+        <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between"><div><p className="eyebrow">Phase 4</p><h2 className="mt-2 text-2xl font-black">Ride workspace</h2></div><Link href={`/guilds/${guild.slug}/rides/new`} className="rounded-full bg-orange-500 px-5 py-2.5 text-center text-sm font-black text-white">Create ride draft</Link></div>
         <div className="mt-5 grid gap-3">
           {guild.rides.map((ride) => (
             <div key={ride.id} className="flex flex-col gap-2 rounded-2xl border border-white/8 p-4 sm:flex-row sm:items-center sm:justify-between">
               <div><p className="font-bold">{ride.title}</p><p className="mt-1 text-xs text-zinc-500">{ride.status} · {ride.startsAt.toLocaleDateString("en-IN")}</p></div>
-              <p className="text-sm font-bold text-orange-300">{ride.bookedSlots}/{ride.totalSlots} booked</p>
+              <div className="flex items-center gap-3"><p className="text-sm font-bold text-orange-300">{ride.bookedSlots}/{ride.totalSlots} booked</p><Link href={`/guilds/${guild.slug}/rides/${ride.id}/edit`} className="rounded-full border border-white/15 px-4 py-2 text-xs font-bold">Edit package</Link></div>
             </div>
           ))}
         </div>

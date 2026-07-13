@@ -27,6 +27,7 @@ export default async function AccountPage({ searchParams }: Props) {
       orderBy: { createdAt: "desc" },
     }) : [],
   ]);
+  const manageableMemberships = session.user.communityMemberships.filter((membership) => membership.roles.length > 0);
 
   return (
     <section className="mx-auto min-h-[70vh] max-w-5xl px-5 py-16 lg:px-8">
@@ -50,7 +51,10 @@ export default async function AccountPage({ searchParams }: Props) {
             )}
           </div>
         </div>
-        <LogoutButton />
+        <div className="flex flex-wrap items-center gap-3">
+          {manageableMemberships.map((membership) => <Link key={membership.id} href={`/guilds/${membership.community.slug}/manage`} className="rounded-full bg-orange-500 px-5 py-2.5 text-sm font-black text-white shadow-lg shadow-orange-950/30 transition hover:bg-orange-400">Manage {membership.community.name}</Link>)}
+          <LogoutButton />
+        </div>
       </div>
 
       {state.inviteAccepted && <p className="mt-6 rounded-2xl border border-emerald-400/20 bg-emerald-400/10 px-4 py-3 text-sm font-semibold text-emerald-300">Guild staff invitation accepted. Your new access is active now.</p>}
@@ -112,13 +116,6 @@ export default async function AccountPage({ searchParams }: Props) {
       <div className="mt-8 flex flex-wrap gap-3">
         {session.user.platformRoles.some(({ role }) => role === "PLATFORM_ADMIN") && (
           <a href="/admin" className="rounded-full bg-orange-500 px-5 py-2.5 text-sm font-black text-white">Open platform admin</a>
-        )}
-        {session.user.communityMemberships.flatMap((membership) =>
-          membership.roles.length ? [
-            <a key={membership.id} href={`/guilds/${membership.community.slug}/manage`} className="rounded-full border border-white/15 px-5 py-2.5 text-sm font-bold">
-              Manage {membership.community.name}
-            </a>,
-          ] : [],
         )}
       </div>
     </section>

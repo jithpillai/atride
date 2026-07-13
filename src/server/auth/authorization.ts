@@ -42,3 +42,11 @@ export async function requireGuildAdmin(slug: string) {
   }
   return result;
 }
+
+export async function requireRideManager(slug: string) {
+  const result = await requireGuildManager(slug);
+  if (!result.membership.roles.some(({ role }) => role === "OWNER" || role === "ADMIN" || role === "RIDE_MANAGER")) {
+    redirect("/account?access=denied");
+  }
+  return result;
+}

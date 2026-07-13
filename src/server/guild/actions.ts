@@ -7,6 +7,7 @@ import { db } from "@/lib/db";
 import { requireGuildAdmin, requirePlatformAdmin, requireSession } from "@/server/auth/authorization";
 import { isEmail, normalizeEmail } from "@/server/auth/crypto";
 import { isStaffRole, normalizeOptionalHttpsUrl, parseOperatingCities, type StaffRole } from "@/server/guild/validation";
+import { DEFAULT_GUILD_RIDE_POLICIES, policyContent } from "@/server/guild/default-ride-policies";
 
 const RESERVED_SLUGS = new Set(["admin", "api", "account", "login", "onboarding", "rides", "guilds", "www", "support"]);
 
@@ -62,10 +63,33 @@ export async function createGuild(formData: FormData) {
           roles: { create: { role: "OWNER" } },
         },
       },
+      ridePolicyTemplates: {
+        create: DEFAULT_GUILD_RIDE_POLICIES.map((policy) => ({ type: policy.type, title: policy.title, content: policyContent(formData, policy.field, policy.content) })),
+      },
     },
   });
   revalidatePath("/admin");
   redirect("/admin?guildCreated=1");
+}
+
+export async function updateGuildRidePolicyTemplates(formData: FormData) {
+  const slug = value(formData, "slug", 80);
+  const { session } = await requireGuildAdmin(slug);
+  const guild = await db.community.findUnique({ where: { slug }, select: { id: true } });
+  if (!guild) redirect("/account?access=denied");
+  const policies = DEFAULT_GUILD_RIDE_POLICIES.map((policy) => ({ ...policy, content: policyContent(formData, policy.field, policy.content) }));
+  await db.$transaction(async (tx) => {
+    for (const policy of policies) {
+      await tx.communityRidePolicyTemplate.upsert({
+        where: { communityId_type: { communityId: guild.id, type: policy.type } },
+        create: { communityId: guild.id, type: policy.type, title: policy.title, content: policy.content },
+        update: { title: policy.title, content: policy.content },
+      });
+    }
+    await tx.communityAuditEvent.create({ data: { communityId: guild.id, actorUserId: session.userId, action: "GUILD_RIDE_POLICY_TEMPLATES_UPDATED" } });
+  });
+  revalidatePath(`/guilds/${slug}/manage`);
+  redirect(`/guilds/${slug}/manage?policySaved=1#ride-policy-defaults`);
 }
 
 export async function setGuildStatus(formData: FormData) {

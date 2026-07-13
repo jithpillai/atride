@@ -184,6 +184,21 @@ export const findPublicRideBySlug = cache(async (slug: string): Promise<RideView
   return ride ? toRideView(ride) : null;
 });
 
+export const findPublicRidePackageBySlug = cache(async (slug: string) => db.ride.findFirst({
+  where: {
+    slug, status: "PUBLISHED", visibility: "PUBLIC",
+    community: { status: "ACTIVE", visibility: { guildHallAccess: "PUBLIC" } },
+  },
+  include: {
+    community: { select: { slug: true, name: true, shortName: true } },
+    origins: { orderBy: { sortOrder: "asc" } }, itineraryDays: { orderBy: { dayNumber: "asc" } },
+    accommodations: { orderBy: { checkInAt: "asc" } }, packageItems: { orderBy: [{ type: "asc" }, { sortOrder: "asc" }] },
+    policies: { orderBy: [{ type: "asc" }, { version: "desc" }] },
+    coverAsset: true, mediaAssets: { where: { purpose: "RIDE_GALLERY" }, orderBy: [{ sortOrder: "asc" }, { createdAt: "asc" }] },
+    staffAssignments: { include: { user: { select: { displayName: true } } }, orderBy: { role: "asc" } },
+  },
+}));
+
 export const listStaticGuildSlugs = cache(async (): Promise<string[]> => {
   const guilds = await db.community.findMany({
     where: { status: "ACTIVE" },

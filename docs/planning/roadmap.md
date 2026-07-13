@@ -14,6 +14,7 @@ Current infrastructure status:
 - SMS is explicitly outside the launch critical path and is deferred to an optional final phase. Cloudinary media uploads are active; maps, Redis workers, and payments remain deferred to their delivery phases.
 - Phase 2 foundations are implemented: Google OpenID Connect plus email OTP, opaque sessions, account/logout, first-login onboarding, private participant profiles, a vehicle garage, seeded roles, optional Firebase phone verification, and protected platform/Guild authorization boundaries. Personalized upcoming rides and distributed abuse controls remain scheduled with their dependent phases.
 - Phase 3A and the first testable Phase 3B staff-management slice are implemented. Platform administrators can onboard Guilds; Owners/Admins can manage branding, visibility, official links, operating cities, member status, staff invitations and roles, and inspect tenant-scoped audit history.
+- Phase 4A is active: authorized Ride Managers can create tenant-scoped drafts, maintain flexible multi-origin plans, itinerary, accommodation, package items, meals, activities, linked commercial dates, versioned policies, ride crew, cover/gallery media, and publication state. Guild-level policy templates are collected during onboarding and snapshot into each new ride. Copyable AI-formatting prompts, local image previews, and multi-select galleries reduce organizer entry effort. Public ride pages render the canonical package. Rich repeatable add/remove controls, origin-specific staff, announcement export, and publication-state refinements remain in Phase 4.
 
 Related documents:
 
@@ -175,6 +176,8 @@ External accounts needed:
 - Staging wildcard domain and TLS.
 
 ### Phase 4 — Ride creation and publication
+
+Phase 4A foundation implemented: the Guild workspace links to a protected Ride Studio where Owners, Admins, and Ride Managers create drafts and edit the canonical trip package. The first editor uses documented structured rows for repeated origins, itinerary days, meals, and activities; always-visible examples are generated from the draft’s dates, origin, destination, and capacity, and one-click prompts help external AI tools transform existing WhatsApp announcements without inventing missing facts. Total capacity belongs to the destination/stay; origin allocations are optional planning hints. Linked dates shift together, registration close and balance due default to the same pre-ride date, and browser drafts survive failed validation. Guild onboarding and management maintain reusable policy templates; each new ride receives an independently editable, versioned snapshot. Records render on the public ride page alongside tenant-authorized Cloudinary cover and gallery media, with multi-select uploads and immediate local previews. Publishing enforces package completeness, all mutations show pending feedback, privileged changes are audited, and demonstration rides include itinerary/stay/package/policy data. Richer add/remove row controls, origin-specific staff assignment, announcement generation, and final state-transition rules remain in the rest of Phase 4.
 
 Build:
 
