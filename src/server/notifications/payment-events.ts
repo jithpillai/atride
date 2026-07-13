@@ -14,6 +14,8 @@ function paymentPayload(payment: {
   purpose: string;
   method: string;
   payerReference: string | null;
+  payeeVpaSnapshot: string | null;
+  payeeNameSnapshot: string | null;
   submittedAt: Date | null;
   booking: {
     user: { displayName: string };
@@ -29,6 +31,8 @@ function paymentPayload(payment: {
     paymentPurpose: payment.purpose,
     paymentMethod: payment.method,
     payerReference: payment.payerReference ?? "",
+    payeeVpa: payment.payeeVpaSnapshot ?? "",
+    payeeName: payment.payeeNameSnapshot ?? "",
     submittedAt: payment.submittedAt?.toISOString() ?? "",
     rejectionReason: rejectionReason ?? "",
     reviewUrl,

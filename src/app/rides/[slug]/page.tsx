@@ -12,6 +12,7 @@ import { findPublicRidePackageBySlug, listPublicRideSlugs } from "@/server/repos
 import { getCurrentSession } from "@/server/auth/session";
 import { findUserBookingForRide } from "@/server/booking/service";
 import { summarizeBookingPayments } from "@/server/booking/payment-summary";
+import { UpiPaymentPanel } from "@/components/upi-payment-panel";
 
 type Props = { params: Promise<{ slug: string }>; searchParams: Promise<{ booking?: string }> };
 export const revalidate = 300;
@@ -80,6 +81,8 @@ export default async function RidePage({ params, searchParams }: Props) {
               {payment.dueAt && !locked && payment.status !== "CONFIRMED" && <p className={`mt-2 text-xs ${active && paymentSummary.overdue ? "font-bold text-red-300" : "text-zinc-500"}`}>{active && paymentSummary.overdue ? "Overdue · " : "Due · "}{when(payment.dueAt)}</p>}
               {active && payment.method === "CASH" && payment.status === "PENDING" && <p className="mt-3 text-xs leading-5 text-zinc-400">Cash selected. Pay the Guild directly; only authorized finance staff can mark it received.</p>}
               {active && payment.status === "SUBMITTED" && <p className="mt-3 text-xs font-bold leading-5 text-amber-300">Proof submitted. The Guild finance team has been notified by email.</p>}
+              {active && payment.method === "UPI" && (payment.status === "PENDING" || payment.status === "REJECTED") && payment.payeeVpaSnapshot && payment.payeeNameSnapshot && <UpiPaymentPanel paymentId={payment.id} vpa={payment.payeeVpaSnapshot} payeeName={payment.payeeNameSnapshot} amountPaise={payment.amountPaise} rideTitle={ride.title} purpose={payment.purpose} instructions={payment.payeeInstructionsSnapshot} />}
+              {active && payment.method === "UPI" && (payment.status === "PENDING" || payment.status === "REJECTED") && (!payment.payeeVpaSnapshot || !payment.payeeNameSnapshot) && <p className="mt-3 rounded-xl border border-amber-400/20 bg-amber-400/[.04] p-3 text-xs leading-5 text-amber-300">This older obligation has no UPI recipient snapshot. Ask the Guild finance team for verified payment instructions before paying.</p>}
               {active && payment.method !== "CASH" && (payment.status === "PENDING" || payment.status === "REJECTED") && <div className="mt-4"><MediaUploader purpose="PAYMENT_PROOF" bookingPaymentId={payment.id} label={payment.status === "REJECTED" ? "Replace rejected payment proof" : `Upload ${payment.purpose === "BALANCE" ? "balance" : "payment"} proof`} help={payment.status === "REJECTED" ? `Finance feedback: ${payment.rejectionReason ?? "Upload a clearer or corrected payment record."}` : "Private JPEG, PNG, or WebP up to 5 MB. The Guild finance team will be notified after submission."} /></div>}
             </div>;
           })}</div>
@@ -95,6 +98,7 @@ export default async function RidePage({ params, searchParams }: Props) {
           accessibilityNotes={session.user.profile?.accessibilityNotes ?? ""}
           soldOut={soldOut}
           newcomerConsentAvailable={ride.community.shortName.length > 0}
+          upiAvailable={ride.community.paymentSettings?.upiEnabled ?? false}
         /> : <Link href={`/login?returnTo=${encodeURIComponent(`/rides/${ride.slug}#booking`)}`} className="mt-5 block rounded-2xl bg-orange-500 px-5 py-3.5 text-center text-sm font-black text-white hover:bg-orange-400">Sign in to reserve</Link>
       : <p className="mt-5 rounded-2xl border border-white/10 p-4 text-center text-sm font-black text-zinc-300">This ride is {ride.status.toLowerCase()} and is not accepting reservations.</p>}
     </aside></section>

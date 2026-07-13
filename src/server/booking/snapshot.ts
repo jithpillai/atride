@@ -19,7 +19,17 @@ type SnapshotRide = {
   accommodations: Array<{ propertyName: string; locality: string; checkInAt: Date; checkOutAt: Date; roomSummary: string; amenities: string[]; participantNote: string | null; exactLocationRestricted: boolean }>;
   packageItems: Array<{ id: string; type: string; dayNumber: number | null; title: string; description: string | null; pricePaise: number | null; sortOrder: number }>;
   policies: Array<{ id: string; type: string; title: string; content: string; version: number; sortOrder: number }>;
-  community: { id: string; slug: string; name: string };
+  community: {
+    id: string;
+    slug: string;
+    name: string;
+    paymentSettings?: {
+      upiEnabled: boolean;
+      upiVpa: string | null;
+      upiPayeeName: string | null;
+      participantInstructions: string | null;
+    } | null;
+  };
 };
 
 export function buildBookingSnapshot(ride: SnapshotRide) {
@@ -46,7 +56,7 @@ export function buildBookingSnapshot(ride: SnapshotRide) {
       vehicleType: ride.vehicleType,
       vehicleRequirements: ride.vehicleRequirements,
     },
-    guild: ride.community,
+    guild: { id: ride.community.id, slug: ride.community.slug, name: ride.community.name },
     origins: ride.origins.map((origin) => ({ ...origin, departureAt: origin.departureAt.toISOString() })),
     itinerary: ride.itineraryDays.map((item) => ({
       ...item,
@@ -62,4 +72,3 @@ export function buildBookingSnapshot(ride: SnapshotRide) {
     policies: latestPolicies,
   };
 }
-
