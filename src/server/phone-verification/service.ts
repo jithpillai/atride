@@ -4,7 +4,6 @@ import { createSessionToken, hashNetworkValue, hashSessionToken } from "@/server
 import { AuthError } from "@/server/auth/auth-service";
 import { normalizePhone } from "@/server/profile/validation";
 import { FIREBASE_PHONE_AUTH_MAX_AGE_SECONDS, isSupportedIndianMobile, verifiedFirebasePhone } from "./claims";
-import { getFirebaseAdminAuth } from "./firebase-admin";
 
 const CHALLENGE_TTL_MS = 10 * 60 * 1000;
 const RESEND_COOLDOWN_MS = 60 * 1000;
@@ -86,6 +85,7 @@ export async function confirmPhoneVerification(userId: string, challengeToken: s
 
   let verifiedPhone: string | null = null;
   try {
+    const { getFirebaseAdminAuth } = await import("./firebase-admin");
     const claims = await getFirebaseAdminAuth().verifyIdToken(idToken, true);
     const authenticatedAfterChallengeStarted = Boolean(
       claims.auth_time && claims.auth_time >= Math.floor(challenge.createdAt.getTime() / 1000) - 30,
