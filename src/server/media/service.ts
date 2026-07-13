@@ -4,6 +4,8 @@ import { randomUUID } from "node:crypto";
 
 import { db } from "@/lib/db";
 import { AuthError } from "@/server/auth/auth-service";
+import { dispatchNotificationOutbox } from "@/server/notifications/dispatcher";
+import { queueFinancePaymentSubmitted } from "@/server/notifications/payment-events";
 import { cloudinaryConfig } from "./cloudinary";
 import { ALLOWED_IMAGE_FORMATS, MEDIA_POLICY, type SupportedMediaPurpose } from "./policy";
 
@@ -12,10 +14,32 @@ const RIDE_MEDIA_ROLES = new Set(["OWNER", "ADMIN", "RIDE_MANAGER"]);
 
 type SessionShape = Awaited<ReturnType<typeof import("@/server/auth/session").getCurrentSession>>;
 
-export async function resolveMediaContext(session: NonNullable<SessionShape>, purpose: SupportedMediaPurpose, communitySlug?: string, rideId?: string) {
+export async function resolveMediaContext(session: NonNullable<SessionShape>, purpose: SupportedMediaPurpose, communitySlug?: string, rideId?: string, bookingPaymentId?: string) {
   const { folderPrefix } = cloudinaryConfig();
   if (purpose === "USER_AVATAR") {
-    return { communityId: null, rideId: null, publicIdPrefix: `${folderPrefix}/users/${session.userId}/avatar` };
+    return { communityId: null, rideId: null, bookingPaymentId: null, publicIdPrefix: `${folderPrefix}/users/${session.userId}/avatar` };
+  }
+  if (purpose === "PAYMENT_PROOF") {
+    if (!bookingPaymentId) throw new AuthError("PAYMENT_REQUIRED", "Select the payment this proof belongs to.");
+    const payment = await db.bookingPayment.findFirst({
+      where: {
+        id: bookingPaymentId,
+        status: { in: ["PENDING", "REJECTED"] },
+        booking: { userId: session.userId },
+        OR: [
+          { purpose: { in: ["CONFIRMATION_DEPOSIT", "FULL_PAYMENT"] }, booking: { status: "RESERVED" } },
+          { purpose: "BALANCE", booking: { status: "CONFIRMED" } },
+        ],
+      },
+      select: { id: true, booking: { select: { communityId: true, rideId: true } } },
+    });
+    if (!payment) throw new AuthError("MEDIA_FORBIDDEN", "This payment cannot accept proof from this account.", 403);
+    return {
+      communityId: payment.booking.communityId,
+      rideId: payment.booking.rideId,
+      bookingPaymentId: payment.id,
+      publicIdPrefix: `${folderPrefix}/guilds/${payment.booking.communityId}/payments/${payment.id}`,
+    };
   }
   if (!communitySlug) throw new AuthError("GUILD_REQUIRED", "Select a Guild for this upload.");
   const membership = session.user.communityMemberships.find(({ community }) => community.slug === communitySlug);
@@ -36,23 +60,24 @@ export async function resolveMediaContext(session: NonNullable<SessionShape>, pu
       select: { id: true },
     });
     if (!ride) throw new AuthError("MEDIA_FORBIDDEN", "You cannot manage media for this ride.", 403);
-    return { communityId: membership.communityId, rideId: ride.id, publicIdPrefix: `${folderPrefix}/guilds/${membership.communityId}/rides/${ride.id}/${purpose === "RIDE_COVER" ? "cover" : "gallery"}` };
+    return { communityId: membership.communityId, rideId: ride.id, bookingPaymentId: null, publicIdPrefix: `${folderPrefix}/guilds/${membership.communityId}/rides/${ride.id}/${purpose === "RIDE_COVER" ? "cover" : "gallery"}` };
   }
   if (!membership.roles.some(({ role }) => allowedRoles.has(role))) throw new AuthError("MEDIA_FORBIDDEN", "You cannot manage media for this Guild.", 403);
   const suffix = purpose === "GUILD_LOGO" ? "logo" : purpose === "GUILD_COVER" ? "cover" : "gallery";
   return {
     communityId: membership.communityId,
     rideId: null,
+    bookingPaymentId: null,
     publicIdPrefix: `${folderPrefix}/guilds/${membership.communityId}/${suffix}`,
   };
 }
 
-export async function createUploadSignature(session: NonNullable<SessionShape>, purpose: SupportedMediaPurpose, communitySlug?: string, rideId?: string) {
-  const context = await resolveMediaContext(session, purpose, communitySlug, rideId);
+export async function createUploadSignature(session: NonNullable<SessionShape>, purpose: SupportedMediaPurpose, communitySlug?: string, rideId?: string, bookingPaymentId?: string) {
+  const context = await resolveMediaContext(session, purpose, communitySlug, rideId, bookingPaymentId);
   const { cloudinary, cloudName, apiKey, apiSecret } = cloudinaryConfig();
   const timestamp = Math.floor(Date.now() / 1000);
   const publicId = `${context.publicIdPrefix}/${randomUUID()}`;
-  const deliveryType = purpose === "USER_AVATAR" ? "authenticated" : "upload";
+  const deliveryType = purpose === "USER_AVATAR" || purpose === "PAYMENT_PROOF" ? "authenticated" : "upload";
   const uploadParams = { timestamp, public_id: publicId, overwrite: false, type: deliveryType };
   return {
     cloudName,
@@ -66,15 +91,15 @@ export async function createUploadSignature(session: NonNullable<SessionShape>, 
   };
 }
 
-type CompleteInput = { purpose: SupportedMediaPurpose; communitySlug?: string; rideId?: string; publicId: string };
+type CompleteInput = { purpose: SupportedMediaPurpose; communitySlug?: string; rideId?: string; bookingPaymentId?: string; publicId: string; payerReference?: string };
 
 export async function completeMediaUpload(session: NonNullable<SessionShape>, input: CompleteInput) {
-  const context = await resolveMediaContext(session, input.purpose, input.communitySlug, input.rideId);
+  const context = await resolveMediaContext(session, input.purpose, input.communitySlug, input.rideId, input.bookingPaymentId);
   if (!input.publicId.startsWith(`${context.publicIdPrefix}/`)) {
     throw new AuthError("INVALID_MEDIA", "The uploaded asset does not match this account or Guild.");
   }
   const { cloudinary } = cloudinaryConfig();
-  const deliveryType = input.purpose === "USER_AVATAR" ? "authenticated" : "upload";
+  const deliveryType = input.purpose === "USER_AVATAR" || input.purpose === "PAYMENT_PROOF" ? "authenticated" : "upload";
   const resource = await cloudinary.api.resource(input.publicId, { resource_type: "image", type: deliveryType }) as {
     public_id: string; version: number; format: string; width?: number; height?: number; bytes?: number; resource_type: string;
   };
@@ -86,6 +111,7 @@ export async function completeMediaUpload(session: NonNullable<SessionShape>, in
   }
 
   const oldPublicIds: string[] = [];
+  const notificationEventKeys: string[] = [];
   let asset;
   try {
     asset = await db.$transaction(async (tx) => {
@@ -99,7 +125,7 @@ export async function completeMediaUpload(session: NonNullable<SessionShape>, in
         communityId: context.communityId,
         rideId: context.rideId,
         purpose: input.purpose,
-        access: input.purpose === "USER_AVATAR" ? "AUTHENTICATED" : "PUBLIC",
+        access: input.purpose === "PAYMENT_PROOF" ? "PRIVATE" : input.purpose === "USER_AVATAR" ? "AUTHENTICATED" : "PUBLIC",
         publicId: resource.public_id,
         version: resource.version,
         resourceType: resource.resource_type,
@@ -139,6 +165,24 @@ export async function completeMediaUpload(session: NonNullable<SessionShape>, in
         const old = await tx.mediaAsset.delete({ where: { id: ride.coverAssetId } });
         oldPublicIds.push(old.publicId);
       }
+    } else if (input.purpose === "PAYMENT_PROOF" && context.bookingPaymentId) {
+      const payerReference = input.payerReference?.trim().slice(0, 80) ?? "";
+      if (payerReference.length < 6) throw new AuthError("PAYMENT_REFERENCE_REQUIRED", "Enter the UPI or bank transaction reference shown in your payment app.");
+      const payment = await tx.bookingPayment.findUnique({ where: { id: context.bookingPaymentId }, select: { proofAssetId: true, bookingId: true } });
+      if (!payment) throw new AuthError("PAYMENT_REQUIRED", "This payment is unavailable.");
+      await tx.bookingPayment.update({
+        where: { id: context.bookingPaymentId },
+        data: { proofAssetId: created.id, payerReference, status: "SUBMITTED", submittedAt: new Date(), reviewedById: null, reviewedAt: null, rejectionReason: null },
+      });
+      if (payment.proofAssetId) {
+        const old = await tx.mediaAsset.delete({ where: { id: payment.proofAssetId } });
+        oldPublicIds.push(old.publicId);
+      }
+      await tx.communityAuditEvent.create({ data: {
+        communityId: context.communityId!, actorUserId: session.userId, action: "PAYMENT_PROOF_SUBMITTED",
+        metadata: { bookingPaymentId: context.bookingPaymentId, bookingId: payment.bookingId, rideId: context.rideId },
+      } });
+      notificationEventKeys.push(...await queueFinancePaymentSubmitted(tx, context.bookingPaymentId, created.id));
     }
     return created;
     });
@@ -148,13 +192,18 @@ export async function completeMediaUpload(session: NonNullable<SessionShape>, in
   }
 
   await Promise.all(oldPublicIds.map((publicId) => cloudinary.uploader.destroy(publicId, { resource_type: "image", type: deliveryType, invalidate: true }).catch(() => undefined)));
+  if (notificationEventKeys.length) {
+    await dispatchNotificationOutbox({ eventKeys: notificationEventKeys }).catch((error) => {
+      console.error("Immediate payment notification dispatch failed; the durable event remains queued", { error });
+    });
+  }
   return asset;
 }
 
-export async function removeMediaAsset(session: NonNullable<SessionShape>, assetId: string, communitySlug?: string, rideId?: string) {
+export async function removeMediaAsset(session: NonNullable<SessionShape>, assetId: string, communitySlug?: string, rideId?: string, bookingPaymentId?: string) {
   const asset = await db.mediaAsset.findUnique({ where: { id: assetId } });
   if (!asset) return;
-  const context = await resolveMediaContext(session, asset.purpose as SupportedMediaPurpose, communitySlug, rideId);
+  const context = await resolveMediaContext(session, asset.purpose as SupportedMediaPurpose, communitySlug, rideId, bookingPaymentId);
   if (asset.uploaderUserId !== session.userId && !context.communityId) throw new AuthError("MEDIA_FORBIDDEN", "You cannot remove this image.", 403);
   if (asset.communityId !== context.communityId) throw new AuthError("MEDIA_FORBIDDEN", "You cannot remove this image.", 403);
   if (asset.rideId !== context.rideId) throw new AuthError("MEDIA_FORBIDDEN", "You cannot remove this ride image.", 403);

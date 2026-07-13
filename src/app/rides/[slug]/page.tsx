@@ -5,10 +5,15 @@ import { notFound } from "next/navigation";
 
 import { formatMoney, formatRideDate } from "@/lib/format";
 import { ImageWithFallback } from "@/components/image-with-fallback";
+import { RideBookingForm } from "@/components/ride-booking-form";
+import { MediaUploader } from "@/components/media-uploader";
 import { cloudinaryImageUrl } from "@/server/media/cloudinary";
 import { findPublicRidePackageBySlug, listPublicRideSlugs } from "@/server/repositories/discovery-repository";
+import { getCurrentSession } from "@/server/auth/session";
+import { findUserBookingForRide } from "@/server/booking/service";
+import { summarizeBookingPayments } from "@/server/booking/payment-summary";
 
-type Props = { params: Promise<{ slug: string }> };
+type Props = { params: Promise<{ slug: string }>; searchParams: Promise<{ booking?: string }> };
 export const revalidate = 300;
 export async function generateStaticParams() { return (await listPublicRideSlugs()).map((slug) => ({ slug })); }
 export async function generateMetadata({ params }: Props): Promise<Metadata> {
@@ -17,10 +22,15 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
 }
 function when(date: Date) { return date.toLocaleString("en-IN", { timeZone: "Asia/Kolkata", dateStyle: "medium", timeStyle: "short" }); }
 
-export default async function RidePage({ params }: Props) {
+export default async function RidePage({ params, searchParams }: Props) {
   const ride = await findPublicRidePackageBySlug((await params).slug);
   if (!ride) notFound();
+  const session = await getCurrentSession();
+  const booking = session ? await findUserBookingForRide(session.userId, ride.id) : null;
+  const bookingNotice = (await searchParams).booking;
+  const paymentSummary = booking ? summarizeBookingPayments(booking) : null;
   const slotsLeft = ride.totalSlots + ride.bufferSlots - ride.bookedSlots;
+  const soldOut = slotsLeft <= 0;
   const items = (type: "INCLUSION" | "EXCLUSION" | "ADD_ON" | "MEAL" | "ACTIVITY") => ride.packageItems.filter((item) => item.type === type);
   const latestPolicies = ride.policies.filter((policy, index, policies) => policies.findIndex((candidate) => candidate.type === policy.type) === index);
 
@@ -49,9 +59,44 @@ export default async function RidePage({ params }: Props) {
       {!!ride.mediaAssets.length && <section className="mt-12"><p className="eyebrow">Ride gallery</p><h2 className="mt-3 text-3xl font-black">Stay, attractions, and highlights</h2><div className="mt-6 grid gap-4 sm:grid-cols-2">{ride.mediaAssets.map((asset, index) => <Image key={asset.id} src={cloudinaryImageUrl(asset)} alt={`${ride.title} image ${index + 1}`} width={800} height={600} className="aspect-[4/3] w-full rounded-3xl object-cover" />)}</div></section>}
     </main>
 
-    <aside className="h-fit rounded-3xl border border-orange-500/25 bg-[#15191f] p-7 lg:sticky lg:top-28"><p className="text-sm text-zinc-500">Ride fee</p><p className="mt-1 text-3xl font-black">{formatMoney(ride.pricePaise / 100)}</p>{ride.confirmationDepositPaise > 0 && <p className="mt-2 text-xs text-zinc-500">₹{(ride.confirmationDepositPaise / 100).toLocaleString("en-IN")} confirmation deposit</p>}
+    <aside id="booking" className="h-fit scroll-mt-28 rounded-3xl border border-orange-500/25 bg-[#15191f] p-7 lg:sticky lg:top-28"><p className="text-sm text-zinc-500">Ride fee</p><p className="mt-1 text-3xl font-black">{formatMoney(ride.pricePaise / 100)}</p>{ride.confirmationDepositPaise > 0 && <p className="mt-2 text-xs text-zinc-500">₹{(ride.confirmationDepositPaise / 100).toLocaleString("en-IN")} confirmation deposit</p>}
       <div className="mt-6 grid gap-3 border-y border-white/8 py-5 text-sm"><p className="flex justify-between"><span className="text-zinc-500">Starts</span><span className="font-bold">{formatRideDate(ride.startsAt.toISOString())}</span></p><p className="flex justify-between"><span className="text-zinc-500">Distance</span><span className="font-bold">{ride.distanceKm} km</span></p><p className="flex justify-between"><span className="text-zinc-500">Vehicle</span><span className="font-bold">{ride.vehicleType}</span></p><p className="flex justify-between"><span className="text-zinc-500">Difficulty</span><span className="font-bold">{ride.difficulty}</span></p></div>
-      <p className="mt-5 text-sm font-bold text-emerald-400">{slotsLeft} of {ride.totalSlots + ride.bufferSlots} slots available</p>{ride.status === "PUBLISHED" ? <Link href="/login" className="mt-5 block rounded-2xl bg-orange-500 px-5 py-3.5 text-center text-sm font-black text-white hover:bg-orange-400">Sign in to reserve</Link> : <p className="mt-5 rounded-2xl border border-white/10 p-4 text-center text-sm font-black text-zinc-300">This ride is {ride.status.toLowerCase()} and is not accepting reservations.</p>}<p className="mt-4 text-center text-xs leading-5 text-zinc-600">Booking and payment actions arrive in Phase 5.</p>
+      <p className={`mt-5 text-sm font-bold ${soldOut ? "text-amber-400" : "text-emerald-400"}`}>{soldOut ? "Ride capacity reached" : `${slotsLeft} of ${ride.totalSlots + ride.bufferSlots} slots available`}</p>
+      {bookingNotice && <p className="mt-4 rounded-2xl border border-emerald-400/20 bg-emerald-400/[.06] p-4 text-sm font-bold text-emerald-300">{bookingNotice === "waitlisted" ? "You joined the waitlist." : bookingNotice === "already_confirmed" ? "Your booking is already confirmed." : "Your ride reservation is saved."}</p>}
+      {booking ? <div className="mt-5 rounded-2xl border border-white/10 bg-black/20 p-5">
+        <p className="text-xs font-bold uppercase tracking-widest text-orange-300">Your booking</p>
+        <p className="mt-2 text-xl font-black">{booking.status.replaceAll("_", " ")}</p>
+        <p className="mt-2 text-sm text-zinc-400">Starting with {booking.origin?.city ?? "the selected group"} · {booking.occupantRole.toLowerCase()}</p>
+        {booking.status === "RESERVED" && booking.reservationExpiresAt && <p className="mt-3 text-xs leading-5 text-amber-300">Slot held until {when(booking.reservationExpiresAt)} while the Guild reviews your confirmation payment.</p>}
+        {booking.status === "WAITLISTED" && <p className="mt-3 text-xs leading-5 text-zinc-500">No slot or payment is reserved. The Guild can contact you if capacity opens.</p>}
+        {booking.status === "CONFIRMED" && <p className="mt-3 text-xs leading-5 text-emerald-300">Your place is confirmed{paymentSummary?.fullyPaid ? " and the booking is fully paid." : ". Any remaining balance is tracked separately below."}</p>}
+        {booking.status !== "WAITLISTED" && paymentSummary && <div className="mt-5 border-t border-white/10 pt-5">
+          <div className="grid grid-cols-2 gap-3 text-sm"><div className="rounded-xl bg-white/[.035] p-3"><p className="text-xs text-zinc-500">Paid</p><p className="mt-1 font-black text-emerald-300">₹{(paymentSummary.paidPaise / 100).toLocaleString("en-IN")}</p></div><div className="rounded-xl bg-white/[.035] p-3"><p className="text-xs text-zinc-500">Outstanding</p><p className={`mt-1 font-black ${paymentSummary.outstandingPaise ? "text-amber-300" : "text-emerald-300"}`}>₹{(paymentSummary.outstandingPaise / 100).toLocaleString("en-IN")}</p></div></div>
+          <div className="mt-4 grid gap-3">{booking.payments.map((payment) => {
+            const active = paymentSummary.activePayment?.id === payment.id;
+            const locked = payment.purpose === "BALANCE" && booking.status !== "CONFIRMED";
+            return <div key={payment.id} className={`rounded-2xl border p-4 ${active && paymentSummary.overdue ? "border-red-400/25 bg-red-400/[.035]" : "border-white/10 bg-white/[.02]"}`}>
+              <div className="flex items-start justify-between gap-3"><div><p className="text-xs font-black uppercase tracking-wider text-zinc-400">{payment.purpose.replaceAll("_", " ")}</p><p className="mt-1 text-lg font-black">₹{(payment.amountPaise / 100).toLocaleString("en-IN")}</p></div><span className={`rounded-full px-2.5 py-1 text-[10px] font-black ${payment.status === "CONFIRMED" ? "bg-emerald-400/15 text-emerald-300" : payment.status === "REJECTED" ? "bg-red-400/15 text-red-300" : payment.status === "SUBMITTED" ? "bg-amber-400/15 text-amber-300" : "bg-white/10 text-zinc-300"}`}>{locked ? "AFTER ADVANCE" : payment.status}</span></div>
+              {payment.dueAt && !locked && payment.status !== "CONFIRMED" && <p className={`mt-2 text-xs ${active && paymentSummary.overdue ? "font-bold text-red-300" : "text-zinc-500"}`}>{active && paymentSummary.overdue ? "Overdue · " : "Due · "}{when(payment.dueAt)}</p>}
+              {active && payment.method === "CASH" && payment.status === "PENDING" && <p className="mt-3 text-xs leading-5 text-zinc-400">Cash selected. Pay the Guild directly; only authorized finance staff can mark it received.</p>}
+              {active && payment.status === "SUBMITTED" && <p className="mt-3 text-xs font-bold leading-5 text-amber-300">Proof submitted. The Guild finance team has been notified by email.</p>}
+              {active && payment.method !== "CASH" && (payment.status === "PENDING" || payment.status === "REJECTED") && <div className="mt-4"><MediaUploader purpose="PAYMENT_PROOF" bookingPaymentId={payment.id} label={payment.status === "REJECTED" ? "Replace rejected payment proof" : `Upload ${payment.purpose === "BALANCE" ? "balance" : "payment"} proof`} help={payment.status === "REJECTED" ? `Finance feedback: ${payment.rejectionReason ?? "Upload a clearer or corrected payment record."}` : "Private JPEG, PNG, or WebP up to 5 MB. The Guild finance team will be notified after submission."} /></div>}
+            </div>;
+          })}</div>
+        </div>}
+      </div>
+      : ride.status === "PUBLISHED" ? session ? <RideBookingForm
+          rideId={ride.id}
+          rideSlug={ride.slug}
+          origins={ride.origins.map((origin) => ({ id: origin.id, label: `${origin.city} · ${origin.meetingPoint}` }))}
+          vehicles={session.user.vehicles.filter((vehicle) => vehicle.type === ride.vehicleType).map((vehicle) => ({ id: vehicle.id, label: `${vehicle.manufacturer} ${vehicle.model}${vehicle.nickname ? ` · ${vehicle.nickname}` : ""}` }))}
+          addOns={items("ADD_ON").map((item) => ({ id: item.id, title: item.title, description: item.description, pricePaise: item.pricePaise }))}
+          dietaryPreference={session.user.profile?.dietaryPreference ?? ""}
+          accessibilityNotes={session.user.profile?.accessibilityNotes ?? ""}
+          soldOut={soldOut}
+          newcomerConsentAvailable={ride.community.shortName.length > 0}
+        /> : <Link href={`/login?returnTo=${encodeURIComponent(`/rides/${ride.slug}#booking`)}`} className="mt-5 block rounded-2xl bg-orange-500 px-5 py-3.5 text-center text-sm font-black text-white hover:bg-orange-400">Sign in to reserve</Link>
+      : <p className="mt-5 rounded-2xl border border-white/10 p-4 text-center text-sm font-black text-zinc-300">This ride is {ride.status.toLowerCase()} and is not accepting reservations.</p>}
     </aside></section>
   </>;
 }

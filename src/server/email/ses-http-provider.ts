@@ -1,7 +1,7 @@
 import { createHash, createHmac } from "node:crypto";
 
 import { renderOtpEmail } from "./otp-template";
-import { EmailDeliveryError, type EmailProvider, type OtpEmailMessage } from "./types";
+import { EmailDeliveryError, type EmailProvider, type OtpEmailMessage, type TransactionalEmailMessage } from "./types";
 
 type SesConfig = {
   region: string;
@@ -91,18 +91,22 @@ export class SesHttpEmailProvider implements EmailProvider {
   readonly revealsDevelopmentCode = false;
 
   async sendOtp(message: OtpEmailMessage) {
-    const config = getSesConfig();
     const content = renderOtpEmail(message);
+    return this.sendTransactional({ to: message.to, ...content });
+  }
+
+  async sendTransactional(message: TransactionalEmailMessage) {
+    const config = getSesConfig();
     const payload = JSON.stringify({
       FromEmailAddress: `${safeDisplayName(config.fromName)} <${config.fromEmail}>`,
       Destination: { ToAddresses: [message.to] },
       ReplyToAddresses: config.replyToEmail ? [config.replyToEmail] : undefined,
       Content: {
         Simple: {
-          Subject: { Data: content.subject, Charset: "UTF-8" },
+          Subject: { Data: message.subject, Charset: "UTF-8" },
           Body: {
-            Text: { Data: content.text, Charset: "UTF-8" },
-            Html: { Data: content.html, Charset: "UTF-8" },
+            Text: { Data: message.text, Charset: "UTF-8" },
+            Html: { Data: message.html, Charset: "UTF-8" },
           },
         },
       },

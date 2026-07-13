@@ -472,14 +472,16 @@ Booking statuses:
 
 ```text
 RESERVED
-PENDING_PAYMENT
-PENDING_VERIFICATION
 CONFIRMED
 WAITLISTED
 CANCELLED
 EXPIRED
-COMPLETED
+PAYMENT_REJECTED
+TRANSFER_PENDING
+TRANSFERRED
 ```
+
+Payment progress is modelled independently rather than duplicated in the booking status. A booking payment uses `PENDING`, `SUBMITTED`, `CONFIRMED`, or `REJECTED`, and identifies whether it is a confirmation deposit, balance, full payment, or another obligation. A future completed-ride lifecycle may add `COMPLETED` after verified participation.
 
 **Rules:**
 
@@ -489,26 +491,27 @@ COMPLETED
 
 ## 9. Payments
 
-### UC-15: Pay online through the community
+### UC-15: Pay through assisted Guild UPI
 
 **Actor:** Participant
 
 **Flow:**
 
-1. @Ride loads the ride community's active Razorpay integration.
-2. The backend creates a gateway order using that community's encrypted credentials.
-3. Participant completes Razorpay checkout.
-4. @Ride receives and verifies the signed webhook.
-5. Payment and booking are confirmed atomically.
-6. Participant and organizer receive confirmation.
+1. @Ride loads the ride's snapshotted price obligations and the Guild's active UPI recipient.
+2. On mobile, @Ride opens a standard UPI intent with recipient, Guild name, exact amount, currency, and booking reference prefilled.
+3. On desktop, @Ride displays a QR for the same UPI URI.
+4. The participant completes payment directly in their UPI app and submits the transaction reference and optional protected proof.
+5. Guild Owner/Admin/Finance recipients receive an event email with a direct review link.
+6. Authorized finance staff confirm or reject the advance or balance obligation; @Ride updates the booking atomically and notifies the participant.
 
 **Rules:**
 
-- Money goes directly to the community's Razorpay account.
+- Money goes directly to the community's bank/UPI account.
 - @Ride does not collect or settle ride funds.
-- Browser checkout success is not proof of payment.
-- Duplicate webhooks do not duplicate confirmation.
-- Credentials are never displayed after saving or exposed to the client.
+- Opening a UPI app or submitting proof is not confirmation; authorized finance review is required.
+- The booking separately tracks confirmation advance, balance due, due dates, submitted references, and confirmed amounts.
+- The UPI recipient used for an obligation is snapshotted so a later Guild-setting change cannot rewrite payment history.
+- A future community-owned gateway may automate reconciliation only after the optional gateway phase is approved.
 
 Payment statuses:
 
@@ -540,7 +543,7 @@ Supported methods may include cash, direct UPI, bank transfer, payment at assemb
 
 ### UC-17: Verify offline payment
 
-**Actor:** Community Owner, Community Admin, Finance Manager, or explicitly permitted Captain
+**Actor:** Community Owner, Community Admin, or Finance Manager
 
 **Flow:**
 
@@ -549,7 +552,7 @@ Supported methods may include cash, direct UPI, bank transfer, payment at assemb
 3. Record actor, timestamp, amount, method, proof, and note.
 4. Confirm booking or release capacity.
 
-Financial access is not granted to captains by default.
+Financial access is not granted to captains by default. The current Phase 5 implementation requires an explicit Owner, Admin, or Finance role; a future custom permission may delegate only the required finance action without granting a broader role.
 
 ### UC-18: Manage payment expiry and refunds
 

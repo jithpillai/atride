@@ -9,7 +9,7 @@ export async function POST(request: Request) {
     assertSameOrigin(request);
     const session = await getCurrentSession();
     if (!session) throw new AuthError("AUTH_REQUIRED", "Sign in to complete an upload.", 401);
-    const body = await request.json() as { purpose?: unknown; communitySlug?: unknown; rideId?: unknown; publicId?: unknown };
+    const body = await request.json() as { purpose?: unknown; communitySlug?: unknown; rideId?: unknown; bookingPaymentId?: unknown; publicId?: unknown; payerReference?: unknown };
     const purpose = typeof body.purpose === "string" ? body.purpose : "";
     if (!isSupportedMediaPurpose(purpose) || typeof body.publicId !== "string") {
       throw new AuthError("INVALID_MEDIA", "The uploaded image is invalid.");
@@ -19,6 +19,8 @@ export async function POST(request: Request) {
       publicId: body.publicId,
       communitySlug: typeof body.communitySlug === "string" ? body.communitySlug : undefined,
       rideId: typeof body.rideId === "string" ? body.rideId : undefined,
+      bookingPaymentId: typeof body.bookingPaymentId === "string" ? body.bookingPaymentId : undefined,
+      payerReference: typeof body.payerReference === "string" ? body.payerReference : undefined,
     });
     return Response.json({ ok: true, assetId: asset.id });
   } catch (error) {

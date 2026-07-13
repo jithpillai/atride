@@ -52,6 +52,14 @@ export async function requireRideManager(slug: string) {
   return result;
 }
 
+export async function requireGuildFinance(slug: string) {
+  const result = await requireGuildManager(slug);
+  if (!result.membership.roles.some(({ role }) => role === "OWNER" || role === "ADMIN" || role === "FINANCE")) {
+    redirect("/account?access=denied");
+  }
+  return result;
+}
+
 const RIDE_EDITOR_STAFF_ROLES = new Set(["LEAD_CAPTAIN", "CAPTAIN", "VICE_CAPTAIN"]);
 
 export async function requireRideEditor(slug: string, rideId: string) {

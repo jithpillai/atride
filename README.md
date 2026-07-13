@@ -24,7 +24,7 @@ The visual brand is `@Ride`; the written and search-friendly name is `AtRide`; t
 - Build a private, verified Ride Passport without a public rider score
 - See upcoming and live rides on the landing page across participant and assigned crew roles
 - Select a starting group and book available slots
-- Pay through the community's Razorpay account or an approved offline method
+- Pay directly to the community through an assisted UPI intent/QR, bank transfer, or cash flow
 - Receive confirmation, payment, schedule, and trip-event notifications
 - Read official ride announcements and optionally join an organizer-managed WhatsApp group
 - Follow participant-only checkpoint and trip progress
@@ -36,8 +36,8 @@ The visual brand is `@Ride`; the written and search-friendly name is `AtRide`; t
 - Staff invitations and scoped access control
 - Draft and publish trips with a vehicle type, images, pricing, inclusions, and capacity
 - Configure multiple starting groups, captains, routes, and merge points
-- Connect a community-owned Razorpay account
-- Verify offline UPI, bank-transfer, or cash payments
+- Configure a community-owned UPI recipient and verify UPI, bank-transfer, or cash payments
+- Optionally connect a community-owned payment gateway in a later evidence-gated phase
 - Manage participants, waitlists, staff, checkpoints, and ride operations
 - Configure official announcements and an optional WhatsApp discussion or announcements-only group
 - Embed public ride widgets in an existing Guild website, with custom domains planned later
@@ -70,7 +70,7 @@ The visual brand is `@Ride`; the written and search-friendly name is `AtRide`; t
 - A person may be a rider in one community, an administrator in another, and a captain on a specific ride.
 - Communities never share a common administrator password; each staff member has an individual audited account.
 
-Communities own their ride payments. Each community connects its own Razorpay credentials, and ride money goes directly to that account. @Ride records and verifies the booking outcome but does not collect, hold, or settle ride funds.
+Communities own their ride payments. The default flow opens the participant's UPI app or presents a QR containing the Guild's UPI ID and exact amount; funds move directly to the Guild, and permitted finance staff verify the submitted transaction reference/proof. @Ride records advance and balance obligations but does not collect, hold, or settle ride funds. A community-owned Razorpay integration is optional and deferred until demonstrated demand after the web and app phases.
 
 The domain model is vehicle-neutral. New trips select a vehicle type, with `BIKE` as the initial default. Motorcycle-oriented screens can use familiar terms such as rider and pillion, while future four-wheel experiences can use driver, co-driver, passenger, convoy, and expedition without changing the identity or booking foundation.
 
@@ -99,7 +99,7 @@ identity | communities | rides | bookings | payments | tracking
    |             |                    |
    v             v                    v
 PostgreSQL     Redis           External services
-+ PostGIS      + BullMQ        Razorpay, SES,
++ PostGIS      + BullMQ        UPI intents, SES,
                                 Maps, Cloudinary
                  |
                  v
@@ -118,7 +118,7 @@ PostgreSQL     Redis           External services
 | Authentication | Google OpenID Connect plus email OTP and opaque PostgreSQL sessions; Firebase only for phone ownership verification |
 | Images and media | Cloudinary initially |
 | Maps and geocoding | Google Maps Platform |
-| Online payments | Per-community Razorpay integration |
+| Payments | Guild-owned UPI intent/QR with manual verification; optional later Razorpay |
 | Authentication OTP | Amazon SES email OTP initially |
 | SMS | Firebase one-time phone verification only; ride/service SMS remains deferred |
 | Email | Amazon SES |
@@ -217,7 +217,7 @@ pnpm test
 pnpm build
 ```
 
-The demonstration fixture remains the repeatable database seed source, while production UI reads go through tenant-scoped Prisma repositories. Redis and Mailpit are introduced behind application-owned adapters as their phases require them. Email, maps, storage, and Razorpay use development adapters so provider accounts do not block the first phases. Ride/service SMS is disabled and is not a launch dependency; Firebase sends only optional one-time phone-verification codes.
+The demonstration fixture remains the repeatable database seed source, while production UI reads go through tenant-scoped Prisma repositories. Redis and Mailpit are introduced behind application-owned adapters as their phases require them. Email, maps, and storage use development adapters so provider accounts do not block the first phases. Assisted UPI needs no platform merchant account; the optional Razorpay adapter remains deferred. Ride/service SMS is disabled and is not a launch dependency; Firebase sends only optional one-time phone-verification codes.
 
 Example local tenant URLs:
 
@@ -233,8 +233,8 @@ localhost:3000/guilds/wild-gear
 - Commit only a redacted `.env.example` containing variable names.
 - Use separate credentials and data stores for local, CI, staging, and production.
 - Restrict browser and server API keys independently.
-- Store tenant Razorpay credentials encrypted in the database, not in source control.
-- Use verified webhooks and idempotency for payments and provider callbacks.
+- Restrict Guild UPI configuration and payment evidence to authorized tenant roles, and snapshot the recipient used for each obligation.
+- If the optional gateway phase is approved, encrypt tenant credentials and use verified, idempotent webhooks.
 
 ## Current decisions and open questions
 

@@ -5,6 +5,7 @@ import { cache } from "react";
 import type { GuildView, ResolvedGuild, RideView, TenantContext } from "@/domain/discovery";
 import type { Prisma } from "@/generated/prisma/client";
 import { db } from "@/lib/db";
+import { summarizeBookingPayments } from "@/server/booking/payment-summary";
 import { cloudinaryImageUrl } from "@/server/media/cloudinary";
 
 const guildInclude = {
@@ -123,17 +124,44 @@ export const listUpcomingStaffRides = cache(async (userId: string) => {
     where: {
       startsAt: { gte: new Date() },
       status: { in: ["PUBLISHED", "CLOSED", "POSTPONED"] },
-      staffAssignments: { some: { userId } },
+      OR: [
+        { staffAssignments: { some: { userId } } },
+        { bookings: { some: { userId, status: { in: ["RESERVED", "CONFIRMED", "WAITLISTED", "PAYMENT_REJECTED", "TRANSFER_PENDING"] } } } },
+      ],
     },
-    include: { community: { select: { slug: true, name: true } }, coverAsset: true, staffAssignments: { where: { userId }, include: { origin: { select: { city: true } } } } },
+    include: {
+      community: { select: { slug: true, name: true } },
+      coverAsset: true,
+      staffAssignments: { where: { userId }, include: { origin: { select: { city: true } } } },
+      bookings: { where: { userId }, include: { origin: { select: { city: true } }, payments: { orderBy: { createdAt: "asc" } } } },
+    },
     orderBy: { startsAt: "asc" },
-    take: 6,
+    take: 12,
   });
-  return rides.map((ride) => ({
-    ...toRideView(ride),
-    guildName: ride.community.name,
-    assignments: ride.staffAssignments.map((assignment) => ({ role: assignment.role, originCity: assignment.origin?.city ?? null })),
-  }));
+  const mapped = rides.map((ride) => {
+    const booking = ride.bookings[0];
+    const summary = booking ? summarizeBookingPayments(booking) : null;
+    return {
+      ...toRideView(ride),
+      guildName: ride.community.name,
+      assignments: ride.staffAssignments.map((assignment) => ({ role: assignment.role, originCity: assignment.origin?.city ?? null })),
+      booking: booking ? {
+        status: booking.status,
+        originCity: booking.origin?.city ?? null,
+        paymentStatus: summary?.activePayment?.status ?? (summary?.fullyPaid ? "CONFIRMED" : null),
+        paymentPurpose: summary?.activePayment?.purpose ?? null,
+        paidPaise: summary?.paidPaise ?? 0,
+        outstandingPaise: summary?.outstandingPaise ?? booking.totalPricePaise,
+        paymentOverdue: summary?.overdue ?? false,
+        reservationExpiresAt: booking.reservationExpiresAt?.toISOString() ?? null,
+      } : null,
+    };
+  });
+  const priority = (ride: typeof mapped[number]) => ride.booking?.outstandingPaise ? 0
+    : ride.booking?.status === "CONFIRMED" ? 1
+      : ride.booking?.status === "WAITLISTED" ? 2
+        : 3;
+  return mapped.sort((left, right) => priority(left) - priority(right) || new Date(left.startDate).getTime() - new Date(right.startDate).getTime()).slice(0, 6);
 });
 
 export const listMarketplaceCities = cache(async (): Promise<string[]> => {
