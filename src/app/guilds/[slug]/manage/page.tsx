@@ -2,15 +2,16 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 
 import { FormPendingSubmit } from "@/components/pending-feedback";
+import { CopyGuildJoinLink } from "@/components/guild-join-link";
 import { MediaUploader } from "@/components/media-uploader";
 import { db } from "@/lib/db";
 import { requireGuildManager } from "@/server/auth/authorization";
-import { inviteGuildStaff, revokeGuildInvitation, updateGuildEmbedOrigins, updateGuildMemberRole, updateGuildMemberStatus, updateGuildProfile, updateGuildRidePolicyTemplates } from "@/server/guild/actions";
+import { createGuildJoinLink, inviteGuildStaff, revokeGuildInvitation, revokeGuildJoinLink, updateGuildEmbedOrigins, updateGuildMemberRole, updateGuildMemberStatus, updateGuildProfile, updateGuildRidePolicyTemplates } from "@/server/guild/actions";
 import { DEFAULT_GUILD_RIDE_POLICIES } from "@/server/guild/default-ride-policies";
 import { cloudinaryImageUrl } from "@/server/media/cloudinary";
 
 type WorkspaceSection = "operations" | "profile" | "settings" | "log";
-type Props = { params: Promise<{ slug: string }>; searchParams: Promise<{ section?: string; saved?: string; error?: string; staffSaved?: string; staffError?: string; policySaved?: string; embedSaved?: string; embedError?: string }> };
+type Props = { params: Promise<{ slug: string }>; searchParams: Promise<{ section?: string; saved?: string; error?: string; staffSaved?: string; staffError?: string; joinSaved?: string; joinError?: string; policySaved?: string; embedSaved?: string; embedError?: string }> };
 
 export const metadata = { title: "Manage Guild", robots: { index: false, follow: false } };
 
@@ -30,6 +31,7 @@ export default async function GuildManagePage({ params, searchParams }: Props) {
         include: { roles: { orderBy: { role: "asc" } }, user: { select: { id: true, displayName: true, contacts: { where: { type: "EMAIL", isPrimary: true }, take: 1 } } } },
       },
       invitations: { where: { status: "PENDING" }, orderBy: { createdAt: "desc" }, take: 20 },
+      joinLinks: { orderBy: { createdAt: "desc" }, take: 20 },
       auditEvents: { orderBy: { createdAt: "desc" }, take: 30, include: { actor: { select: { displayName: true } } } },
       ridePolicyTemplates: true,
       embedOrigins: { orderBy: { origin: "asc" } },
@@ -73,6 +75,8 @@ export default async function GuildManagePage({ params, searchParams }: Props) {
       {state.error && <p role="alert" className="mt-6 rounded-2xl border border-red-400/20 bg-red-400/10 px-4 py-3 text-sm font-semibold text-red-300">Check the highlighted Guild details and try again.</p>}
       {state.staffSaved && <p className="mt-6 rounded-2xl border border-emerald-400/20 bg-emerald-400/10 px-4 py-3 text-sm font-semibold text-emerald-300">Guild staff settings updated.</p>}
       {state.staffError && <p role="alert" className="mt-6 rounded-2xl border border-red-400/20 bg-red-400/10 px-4 py-3 text-sm font-semibold text-red-300">That staff change could not be completed. Protected Owner and self-access rules may apply.</p>}
+      {state.joinSaved && <p className="mt-6 rounded-2xl border border-emerald-400/20 bg-emerald-400/10 px-4 py-3 text-sm font-semibold text-emerald-300">Guild membership invitation links updated.</p>}
+      {state.joinError && <p role="alert" className="mt-6 rounded-2xl border border-red-400/20 bg-red-400/10 px-4 py-3 text-sm font-semibold text-red-300">That membership invitation link could not be updated.</p>}
       {state.policySaved && <p className="mt-6 rounded-2xl border border-emerald-400/20 bg-emerald-400/10 px-4 py-3 text-sm font-semibold text-emerald-300">Default ride rules saved. New rides will start with these policies.</p>}
       {state.embedSaved && <p className="mt-6 rounded-2xl border border-emerald-400/20 bg-emerald-400/10 px-4 py-3 text-sm font-semibold text-emerald-300">Approved public widget origins saved.</p>}
       {state.embedError && <p role="alert" className="mt-6 rounded-2xl border border-red-400/20 bg-red-400/10 px-4 py-3 text-sm font-semibold text-red-300">Enter one complete HTTPS origin per line, without paths—for example, https://www.example.com.</p>}
@@ -136,6 +140,21 @@ export default async function GuildManagePage({ params, searchParams }: Props) {
         {activeSection === "operations" &&
         <section id="staff" className="mt-10 scroll-mt-24">
           <p className="eyebrow">People and permissions</p><h2 className="mt-3 text-2xl font-black">Members and Guild staff</h2>
+          {canAdminister && <div id="join-links" className="mt-6 scroll-mt-24 rounded-3xl border border-white/10 bg-white/[.025] p-6">
+            <h3 className="text-xl font-black">Participant invitation links</h3>
+            <p className="mt-2 max-w-3xl text-sm leading-6 text-zinc-500">Share a revocable link in WhatsApp or social channels. A rider who signs in through it, and completes onboarding if needed, is automatically added as a participant member—never as Guild staff.</p>
+            <form action={createGuildJoinLink} className="relative mt-5 grid gap-4 md:grid-cols-[1fr_150px_150px_auto] md:items-end">
+              <input type="hidden" name="slug" value={guild.slug} />
+              <label className="text-sm font-semibold">Link label<input name="label" maxLength={120} defaultValue="General member invitation" className="field" /></label>
+              <label className="text-sm font-semibold">Expires in<select name="expiryDays" defaultValue="30" className="field bg-[#101419]"><option value="7">7 days</option><option value="30">30 days</option><option value="90">90 days</option><option value="365">1 year</option></select></label>
+              <label className="text-sm font-semibold">Maximum joins<input name="maxUses" type="number" min="1" max="10000" placeholder="Unlimited" className="field" /></label>
+              <FormPendingSubmit idleLabel="Create link" pendingLabel="Creating…" overlayLabel="Creating membership invitation…" className="rounded-full bg-orange-500 px-5 py-3 text-sm font-black text-white" />
+            </form>
+            {!!guild.joinLinks.length && <div className="mt-5 grid gap-3">{guild.joinLinks.map((link) => {
+              const inactive = !!link.revokedAt || (!!link.expiresAt && link.expiresAt <= new Date()) || (link.maxUses !== null && link.useCount >= link.maxUses);
+              return <div key={link.id} className="flex flex-col gap-3 rounded-2xl border border-white/8 p-4 lg:flex-row lg:items-center lg:justify-between"><div><p className="font-bold">{link.label}</p><p className="mt-1 text-xs text-zinc-500">{link.useCount}{link.maxUses === null ? " joins" : `/${link.maxUses} joins`} · {link.expiresAt ? `expires ${link.expiresAt.toLocaleDateString("en-IN")}` : "no expiry"}{inactive ? " · inactive" : ""}</p></div><div className="flex flex-wrap gap-2">{!inactive && <CopyGuildJoinLink token={link.id} />}{!link.revokedAt && <form action={revokeGuildJoinLink} className="relative"><input type="hidden" name="slug" value={guild.slug} /><input type="hidden" name="linkId" value={link.id} /><FormPendingSubmit idleLabel="Revoke" pendingLabel="Revoking…" overlayLabel="Revoking membership invitation…" className="rounded-full border border-red-400/30 px-4 py-2 text-xs font-bold text-red-300" /></form>}</div></div>;
+            })}</div>}
+          </div>}
           <form action={inviteGuildStaff} className="relative mt-6 grid gap-4 rounded-3xl border border-white/10 bg-white/[.025] p-6 md:grid-cols-[1fr_220px_auto] md:items-end">
             <input type="hidden" name="slug" value={guild.slug} />
             <label className="text-sm font-semibold">Verified account email<input required type="email" name="email" placeholder="rider@example.com" className="mt-2 w-full rounded-2xl border border-white/10 bg-black/20 px-4 py-3 outline-none focus:border-orange-500" /></label>

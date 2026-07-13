@@ -29,6 +29,13 @@ export function optionalDate(value: string) {
   return value ? requiredDate(value) : null;
 }
 
+export function requiredCalendarDate(value: string) {
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(value)) throw new Error("Invalid date");
+  const date = new Date(`${value}T00:00:00.000Z`);
+  if (Number.isNaN(date.getTime()) || date.toISOString().slice(0, 10) !== value) throw new Error("Invalid date");
+  return date;
+}
+
 function rows(value: string) {
   return value.split("\n").map((line) => line.trim()).filter(Boolean).map((line) => line.split("|").map((part) => part.trim()));
 }
@@ -53,9 +60,16 @@ export function parseOrigins(value: string) {
 }
 
 export function parseItinerary(value: string) {
-  return rows(value).map((parts, index) => {
+  const calendarDays = new Map<string, number>();
+  return rows(value).map((parts, sortOrder) => {
     if (parts.length < 3 || !parts[1] || !parts[2]) throw new Error("Invalid itinerary row");
-    return { dayNumber: index + 1, date: requiredDate(parts[0]), title: parts[1], summary: parts.slice(2).join(" | ") };
+    const dateOrTime = parts[0];
+    const hasTime = /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}$/.test(dateOrTime);
+    const dateText = hasTime ? dateOrTime.slice(0, 10) : dateOrTime;
+    const date = requiredCalendarDate(dateText);
+    const scheduledAt = hasTime ? requiredDate(dateOrTime) : null;
+    if (!calendarDays.has(dateText)) calendarDays.set(dateText, calendarDays.size + 1);
+    return { dayNumber: calendarDays.get(dateText)!, sortOrder, date, scheduledAt, title: parts[1], summary: parts.slice(2).join(" | ") };
   });
 }
 

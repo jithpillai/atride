@@ -6,7 +6,7 @@ type AnnouncementRide = {
   slug: string; vehicleType: string; distanceKm: number; updatedAt: Date;
   community: { name: string };
   origins: Array<{ city: string; meetingPoint: string; departureAt: Date; mergePoint: string | null; routeSummary: string | null }>;
-  itineraryDays: Array<{ dayNumber: number; date: Date; title: string; summary: string }>;
+  itineraryDays: Array<{ dayNumber: number; date: Date; scheduledAt: Date | null; title: string; summary: string }>;
   accommodations: Array<{ propertyName: string; locality: string; roomSummary: string; amenities: string[]; exactLocationRestricted: boolean }>;
   packageItems: Array<{ type: string; dayNumber: number | null; title: string; description: string | null }>;
   policies: Array<{ type: string; title: string; content: string; version: number }>;
@@ -32,7 +32,7 @@ export function generateAnnouncementText(ride: AnnouncementRide, appUrl = "https
     `💰 *Ride fee:* ${money(ride.pricePaise)} per person${ride.confirmationDepositPaise ? `\n*Confirmation amount:* ${money(ride.confirmationDepositPaise)}` : ""}`,
     `🎟️ *Availability:* ${available > 0 ? `${available} slot${available === 1 ? "" : "s"} currently available` : "Slots closed"}`,
     `*Starting groups*\n${ride.origins.map((origin) => `- ${origin.city}: ${origin.meetingPoint}, ${time(origin.departureAt)}${origin.mergePoint ? `; merges at ${origin.mergePoint}` : ""}${origin.routeSummary ? `\n  Route: ${origin.routeSummary}` : ""}`).join("\n")}`,
-    `*Day-wise plan*\n${ride.itineraryDays.map((day) => `- Day ${day.dayNumber} (${date(day.date)}): ${day.title} — ${day.summary}`).join("\n")}`,
+    `*Day-wise plan*\n${ride.itineraryDays.map((day) => `- Day ${day.dayNumber} (${day.scheduledAt ? time(day.scheduledAt) : date(day.date)}): ${day.title} — ${day.summary}`).join("\n")}`,
     stay ? `*Accommodation*\n${stay.exactLocationRestricted ? "- Stay is included; exact property/location details are shared with confirmed participants." : `- ${stay.propertyName}, ${stay.locality}`}${stay.roomSummary ? `\n- ${stay.roomSummary}` : ""}${stay.amenities.length ? `\n- Amenities: ${stay.amenities.join(", ")}` : ""}` : "",
     byType("MEAL").length ? `*Meals*\n${byType("MEAL").map(itemLine).join("\n")}` : "",
     byType("ACTIVITY").length ? `*Activities and highlights*\n${byType("ACTIVITY").map(itemLine).join("\n")}` : "",

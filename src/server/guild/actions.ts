@@ -218,6 +218,92 @@ export async function revokeGuildInvitation(formData: FormData) {
   redirect(`/guilds/${slug}/manage?section=operations&staffSaved=revoked#staff`);
 }
 
+export async function createGuildJoinLink(formData: FormData) {
+  const slug = value(formData, "slug", 80);
+  const { session } = await requireGuildAdmin(slug);
+  const label = value(formData, "label", 120) || "Guild member invitation";
+  const expiryDays = Number(value(formData, "expiryDays", 4));
+  const maxUsesText = value(formData, "maxUses", 6);
+  const maxUses = maxUsesText ? Number(maxUsesText) : null;
+  if (![7, 30, 90, 365].includes(expiryDays) || (maxUses !== null && (!Number.isInteger(maxUses) || maxUses < 1 || maxUses > 10000))) {
+    redirect(`/guilds/${slug}/manage?section=operations&joinError=invalid#join-links`);
+  }
+  const guild = await db.community.findUnique({ where: { slug }, select: { id: true } });
+  if (!guild) redirect("/account?access=denied");
+  await db.$transaction([
+    db.communityJoinLink.create({
+      data: {
+        communityId: guild.id,
+        createdById: session.userId,
+        label,
+        maxUses,
+        expiresAt: new Date(Date.now() + expiryDays * 24 * 60 * 60 * 1000),
+      },
+    }),
+    db.communityAuditEvent.create({
+      data: { communityId: guild.id, actorUserId: session.userId, action: "GUILD_JOIN_LINK_CREATED", metadata: { label, expiryDays, maxUses } },
+    }),
+  ]);
+  revalidatePath(`/guilds/${slug}/manage`);
+  redirect(`/guilds/${slug}/manage?section=operations&joinSaved=created#join-links`);
+}
+
+export async function revokeGuildJoinLink(formData: FormData) {
+  const slug = value(formData, "slug", 80);
+  const { session } = await requireGuildAdmin(slug);
+  const linkId = value(formData, "linkId", 36);
+  const link = await db.communityJoinLink.findFirst({ where: { id: linkId, community: { slug }, revokedAt: null }, select: { id: true, communityId: true, label: true } });
+  if (!link) redirect(`/guilds/${slug}/manage?section=operations&joinError=missing#join-links`);
+  await db.$transaction([
+    db.communityJoinLink.update({ where: { id: link.id }, data: { revokedAt: new Date() } }),
+    db.communityAuditEvent.create({ data: { communityId: link.communityId, actorUserId: session.userId, action: "GUILD_JOIN_LINK_REVOKED", metadata: { label: link.label } } }),
+  ]);
+  revalidatePath(`/guilds/${slug}/manage`);
+  redirect(`/guilds/${slug}/manage?section=operations&joinSaved=revoked#join-links`);
+}
+
+export async function acceptGuildJoinLink(formData: FormData) {
+  const linkId = value(formData, "linkId", 36);
+  const returnTo = `/join/${linkId}`;
+  const session = await requireSession(returnTo);
+  if (!session.user.profile?.onboardingCompletedAt) redirect(`/onboarding?returnTo=${encodeURIComponent(returnTo)}`);
+  const now = new Date();
+  const link = await db.communityJoinLink.findFirst({
+    where: { id: linkId, revokedAt: null, OR: [{ expiresAt: null }, { expiresAt: { gt: now } }] },
+    include: { community: { select: { id: true, slug: true } } },
+  });
+  if (!link || (link.maxUses !== null && link.useCount >= link.maxUses)) redirect(`${returnTo}?error=invalid`);
+  const existing = await db.communityMembership.findUnique({ where: { communityId_userId: { communityId: link.communityId, userId: session.userId } } });
+  if (existing?.status === "ACTIVE") redirect(`/guilds/${link.community.slug}?joined=existing`);
+
+  try {
+    await db.$transaction(async (tx) => {
+      const consumed = await tx.communityJoinLink.updateMany({
+        where: {
+          id: link.id,
+          revokedAt: null,
+          OR: [{ expiresAt: null }, { expiresAt: { gt: now } }],
+          ...(link.maxUses === null ? {} : { useCount: { lt: link.maxUses } }),
+        },
+        data: { useCount: { increment: 1 } },
+      });
+      if (consumed.count !== 1) throw new Error("JOIN_LINK_UNAVAILABLE");
+      await tx.communityMembership.upsert({
+        where: { communityId_userId: { communityId: link.communityId, userId: session.userId } },
+        create: { communityId: link.communityId, userId: session.userId, status: "ACTIVE", joinedAt: now },
+        update: { status: "ACTIVE", joinedAt: now },
+      });
+      await tx.communityAuditEvent.create({ data: { communityId: link.communityId, actorUserId: session.userId, targetUserId: session.userId, action: "GUILD_JOIN_LINK_ACCEPTED", metadata: { linkId: link.id, label: link.label } } });
+    });
+  } catch {
+    redirect(`${returnTo}?error=invalid`);
+  }
+  revalidatePath("/account");
+  revalidatePath(`/guilds/${link.community.slug}`);
+  revalidatePath(`/guilds/${link.community.slug}/manage`);
+  redirect(`/guilds/${link.community.slug}?joined=1`);
+}
+
 export async function acceptGuildInvitation(formData: FormData) {
   const session = await requireSession("/account");
   const invitationId = value(formData, "invitationId", 36);

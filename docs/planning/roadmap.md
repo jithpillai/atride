@@ -114,6 +114,7 @@ Build:
 - Optional Firebase verification of a saved operational phone, with number-change invalidation
 - Platform, community, and ride-level roles
 - Staff invitation acceptance
+- Revocable participant invitation links that preserve the destination through sign-in and onboarding
 - Authenticated `Your upcoming rides` landing-page container and protected query contract
 - Rate limiting and OTP abuse prevention
 - Audit records for privileged role changes

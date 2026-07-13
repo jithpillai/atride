@@ -47,7 +47,9 @@ export async function completeOnboarding(previousState: ProfileFormState, formDa
   ]);
 
   revalidatePath("/account");
-  redirect("/account?onboarding=complete");
+  const requestedReturnTo = text(formData, "returnTo", 1000);
+  const returnTo = requestedReturnTo.startsWith("/") && !requestedReturnTo.startsWith("//") ? requestedReturnTo : "/account?onboarding=complete";
+  redirect(returnTo);
 }
 
 export async function updateProfile(previousState: ProfileFormState, formData: FormData): Promise<ProfileFormState> {

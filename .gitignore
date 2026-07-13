@@ -18,7 +18,7 @@ src/generated/prisma/
 .env.local
 .env.*.local
 .vercel/
-
+demo_accounts.md
 # Logs and OS files
 *.log
 .DS_Store

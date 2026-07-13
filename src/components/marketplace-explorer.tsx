@@ -61,7 +61,8 @@ export function MarketplaceExplorer({ cities, guilds, rides }: Props) {
               return (
                 <article key={ride.slug} className="overflow-hidden rounded-[1.75rem] border border-white/10 bg-[#13171d] shadow-2xl shadow-black/20">
                   <div className="relative h-52 p-6" style={{ background: ride.gradient }}>
-                    <div className="absolute inset-0 bg-[radial-gradient(circle_at_75%_20%,rgba(255,255,255,.18),transparent_35%)]" />
+                    {ride.coverUrl && <ImageWithFallback src={ride.coverUrl} fallbackSrc="/defaults/guild-hall-cover.png" alt="" fill sizes="(min-width:1280px) 33vw, (min-width:768px) 50vw, 100vw" className="object-cover" />}
+                    <div className="absolute inset-0 bg-gradient-to-t from-black/90 via-black/25 to-black/15" />
                     <div className="relative flex items-start justify-between">
                       <span className="rounded-full bg-black/35 px-3 py-1 text-xs font-bold uppercase tracking-[.14em] text-white backdrop-blur">
                         {ride.vehicleType === "BIKE" ? "Motorcycle" : ride.vehicleType}

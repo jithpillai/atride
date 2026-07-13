@@ -191,6 +191,7 @@ model Community {
   rides                Ride[]
   memberships          CommunityMembership[]
   invitations          CommunityInvitation[]
+  joinLinks            CommunityJoinLink[]
   auditEvents          CommunityAuditEvent[]
   ridePolicyTemplates  CommunityRidePolicyTemplate[]
   rideStaffAssignments RideStaffAssignment[]
@@ -285,7 +286,7 @@ model Ride {
   mediaAssets      MediaAsset[]          @relation("RideMedia")
   coverAsset       MediaAsset?           @relation("RideCover", fields: [coverAssetId], references: [id], onDelete: SetNull)
   aiGenerations    RideAiGeneration[]
-  announcements   RideAnnouncement[]
+  announcements    RideAnnouncement[]
 
   @@unique([communityId, slug])
   @@unique([id, communityId])
@@ -307,7 +308,7 @@ model RideOrigin {
   routeSummary   String?  @map("route_summary") @db.Text
   sortOrder      Int      @default(0) @map("sort_order")
 
-  ride Ride @relation(fields: [rideId], references: [id], onDelete: Cascade)
+  ride             Ride                  @relation(fields: [rideId], references: [id], onDelete: Cascade)
   staffAssignments RideStaffAssignment[]
 
   @@index([rideId, sortOrder])
@@ -330,16 +331,18 @@ model CommunityRidePolicyTemplate {
 }
 
 model RideItineraryDay {
-  id        String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
-  rideId    String   @map("ride_id") @db.Uuid
-  dayNumber Int      @map("day_number")
-  date      DateTime @db.Date
-  title     String   @db.VarChar(180)
-  summary   String   @db.Text
+  id          String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  rideId      String    @map("ride_id") @db.Uuid
+  dayNumber   Int       @map("day_number")
+  sortOrder   Int       @default(0) @map("sort_order")
+  date        DateTime  @db.Date
+  scheduledAt DateTime? @map("scheduled_at") @db.Timestamptz(3)
+  title       String    @db.VarChar(180)
+  summary     String    @db.Text
 
   ride Ride @relation(fields: [rideId], references: [id], onDelete: Cascade)
 
-  @@unique([rideId, dayNumber])
+  @@unique([rideId, sortOrder])
   @@map("ride_itinerary_days")
 }
 
@@ -410,6 +413,7 @@ model User {
   phoneVerificationChallenges PhoneVerificationChallenge[]
   uploadedMedia               MediaAsset[]                 @relation("MediaUploader")
   sentCommunityInvitations    CommunityInvitation[]        @relation("CommunityInvitationSender")
+  createdCommunityJoinLinks   CommunityJoinLink[]          @relation("CommunityJoinLinkCreator")
   communityAuditEvents        CommunityAuditEvent[]        @relation("CommunityAuditActor")
   rideAiGenerations           RideAiGeneration[]
   rideAnnouncements           RideAnnouncement[]
@@ -654,6 +658,25 @@ model CommunityInvitation {
   @@map("community_invitations")
 }
 
+model CommunityJoinLink {
+  id          String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  communityId String    @map("community_id") @db.Uuid
+  label       String    @db.VarChar(120)
+  createdById String    @map("created_by_id") @db.Uuid
+  expiresAt   DateTime? @map("expires_at") @db.Timestamptz(3)
+  maxUses     Int?      @map("max_uses")
+  useCount    Int       @default(0) @map("use_count")
+  revokedAt   DateTime? @map("revoked_at") @db.Timestamptz(3)
+  createdAt   DateTime  @default(now()) @map("created_at") @db.Timestamptz(3)
+  updatedAt   DateTime  @updatedAt @map("updated_at") @db.Timestamptz(3)
+
+  community Community @relation(fields: [communityId], references: [id], onDelete: Cascade)
+  createdBy User      @relation("CommunityJoinLinkCreator", fields: [createdById], references: [id], onDelete: Restrict)
+
+  @@index([communityId, revokedAt, expiresAt])
+  @@map("community_join_links")
+}
+
 model CommunityAuditEvent {
   id           String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
   communityId  String   @map("community_id") @db.Uuid
@@ -679,9 +702,9 @@ model RideStaffAssignment {
   role        RideStaffRole
   createdAt   DateTime      @default(now()) @map("created_at") @db.Timestamptz(3)
 
-  community Community @relation(fields: [communityId], references: [id], onDelete: Cascade)
-  ride      Ride      @relation(fields: [rideId, communityId], references: [id, communityId], onDelete: Cascade)
-  user      User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  community Community   @relation(fields: [communityId], references: [id], onDelete: Cascade)
+  ride      Ride        @relation(fields: [rideId, communityId], references: [id, communityId], onDelete: Cascade)
+  user      User        @relation(fields: [userId], references: [id], onDelete: Cascade)
   origin    RideOrigin? @relation(fields: [originId], references: [id], onDelete: SetNull)
 
   @@unique([rideId, userId, role])
@@ -711,12 +734,12 @@ model RideAiGeneration {
 }
 
 model RideAnnouncement {
-  id           String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
-  rideId       String   @map("ride_id") @db.Uuid
-  createdById  String   @map("created_by_id") @db.Uuid
-  content      String   @db.Text
+  id            String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  rideId        String   @map("ride_id") @db.Uuid
+  createdById   String   @map("created_by_id") @db.Uuid
+  content       String   @db.Text
   sourceVersion DateTime @map("source_version") @db.Timestamptz(3)
-  createdAt    DateTime @default(now()) @map("created_at") @db.Timestamptz(3)
+  createdAt     DateTime @default(now()) @map("created_at") @db.Timestamptz(3)
 
   ride      Ride @relation(fields: [rideId], references: [id], onDelete: Cascade)
   createdBy User @relation(fields: [createdById], references: [id], onDelete: Restrict)

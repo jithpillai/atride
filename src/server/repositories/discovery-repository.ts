@@ -21,6 +21,7 @@ const rideInclude = {
   community: {
     select: { slug: true },
   },
+  coverAsset: true,
 } satisfies Prisma.RideInclude;
 
 type GuildRecord = Prisma.CommunityGetPayload<{ include: typeof guildInclude }>;
@@ -79,6 +80,7 @@ function toRideView(ride: RideRecord): RideView {
     difficulty: difficulty[ride.difficulty],
     featured: ride.featured,
     gradient: ride.heroGradient,
+    coverUrl: ride.coverAsset ? cloudinaryImageUrl(ride.coverAsset) : null,
     distanceKm: ride.distanceKm,
   };
 }
@@ -123,7 +125,7 @@ export const listUpcomingStaffRides = cache(async (userId: string) => {
       status: { in: ["PUBLISHED", "CLOSED", "POSTPONED"] },
       staffAssignments: { some: { userId } },
     },
-    include: { community: { select: { slug: true, name: true } }, staffAssignments: { where: { userId }, include: { origin: { select: { city: true } } } } },
+    include: { community: { select: { slug: true, name: true } }, coverAsset: true, staffAssignments: { where: { userId }, include: { origin: { select: { city: true } } } } },
     orderBy: { startsAt: "asc" },
     take: 6,
   });
@@ -209,7 +211,7 @@ export const findPublicRidePackageBySlug = cache(async (slug: string) => db.ride
   },
   include: {
     community: { select: { slug: true, name: true, shortName: true } },
-    origins: { orderBy: { sortOrder: "asc" } }, itineraryDays: { orderBy: { dayNumber: "asc" } },
+    origins: { orderBy: { sortOrder: "asc" } }, itineraryDays: { orderBy: { sortOrder: "asc" } },
     accommodations: { orderBy: { checkInAt: "asc" } }, packageItems: { orderBy: [{ type: "asc" }, { sortOrder: "asc" }] },
     policies: { orderBy: [{ type: "asc" }, { version: "desc" }] },
     coverAsset: true, mediaAssets: { where: { purpose: "RIDE_GALLERY" }, orderBy: [{ sortOrder: "asc" }, { createdAt: "asc" }] },

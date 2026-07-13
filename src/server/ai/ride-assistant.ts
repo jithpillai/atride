@@ -130,16 +130,16 @@ export function requiredItineraryDates(input: Pick<RideAssistantFormInput, "star
 function completeItinerary(generated: string, input: RideAssistantFormInput) {
   const requiredDates = requiredItineraryDates(input);
   if (!requiredDates.length) return { itinerary: generated, missingDates: [] as string[] };
-  const generatedRows = new Map(generated.split("\n").map((line) => line.trim()).filter(Boolean).map((line) => [line.slice(0, 10), line]));
+  const generatedRows = generated.split("\n").map((line) => line.trim()).filter(Boolean);
   const origin = input.origins.split("\n")[0]?.split("|")[0]?.trim() || "Starting point";
   const missingDates: string[] = [];
-  const itinerary = requiredDates.map((date, index) => {
-    const existing = generatedRows.get(date);
-    if (existing) return existing;
+  const itinerary = requiredDates.flatMap((date, index) => {
+    const existing = generatedRows.filter((line) => line.slice(0, 10) === date);
+    if (existing.length) return existing;
     missingDates.push(date);
     const last = index === requiredDates.length - 1;
     const title = index === 0 ? `${origin} to ${input.destination || "destination"}` : last ? `${input.destination || "Destination"} to ${origin}` : `${input.destination || "Destination"} ride plan`;
-    return `${date} | ${title} | Organizer to confirm planned stops, meals, activities, and timing for Day ${index + 1}.`;
+    return [`${date} | ${title} | Organizer to confirm planned stops, meals, activities, and timing for Day ${index + 1}.`];
   }).join("\n");
   return { itinerary, missingDates };
 }
@@ -196,10 +196,10 @@ Rules:
 - Do not include participant names, phone numbers, email addresses, payment handles, payment evidence, private invite links, or medical information.
 - Do not rewrite or weaken Guild policies. They are context only and are saved separately.
 - Keep destination capacity independent from optional starting-group allocations.
-- Return dates as YYYY-MM-DD, and local date-times as YYYY-MM-DDTHH:mm without timezone suffix.
+- Return calendar dates as YYYY-MM-DD. For itinerary events with a confirmed time, use local YYYY-MM-DDTHH:mm without a timezone suffix; otherwise use YYYY-MM-DD.
 - Produce useful factual copy, not exaggerated marketing claims.
 - Give primary attention to these requested sections: ${requestedSections.join(", ")}. Return the complete schema, using empty values for unrequested sections when appropriate.
-- For itinerary, return exactly one chronological row for every REQUIRED_ITINERARY_DATE. Never omit arrival, intermediate, exploration, rest, or return days.
+- For itinerary, return at least one chronological event for every REQUIRED_ITINERARY_DATE. Multiple timed events may share a date. Never omit arrival, intermediate, exploration, rest, or return days.
 - Enrich each itinerary day from the organizer's summary, description, activities, meals, accommodation facts, and OPTIONAL_SOURCE. Do not merely repeat a generic example when confirmed details exist.
 - Place each concrete route, attraction, activity, meal, or stay detail from the authoritative inputs into the most relevant itinerary day exactly once. If its day is not confirmed, describe the assignment as proposed and add that scheduling decision to missingFacts.
 - Accommodation checkInAt/checkOutAt values are property windows, not ride deadlines. Never mention their exact times in itinerary plans unless OPTIONAL_SOURCE explicitly repeats them as operational ride timing.
@@ -225,7 +225,7 @@ export function buildExternalRideAssistantPrompt(input: RideAssistantFormInput, 
 Return only these labelled sections, using the exact line formats shown:
 [DESCRIPTION]\nA clear public description
 [STARTING_GROUPS]\nCity | Meeting point | YYYY-MM-DDTHH:mm | optional Capacity | optional Buffer | Merge point | Route summary
-[ITINERARY]\nYYYY-MM-DD | Day title | Plan and places covered
+[ITINERARY]\nYYYY-MM-DDTHH:mm (or YYYY-MM-DD when time is unknown) | Event title | Plan and places covered
 [ACCOMMODATION]\nRoom summary: ...\nAmenities: comma-separated values\nParticipant note: ...
 [INCLUSIONS]\nTitle | detail
 [EXCLUSIONS]\nTitle | detail
