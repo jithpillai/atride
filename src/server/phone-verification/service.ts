@@ -3,7 +3,7 @@ import { getAuthSecret } from "@/server/auth/config";
 import { createSessionToken, hashNetworkValue, hashSessionToken } from "@/server/auth/crypto";
 import { AuthError } from "@/server/auth/auth-service";
 import { normalizePhone } from "@/server/profile/validation";
-import { isSupportedIndianMobile, verifiedFirebasePhone } from "./claims";
+import { FIREBASE_PHONE_AUTH_MAX_AGE_SECONDS, isSupportedIndianMobile, verifiedFirebasePhone } from "./claims";
 
 const CHALLENGE_TTL_MS = 10 * 60 * 1000;
 const RESEND_COOLDOWN_MS = 60 * 1000;
@@ -87,8 +87,17 @@ export async function confirmPhoneVerification(userId: string, challengeToken: s
   try {
     const { getFirebaseAdminAuth } = await import("./firebase-admin");
     const claims = await getFirebaseAdminAuth().verifyIdToken(idToken, true);
-    verifiedPhone = verifiedFirebasePhone(claims);
-  } catch {
+    const authenticatedAfterChallengeStarted = Boolean(
+      claims.auth_time && claims.auth_time >= Math.floor(challenge.createdAt.getTime() / 1000) - 30,
+    );
+    verifiedPhone = authenticatedAfterChallengeStarted
+      ? verifiedFirebasePhone(claims, Math.floor(now.getTime() / 1000), FIREBASE_PHONE_AUTH_MAX_AGE_SECONDS)
+      : null;
+  } catch (error) {
+    const firebaseCode = typeof error === "object" && error && "code" in error && typeof error.code === "string"
+      ? error.code
+      : "unknown";
+    console.error("Firebase Admin rejected a phone verification token", { firebaseCode });
     verifiedPhone = null;
   }
   if (!verifiedPhone || verifiedPhone !== challenge.normalizedPhone) {
