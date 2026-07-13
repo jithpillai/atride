@@ -3,10 +3,11 @@ import { describe, expect, it } from "vitest";
 import { ALLOWED_IMAGE_FORMATS, isSupportedMediaPurpose, MEDIA_POLICY } from "./policy";
 
 describe("media policy", () => {
-  it("accepts only the implemented Phase 3A purposes", () => {
+  it("accepts implemented profile, Guild, ride, and private payment purposes", () => {
     expect(isSupportedMediaPurpose("USER_AVATAR")).toBe(true);
     expect(isSupportedMediaPurpose("GUILD_GALLERY")).toBe(true);
-    expect(isSupportedMediaPurpose("PAYMENT_PROOF")).toBe(false);
+    expect(isSupportedMediaPurpose("PAYMENT_PROOF")).toBe(true);
+    expect(MEDIA_POLICY.PAYMENT_PROOF.maxBytes).toBe(5 * 1024 * 1024);
   });
 
   it("keeps avatars smaller than Guild cover and gallery images", () => {

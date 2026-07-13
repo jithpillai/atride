@@ -2,7 +2,7 @@
 
 This roadmap splits development into phases that each end with a deployable, testable user journey. It is the authoritative source for phase scope, acceptance tests, development environments, external accounts, and credentials.
 
-Most external accounts are not required immediately. Development can begin with local PostgreSQL, Redis, disabled SMS, mock email, placeholder maps, and Razorpay test doubles. Real provider accounts become necessary progressively.
+Most external accounts are not required immediately. Development can begin with local PostgreSQL, Redis, disabled SMS, mock email, placeholder maps, and standard UPI URI generation. Real provider accounts become necessary progressively.
 
 Current infrastructure status:
 
@@ -15,6 +15,7 @@ Current infrastructure status:
 - Phase 2 foundations are implemented: Google OpenID Connect plus email OTP, opaque sessions, account/logout, first-login onboarding, private participant profiles, a vehicle garage, seeded roles, optional Firebase phone verification, and protected platform/Guild authorization boundaries. Personalized upcoming rides and distributed abuse controls remain scheduled with their dependent phases.
 - Phase 3A and the first testable Phase 3B staff-management slice are implemented. Platform administrators can onboard Guilds; Owners/Admins can manage branding, visibility, official links, operating cities, member status, staff invitations and roles, and inspect tenant-scoped audit history.
 - Phase 4 and Phase 4B are implemented for the current non-map scope: authorized Guild Ride Managers and explicitly assigned lead/captain/vice-captain staff can manage only permitted ride drafts, flexible multi-origin routes, itinerary, accommodation, package items, vehicle requirements, linked commercial dates, versioned Guild-derived policies, origin-specific crew, cover/gallery media, controlled publication states, PII-filtered organizer exports, approved-origin public widgets, and personalized assigned rides. The optional Gemini-backed Ride Assistant produces a reviewable structured draft with per-section regeneration, explicit missing-fact warnings, selective application, usage limits, and an external copy/open-Gemini fallback. Structured map checkpoints remain scheduled with the map/operations capability rather than blocking publication.
+- Phase 5 has started with a complete offline-booking vertical slice. A signed-in participant can reserve one seat with an origin, occupant role, vehicle, preferences, add-ons, consent, and an immutable ride/package/policy snapshot. PostgreSQL row locking prevents overselling, sold-out rides expose a waitlist path, and protected Cloudinary proofs plus UPI/bank references can be submitted. Confirmation advances and balances are separate dated obligations; Guild Owner/Admin/Finance roles receive durable event-driven review notifications and only those roles can confirm payment. Participant bookings and staff duties are merged into one personalized upcoming-rides roadbook. Dynamic UPI intent/QR generation, automated expiry processing, transfer/replacement, richer party/accommodation pricing, and newcomer presentation remain Phase 5 increments.
 
 Related documents:
 
@@ -37,12 +38,12 @@ Related documents:
 | 3 | Community management | Community administrators manage profile, staff, and invitations |
 | 4 | Ride creation | Staff create and publish multi-origin rides |
 | 5 | Booking and offline payment | Participants reserve slots and administrators verify payments |
-| 6 | Community-owned Razorpay | Online payments go directly to each community |
-| 7 | Notifications | OTP, confirmations, reminders, and event messages are delivered reliably |
-| 8 | Ride operations | Captains start groups and update checkpoint progress |
-| 9 | Production hardening | Security, SEO, monitoring, backups, and launch readiness are verified |
-| 10 | PWA and web wrapper | Completed web product becomes installable and optionally store-packaged |
-| 11 | Optional native Android | Native/offline/tracking client proceeds only after evidence-based approval |
+| 6 | Notifications | OTP, confirmations, reminders, and event messages are delivered reliably |
+| 7 | Ride operations | Captains start groups and update checkpoint progress |
+| 8 | Production hardening | Security, SEO, monitoring, backups, and launch readiness are verified |
+| 9 | PWA and web wrapper | Completed web product becomes installable and optionally store-packaged |
+| 10 | Optional native Android | Native/offline/tracking client proceeds only after evidence-based approval |
+| 11 | Optional community-owned Razorpay | Automatic gateway reconciliation proceeds only after the web/app product proves demand |
 | 12 | Optional compliant Indian SMS | DLT-compliant OTP/service SMS is considered only when documentation and usage justify it |
 
 ### Phase 0 — Engineering foundation
@@ -230,6 +231,8 @@ External accounts needed:
 
 ### Phase 5 — Booking and offline payments
 
+Implementation status: **in progress**. The reservation, one-account/one-seat participant flow, waitlist, consent snapshot, separate advance/balance obligations, offline UPI/bank/cash selection, transaction-reference capture, private proof upload, finance confirmation/rejection, durable payment email outbox, audit trail, and personalized upcoming-rides integration are implemented. Remaining work includes Dynamic UPI intent/QR generation, scheduled expiry processing, party/multi-occupant bookings, richer accommodation pricing, replacement/transfer, and newcomer presentation.
+
 Build:
 
 - Participant selection
@@ -243,6 +246,8 @@ Build:
 - Booking confirmation
 - Waitlist
 - Offline UPI, bank transfer, and cash methods
+- Guild-level UPI recipient setup with immutable ride/booking recipient snapshots
+- Booking-specific UPI intent links and desktop dynamic QR codes
 - Payment-proof upload
 - Finance review
 - Reservation expiry and slot release
@@ -274,41 +279,7 @@ External accounts needed:
 - No payment account
 - Cloudinary authenticated/private upload support for payment proof
 
-### Phase 6 — Community-owned Razorpay
-
-Build:
-
-- Encrypted per-community Razorpay credentials
-- Test/live configuration
-- Gateway connection test
-- Razorpay order creation
-- Browser checkout
-- Signature verification
-- Community-specific webhook processing
-- Idempotency and reconciliation
-- Online payment and refund-state recording
-
-Acceptance tests:
-
-- Royal Ravanas bookings use Royal Ravanas test credentials.
-- Wild Gear bookings use Wild Gear credentials.
-- Credentials are never returned to the browser.
-- A successful verified webhook confirms a booking.
-- The browser success screen alone does not confirm payment.
-- Duplicate webhooks do not duplicate confirmation.
-- Invalid signatures are rejected.
-- Money is represented as going directly to the configured community account.
-
-Razorpay provides separate Test and Live API keys, and webhook signatures should be tested in Test mode before activation. [Razorpay API authentication](https://razorpay.com/docs/api/authentication/?preferred-country=IN), [webhook testing](https://razorpay.com/docs/webhooks/validate-test/)
-
-External accounts needed:
-
-- One Razorpay test account owned by the project/team
-- Test key ID and secret
-- Test webhook secret
-- Later, every onboarded community needs its own activated Razorpay account and credentials
-
-### Phase 7 — Email, in-app, and event notifications
+### Phase 6 — Email, in-app, and event notifications
 
 Build:
 
@@ -354,7 +325,7 @@ External accounts needed:
 - Approved sender addresses such as `security@atride.in`
 - Redis and continuously running worker infrastructure
 
-### Phase 8 — Captain console and ride progress
+### Phase 7 — Captain console and ride progress
 
 Build:
 
@@ -397,7 +368,7 @@ External accounts needed:
 - Mobile devices for field testing
 - No native application account is required initially
 
-### Phase 9 — Production hardening and launch
+### Phase 8 — Production hardening and launch
 
 Build and verify:
 
@@ -427,9 +398,9 @@ Acceptance tests:
 - Root marketplace queries and sitemaps exclude unlisted Guilds/private rides.
 - Embed endpoints pass origin, CSP, private-field, and clickjacking tests.
 
-### Phase 10 — Installable PWA and packaged web wrapper
+### Phase 9 — Installable PWA and packaged web wrapper
 
-This phase begins only after the complete web application has passed Phase 9 and launched successfully.
+This phase begins only after the complete web application has passed Phase 8 and launched successfully.
 
 Build:
 
@@ -451,7 +422,7 @@ Acceptance tests:
 - Queued actions retain idempotency and show clear sync state.
 - Updates do not strand an incompatible client.
 - Wrapper distribution adds measurable value over direct PWA installation.
-- Store-packaged wrapper passes login, Razorpay redirect, upload, deep-link, and accessibility testing.
+- Store-packaged wrapper passes login, UPI intent/QR, upload, deep-link, and accessibility testing.
 - PWA/wrapper does not claim reliable background crew tracking.
 
 External accounts needed:
@@ -460,7 +431,7 @@ External accounts needed:
 - VAPID/push configuration if web push is enabled
 - Google Play Console, Android application ID, signing, and test track only for a packaged wrapper
 
-### Phase 11 — Optional native Android application
+### Phase 10 — Optional native Android application
 
 This phase is not automatically started. It requires proven operational demand after the PWA/wrapper is in use.
 
@@ -502,6 +473,35 @@ External accounts needed:
 - Background-location declaration materials only if that capability ships
 
 iOS remains deferred until Android/PWA demand justifies a separate release phase.
+
+### Phase 11 — Optional community-owned Razorpay
+
+This phase is deliberately deferred until after the PWA/native decision. Dynamic UPI plus manual finance verification remains the default because early Guilds may not operate registered businesses or maintain payment-gateway accounts.
+
+Decision gates:
+
+- Multiple active Guilds request automatic reconciliation.
+- Those Guilds can maintain their own activated Razorpay accounts and compliance obligations.
+- Manual UPI verification creates measured operational cost or unacceptable confirmation delay.
+
+If approved, build:
+
+- Encrypted per-community Razorpay credentials and test/live configuration
+- Gateway connection test, order creation, browser/app checkout, and signature verification
+- Community-specific idempotent webhook processing and reconciliation
+- Online payment and refund-state recording without routing funds through @Ride
+
+Acceptance tests:
+
+- Each Guild uses only its own credentials and receives funds directly.
+- Credentials are never returned to the browser.
+- Only verified webhooks confirm payments; browser success alone does not.
+- Duplicate or invalid webhooks cannot duplicate or forge confirmation.
+
+External accounts needed only if this phase is approved:
+
+- A Razorpay test account and webhook secret
+- An activated Razorpay account and credentials for every participating Guild
 
 ### Phase 12 — Optional compliant Indian SMS
 
@@ -555,7 +555,7 @@ Required on the development machine:
 - PostgreSQL/PostGIS container
 - Redis container
 - Mailpit for viewing local email
-- Disabled SMS plus mock Maps, Razorpay, and storage adapters where possible
+- Disabled SMS plus mock Maps and storage adapters where possible; UPI URI generation is local and deterministic
 
 Local tenant URLs can use:
 
@@ -590,7 +590,7 @@ Recommended staging resources:
 - Staging worker
 - Separate PostgreSQL and Redis
 - SES test/sandbox configuration
-- Razorpay Test mode
+- Assisted UPI test recipients that never point to a real person's account
 - Restricted staging Maps keys
 - Separate Cloudinary folder or account/environment
 
@@ -639,19 +639,16 @@ Google recommends separate keys and both application and API restrictions. Brows
 
 ### Needed for payments
 
-For development:
+For the default assisted-UPI flow:
 
-- One Razorpay test merchant account
-- Test key ID
-- Test secret
-- Test webhook secret
+- No platform merchant or gateway account
+- A fictional/test UPI recipient for development
+- Each production Guild's own valid UPI ID and payee name
 
-For each real community:
+Only if optional Phase 11 is approved:
 
-- Its own Razorpay account
-- Its own test/live credentials
-- Its own webhook secret
-- Its own onboarding and activation responsibility
+- One Razorpay test merchant account and webhook secret for development
+- Each participating Guild's own activated account, credentials, webhook secret, and compliance responsibility
 
 The community enters credentials into an encrypted settings screen. Credentials must not be sent by email, WhatsApp, GitHub issue, or chat.
 
@@ -740,7 +737,7 @@ NEXT_PUBLIC_VAPID_PUBLIC_KEY
 VAPID_PRIVATE_KEY
 ```
 
-Community Razorpay credentials should not become normal process-wide environment variables. They are tenant-specific and should be encrypted in the database using `APP_ENCRYPTION_KEY`.
+If optional Phase 11 is approved, community Razorpay credentials must not become normal process-wide environment variables. They are tenant-specific and must be encrypted in the database using `APP_ENCRYPTION_KEY`.
 
 ## What I would need from you first
 
@@ -752,4 +749,4 @@ To begin Phases 0 and 1, I only need:
 4. Confirmation of the primary initial market—presumably India—and default currency `INR`.
 5. Confirmation of the accepted email-OTP-first authentication decision.
 
-SES, Razorpay, Cloudinary, and Google Maps accounts can be created when their corresponding integration phase approaches. Indian SMS accounts and DLT work are deliberately excluded unless Phase 12 is later approved.
+SES, Cloudinary, and Google Maps accounts can be created when their corresponding integration phase approaches. Razorpay is not needed unless Phase 11 is later approved. Indian SMS accounts and DLT work are deliberately excluded unless Phase 12 is later approved.

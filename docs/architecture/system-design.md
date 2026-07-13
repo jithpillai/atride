@@ -29,8 +29,9 @@ Participants             Community staff                 @Ride staff
        +-----------------------+------------------------+
        |                       |                        |
        v                       v                        v
- Community Razorpay      Communication services    Maps and media
- accounts                In-app + Amazon SES        Google + Cloudinary
+ Community UPI          Communication services    Maps and media
+ accounts               In-app + Amazon SES        Google + Cloudinary
+ optional gateway
                          SMS deferred
                                |
                                v
@@ -38,7 +39,7 @@ Participants             Community staff                 @Ride staff
                   PostgreSQL + Redis + workers
 ```
 
-@Ride is the system of record for communities, rides, bookings, payment status, staff assignments, check-ins, notifications, and audit history. Razorpay remains the payment processor and merchant record source for online transactions performed through each community's account.
+@Ride is the system of record for communities, rides, bookings, payment obligations/status, staff assignments, check-ins, notifications, and audit history. The Guild's bank/UPI provider is the source of truth for actual fund movement; permitted Guild staff reconcile transaction references and protected proof in @Ride. An automated community-owned gateway may be added later without making @Ride the merchant or settlement intermediary.
 
 ## 3. Runtime architecture
 
@@ -66,7 +67,7 @@ TypeScript on Node.js
              |                   |                 |
              v                   v                 v
      PostgreSQL/PostGIS        Redis        External providers
-     authoritative data     cache/OTP/queue  Razorpay/SES/
+     authoritative data     cache/OTP/queue  UPI/SES/
                                              Maps/Cloudinary
              ^                   |
              |                   v
@@ -93,7 +94,7 @@ The request-response application handles interactive web and API traffic. The wo
 | Cache/ephemeral state | Redis | OTP, rate limits, caches, reservations, and live state |
 | Queue | BullMQ | Delayed and asynchronous work |
 | Media | Cloudinary initially | Images, transformations, and protected proof uploads |
-| Payments | Razorpay SDK/API | Community-owned online checkout and webhooks |
+| Payments | Dynamic UPI intent/QR plus manual reconciliation | Direct-to-Guild collection without platform settlement |
 | SMS | Disabled initially | Optional compliant post-launch adapter |
 | Email | Amazon SES v2 HTTPS API | Email OTP and transactional email |
 | Maps | Google Maps Platform | Places, geocoding, maps, and route display |
@@ -182,7 +183,8 @@ Repositories use Prisma and require tenant context for tenant-owned records. Raw
 ### 5.6 Integration adapters
 
 ```text
-PaymentGateway       Razorpay implementation
+PaymentIntentGenerator  Standard UPI deep-link and QR implementation
+PaymentGateway          Optional future Razorpay implementation
 SmsProvider          Disabled implementation; compliant provider optional later
 EmailProvider        Amazon SES implementation
 MediaProvider        Cloudinary implementation
@@ -525,6 +527,15 @@ The Ride Assistant is an optional server-side adapter around Gemini structured o
 - `waiver_versions`
 - `waiver_acceptances`
 
+The Phase 5 foundation currently maps this conceptual model into three executable Prisma aggregates:
+
+- `ride_bookings` owns the participant, ride, selected origin/vehicle/occupant role, dietary and accessibility choices, reservation expiry, consent timestamps, computed price, and immutable JSON package/policy snapshot. The first increment deliberately supports one account and one reserved seat per ride.
+- `booking_add_ons` stores selected package add-ons and their immutable quantity/unit-price/total snapshot.
+- `booking_payments` stores deposit, balance, full-payment, or other obligations independently from the booking lifecycle, including amount, due/submission timestamps, offline method, transaction reference, verification state, proof asset, finance reviewer, and review note. A confirmed advance confirms the reserved seat without falsely marking the later balance as paid.
+- `notification_outbox_events` stores one idempotent, recipient-specific delivery event for payment submission, confirmation, or rejection. Owner/Admin/Finance recipients receive review links; participants receive the finance decision. Provider failure leaves a retryable durable record rather than rolling back or losing the business event.
+
+`media_assets` stores payment evidence using private authenticated Cloudinary delivery. `audit_logs` records reservation and finance decisions. The more normalized party-participant, status-history, capacity-reservation, refund, and waiver tables above remain the target for later Phase 5/6 increments where their separate lifecycles are required.
+
 ### 10.5 Ride operations
 
 - `ride_checkins`
@@ -587,10 +598,12 @@ Within a database transaction:
 
 Online or verified offline payment later confirms the booking atomically. Expiry releases abandoned capacity. Concurrency tests must prove that simultaneous requests cannot consume the final slot twice.
 
-### 12.2 Online payment confirmation
+The current PostgreSQL implementation serializes reservation attempts by locking the canonical ride row with `SELECT ... FOR UPDATE`, expires stale holds for that ride before counting capacity, and computes occupancy from capacity-holding booking states. The ride-level `bookedSlots` value is maintained as a denormalized display counter; it is never the sole source of truth for accepting a reservation. Audit events are written in the same transaction. A scheduled global expiry sweep is still required so abandoned holds are released even when no subsequent booking request reaches that ride.
+
+### 12.2 Optional gateway payment confirmation
 
 1. Resolve the community integration using an unguessable integration token.
-2. Verify the Razorpay signature using the encrypted community secret.
+2. Verify the provider signature using the encrypted community secret.
 3. Reject duplicate provider event IDs.
 4. Validate order, booking, amount, and currency.
 5. Save immutable gateway references.

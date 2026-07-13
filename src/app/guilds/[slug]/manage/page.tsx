@@ -9,16 +9,19 @@ import { requireGuildManager } from "@/server/auth/authorization";
 import { createGuildJoinLink, inviteGuildStaff, revokeGuildInvitation, revokeGuildJoinLink, updateGuildEmbedOrigins, updateGuildMemberRole, updateGuildMemberStatus, updateGuildProfile, updateGuildRidePolicyTemplates } from "@/server/guild/actions";
 import { DEFAULT_GUILD_RIDE_POLICIES } from "@/server/guild/default-ride-policies";
 import { cloudinaryImageUrl } from "@/server/media/cloudinary";
+import { reviewBookingPayment } from "@/server/booking/finance-actions";
 
-type WorkspaceSection = "operations" | "profile" | "settings" | "log";
-type Props = { params: Promise<{ slug: string }>; searchParams: Promise<{ section?: string; saved?: string; error?: string; staffSaved?: string; staffError?: string; joinSaved?: string; joinError?: string; policySaved?: string; embedSaved?: string; embedError?: string }> };
+type WorkspaceSection = "operations" | "finance" | "profile" | "settings" | "log";
+type Props = { params: Promise<{ slug: string }>; searchParams: Promise<{ section?: string; saved?: string; error?: string; staffSaved?: string; staffError?: string; joinSaved?: string; joinError?: string; policySaved?: string; embedSaved?: string; embedError?: string; paymentSaved?: string; paymentError?: string; payment?: string }> };
 
 export const metadata = { title: "Manage Guild", robots: { index: false, follow: false } };
 
 export default async function GuildManagePage({ params, searchParams }: Props) {
   const { slug } = await params;
   const { session, membership } = await requireGuildManager(slug);
-  const [guild, state] = await Promise.all([db.community.findUnique({
+  const canAdminister = membership.roles.some(({ role }) => role === "OWNER" || role === "ADMIN");
+  const canFinance = membership.roles.some(({ role }) => role === "OWNER" || role === "ADMIN" || role === "FINANCE");
+  const [guild, state, pendingPayments] = await Promise.all([db.community.findUnique({
     where: { slug },
     include: {
       visibility: true,
@@ -42,15 +45,31 @@ export default async function GuildManagePage({ params, searchParams }: Props) {
         select: { id: true, title: true, status: true, startsAt: true, bookedSlots: true, totalSlots: true },
       },
     },
-  }), searchParams]);
+  }), searchParams, canFinance ? db.bookingPayment.findMany({
+    where: {
+      booking: { community: { slug } },
+      AND: [
+        { OR: [{ status: "SUBMITTED" }, { status: "PENDING", method: "CASH" }] },
+        { OR: [
+          { purpose: { in: ["CONFIRMATION_DEPOSIT", "FULL_PAYMENT"] }, booking: { status: "RESERVED" } },
+          { purpose: "BALANCE", booking: { status: "CONFIRMED" } },
+        ] },
+      ],
+    },
+    include: {
+      proofAsset: true,
+      booking: { include: { user: { select: { displayName: true } }, ride: { select: { title: true, slug: true } }, origin: { select: { city: true } } } },
+    },
+    orderBy: { createdAt: "asc" },
+    take: 50,
+  }) : Promise.resolve([])]);
   if (!guild) notFound();
-  const canAdminister = membership.roles.some(({ role }) => role === "OWNER" || role === "ADMIN");
   const requestedSection = state.section;
-  const activeSection: WorkspaceSection = canAdminister && requestedSection && ["profile", "settings", "log"].includes(requestedSection)
-    ? requestedSection as WorkspaceSection
-    : "operations";
+  const allowedSections = new Set<WorkspaceSection>(["operations", ...(canFinance ? ["finance" as const] : []), ...(canAdminister ? ["profile" as const, "settings" as const, "log" as const] : [])]);
+  const activeSection: WorkspaceSection = requestedSection && allowedSections.has(requestedSection as WorkspaceSection) ? requestedSection as WorkspaceSection : "operations";
   const workspaceSections: Array<{ id: WorkspaceSection; label: string; description: string }> = [
     { id: "operations", label: "Rides & Roles", description: "Rides, members, and staff" },
+    { id: "finance", label: "Bookings & Payments", description: "Offline payment review" },
     { id: "profile", label: "Profile & Media", description: "Guild Hall identity and images" },
     { id: "settings", label: "Policies & White Label", description: "Ride defaults and website access" },
     { id: "log", label: "Activity Log", description: "Privileged change history" },
@@ -65,7 +84,7 @@ export default async function GuildManagePage({ params, searchParams }: Props) {
       <p className="mt-3 text-zinc-400">Your access: {membership.roles.map(({ role }) => role.replaceAll("_", " ")).join(" · ")}</p>
       <nav aria-label="Guild workspace sections" className="mt-8 overflow-x-auto border-b border-white/10">
         <div className="flex min-w-max gap-2">
-          {workspaceSections.filter((section) => canAdminister || section.id === "operations").map((section) => {
+          {workspaceSections.filter((section) => allowedSections.has(section.id)).map((section) => {
             const active = section.id === activeSection;
             return <Link key={section.id} href={`/guilds/${guild.slug}/manage?section=${section.id}`} aria-current={active ? "page" : undefined} className={`group border-b-2 px-4 py-4 text-left transition ${active ? "border-orange-500 text-white" : "border-transparent text-zinc-500 hover:border-white/20 hover:text-zinc-200"}`}><span className="block text-sm font-black">{section.label}</span><span className={`mt-1 block text-[11px] ${active ? "text-orange-300" : "text-zinc-600 group-hover:text-zinc-500"}`}>{section.description}</span></Link>;
           })}
@@ -80,6 +99,8 @@ export default async function GuildManagePage({ params, searchParams }: Props) {
       {state.policySaved && <p className="mt-6 rounded-2xl border border-emerald-400/20 bg-emerald-400/10 px-4 py-3 text-sm font-semibold text-emerald-300">Default ride rules saved. New rides will start with these policies.</p>}
       {state.embedSaved && <p className="mt-6 rounded-2xl border border-emerald-400/20 bg-emerald-400/10 px-4 py-3 text-sm font-semibold text-emerald-300">Approved public widget origins saved.</p>}
       {state.embedError && <p role="alert" className="mt-6 rounded-2xl border border-red-400/20 bg-red-400/10 px-4 py-3 text-sm font-semibold text-red-300">Enter one complete HTTPS origin per line, without paths—for example, https://www.example.com.</p>}
+      {state.paymentSaved && <p className="mt-6 rounded-2xl border border-emerald-400/20 bg-emerald-400/10 px-4 py-3 text-sm font-semibold text-emerald-300">Offline payment {state.paymentSaved}. The booking and audit history were updated.</p>}
+      {state.paymentError && <p role="alert" className="mt-6 rounded-2xl border border-red-400/20 bg-red-400/10 px-4 py-3 text-sm font-semibold text-red-300">That payment could not be reviewed. It may already have been handled or require a rejection reason.</p>}
       {activeSection === "operations" && <><div className="mt-10 rounded-3xl border border-white/10 p-7">
         <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between"><div><p className="eyebrow">Ride operations</p><h2 className="mt-2 text-2xl font-black">Ride workspace</h2></div><Link href={`/guilds/${guild.slug}/rides/new`} className="rounded-full bg-orange-500 px-5 py-2.5 text-center text-sm font-black text-white">Create ride draft</Link></div>
         <div className="mt-5 grid gap-3">
@@ -95,6 +116,7 @@ export default async function GuildManagePage({ params, searchParams }: Props) {
         <article className="rounded-3xl border border-white/10 bg-white/[.025] p-6"><p className="text-3xl font-black">{guild._count.rides}</p><p className="mt-2 text-sm text-zinc-500">Rides</p></article>
         <article className="rounded-3xl border border-white/10 bg-white/[.025] p-6"><p className="text-3xl font-black">{guild._count.memberships}</p><p className="mt-2 text-sm text-zinc-500">Members</p></article>
       </div></>}
+      {canFinance && activeSection === "finance" && <section className="mt-10"><p className="eyebrow">Offline payments</p><h2 className="mt-3 text-2xl font-black">Finance review queue</h2><p className="mt-3 max-w-3xl text-sm leading-7 text-zinc-500">Confirmation advances and later balances appear as separate obligations. Confirm only after matching the amount and payer evidence with the Guild&apos;s account or cash record. Captains without Owner, Admin, or Finance access cannot use these controls.</p><div className="mt-6 grid gap-4">{pendingPayments.length ? pendingPayments.map((payment) => <article id={`payment-${payment.id}`} key={payment.id} className={`scroll-mt-32 rounded-3xl border p-6 ${state.payment === payment.id ? "border-orange-400/50 bg-orange-400/[.045]" : "border-white/10 bg-white/[.025]"}`}><div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between"><div><p className="text-xs font-bold uppercase tracking-widest text-orange-300">{payment.method.replaceAll("_", " ")} · {payment.purpose.replaceAll("_", " ")}</p><h3 className="mt-2 text-xl font-black">{payment.booking.user.displayName}</h3><p className="mt-1 text-sm text-zinc-400">{payment.booking.ride.title} · {payment.booking.origin?.city ?? "Starting group unavailable"}</p><p className="mt-3 text-2xl font-black">₹{(payment.amountPaise / 100).toLocaleString("en-IN")}</p>{payment.submittedAt && <p className="mt-2 text-xs text-zinc-500">Submitted {payment.submittedAt.toLocaleString("en-IN", { timeZone: "Asia/Kolkata", dateStyle: "medium", timeStyle: "short" })}</p>}{payment.dueAt && <p className="mt-1 text-xs text-zinc-500">Due {payment.dueAt.toLocaleString("en-IN", { timeZone: "Asia/Kolkata", dateStyle: "medium", timeStyle: "short" })}</p>}{payment.payerReference && <p className="mt-2 text-xs text-zinc-500">Reference: {payment.payerReference}</p>}</div><div className="flex flex-wrap gap-2">{payment.proofAsset && <a href={cloudinaryImageUrl(payment.proofAsset)} target="_blank" rel="noreferrer" className="rounded-full border border-white/15 px-4 py-2 text-xs font-bold">View private proof</a>}<Link href={`/rides/${payment.booking.ride.slug}`} className="rounded-full border border-white/15 px-4 py-2 text-xs font-bold">View ride</Link></div></div><div className="mt-5 grid gap-3 sm:grid-cols-[auto_1fr]"><form action={reviewBookingPayment} className="relative"><input type="hidden" name="guildSlug" value={guild.slug} /><input type="hidden" name="paymentId" value={payment.id} /><input type="hidden" name="decision" value="CONFIRM" /><FormPendingSubmit idleLabel={payment.method === "CASH" ? `Confirm ${payment.purpose === "BALANCE" ? "balance" : "cash"} received` : `Confirm ${payment.purpose === "BALANCE" ? "balance" : "payment"}`} pendingLabel="Confirming…" overlayLabel="Confirming booking payment…" className="rounded-full bg-emerald-500 px-5 py-2.5 text-xs font-black text-black" /></form>{payment.status === "SUBMITTED" && <form action={reviewBookingPayment} className="relative flex flex-col gap-2 sm:flex-row"><input type="hidden" name="guildSlug" value={guild.slug} /><input type="hidden" name="paymentId" value={payment.id} /><input type="hidden" name="decision" value="REJECT" /><input required minLength={5} maxLength={1000} name="rejectionReason" placeholder="Reason visible to participant" className="field py-2 text-xs" /><FormPendingSubmit idleLabel="Reject proof" pendingLabel="Rejecting…" overlayLabel="Returning payment proof…" className="rounded-full border border-red-400/30 px-5 py-2.5 text-xs font-black text-red-300" /></form>}</div></article>) : <p className="rounded-3xl border border-dashed border-white/10 p-8 text-center text-sm text-zinc-500">No offline payments are waiting for review.</p>}</div></section>}
       {canAdminister && guild.visibility && <>
         {activeSection === "profile" && <>
         <form action={updateGuildProfile} className="relative mt-10 overflow-hidden rounded-3xl border border-white/10 bg-white/[.025] p-7">

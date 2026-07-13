@@ -18,6 +18,7 @@ export async function getSessionByToken(token?: string) {
         include: {
           contacts: { where: { isPrimary: true } },
           profile: { include: { avatarAsset: true } },
+          vehicles: { orderBy: [{ isPrimary: "desc" }, { createdAt: "asc" }] },
           platformRoles: true,
           communityMemberships: {
             where: { status: "ACTIVE" },

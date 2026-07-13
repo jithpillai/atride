@@ -21,7 +21,8 @@ The initial reason for a Guild to adopt @Ride is not marketplace audience. It is
 - Multiple origins and ride staff
 - Capacity and waitlists
 - Registration and bookings
-- Community-owned Razorpay
+- Community-owned UPI collection with manual finance verification
+- Optional community-owned gateway after demonstrated demand
 - Offline payment verification
 - Participant manifests
 - Announcements and notifications

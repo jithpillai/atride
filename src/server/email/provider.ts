@@ -10,6 +10,12 @@ const mockProvider: EmailProvider = {
     }
     return {};
   },
+  async sendTransactional() {
+    if (process.env.NODE_ENV === "production") {
+      throw new EmailDeliveryError("The mock email provider is disabled in production.");
+    }
+    return {};
+  },
 };
 
 export function getEmailProvider(destination?: string): EmailProvider {

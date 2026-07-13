@@ -1,6 +1,6 @@
 # ADR-004: Use community-owned Razorpay integrations
 
-- Status: Accepted
+- Status: Superseded by ADR-016
 - Date: 2026-07-07
 
 ## Context

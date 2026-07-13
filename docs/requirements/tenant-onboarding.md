@@ -185,34 +185,31 @@ Rules:
 
 ## 9. Payment onboarding
 
-### 9.1 Online payments
+### 9.1 Assisted UPI payments
 
-Each community connects its own Razorpay account.
+Each community configures the UPI recipient to which its participants pay directly.
 
 Setup fields:
 
-- Key ID
-- Key secret
-- Webhook secret
-- Test/live mode
+- UPI ID/VPA
+- Payee/display name
+- Optional finance instructions
 - Enabled status
 
 Activation flow:
 
 1. Authorized owner opens payment settings.
-2. Enter test credentials over HTTPS.
-3. Backend encrypts secrets immediately.
-4. Run a connection/configuration test.
-5. Create a unique, unguessable webhook integration path/token.
-6. Verify a test webhook and payment.
-7. Allow live-mode credentials after community readiness requirements pass.
-8. Audit credential creation, replacement, mode change, and disablement.
+2. Enter and validate the UPI ID and payee name.
+3. Preview a sample intent and QR without moving money.
+4. Save the active recipient and audit creation, replacement, and disablement.
+5. Snapshot the active recipient into every new payment obligation.
 
 Rules:
 
-- Secrets are never returned to the browser after saving.
-- Secrets never appear in logs, email, support messages, or Git.
-- Community staff cannot view another tenant's integration.
+- Only authorized Guild roles can change payment settings.
+- Community staff cannot view another tenant's payment configuration.
+- Transaction references and protected proof remain tenant-scoped private data.
+- Razorpay credential onboarding is excluded unless the optional post-app gateway phase is approved.
 - Captains cannot manage credentials unless they also hold an explicit permitted community role.
 - @Ride does not collect or settle the community's ride funds.
 

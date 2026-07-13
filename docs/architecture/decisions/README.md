@@ -16,7 +16,7 @@ Architecture Decision Records (ADRs) capture important choices, their context, a
 | [ADR-001](ADR-001-modular-monolith.md) | TypeScript modular monolith | Accepted |
 | [ADR-002](ADR-002-postgresql-postgis.md) | PostgreSQL/PostGIS as the primary database | Accepted |
 | [ADR-003](ADR-003-hostname-multi-tenancy.md) | Path-first multi-tenancy with deferred wildcard subdomains | Accepted |
-| [ADR-004](ADR-004-community-owned-payments.md) | Community-owned Razorpay integrations | Accepted |
+| [ADR-004](ADR-004-community-owned-payments.md) | Community-owned Razorpay integrations | Superseded by ADR-016 |
 | [ADR-005](ADR-005-central-communications.md) | Central MSG91/SES communication platform | Superseded by ADR-011 |
 | [ADR-006](ADR-006-vehicle-neutral-bike-first.md) | Vehicle-neutral core with a bike-first launch | Accepted |
 | [ADR-007](ADR-007-official-announcements-external-chat.md) | Official @Ride announcements with external WhatsApp chat | Accepted |
@@ -28,6 +28,7 @@ Architecture Decision Records (ADRs) capture important choices, their context, a
 | [ADR-013](ADR-013-opaque-database-sessions.md) | Application-owned opaque PostgreSQL sessions | Accepted |
 | [ADR-014](ADR-014-firebase-phone-verification.md) | Firebase for one-time phone ownership verification | Accepted |
 | [ADR-015](ADR-015-review-before-apply-ai-authoring.md) | Review-before-apply AI ride authoring | Accepted |
+| [ADR-016](ADR-016-assisted-upi-defer-gateway.md) | Assisted UPI by default; defer payment gateways | Accepted |
 
 ## Adding a decision
 
