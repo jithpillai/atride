@@ -701,13 +701,28 @@ model CommunityMembership {
   createdAt   DateTime                  @default(now()) @map("created_at") @db.Timestamptz(3)
   updatedAt   DateTime                  @updatedAt @map("updated_at") @db.Timestamptz(3)
 
-  community Community                 @relation(fields: [communityId], references: [id], onDelete: Cascade)
-  user      User                      @relation(fields: [userId], references: [id], onDelete: Cascade)
-  roles     CommunityRoleAssignment[]
+  community      Community                 @relation(fields: [communityId], references: [id], onDelete: Cascade)
+  user           User                      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  roles          CommunityRoleAssignment[]
+  welcomeConsent GuildWelcomeConsent?
 
   @@unique([communityId, userId])
   @@index([userId, status])
   @@map("community_memberships")
+}
+
+model GuildWelcomeConsent {
+  id           String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  membershipId String    @unique @map("membership_id") @db.Uuid
+  consentedAt  DateTime  @map("consented_at") @db.Timestamptz(3)
+  revokedAt    DateTime? @map("revoked_at") @db.Timestamptz(3)
+  createdAt    DateTime  @default(now()) @map("created_at") @db.Timestamptz(3)
+  updatedAt    DateTime  @updatedAt @map("updated_at") @db.Timestamptz(3)
+
+  membership CommunityMembership @relation(fields: [membershipId], references: [id], onDelete: Cascade)
+
+  @@index([revokedAt, consentedAt])
+  @@map("guild_welcome_consents")
 }
 
 model CommunityRoleAssignment {

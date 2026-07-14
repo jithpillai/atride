@@ -304,6 +304,8 @@ Anonymous and unrelated viewers receive only the sections permitted by the Guild
 
 Derived projections are rebuilt from authoritative participation, role, and award records. They must not become an untraceable source of truth.
 
+The current Phase 5 implementation persists `guild_welcome_consents` against the unique Guild membership. A confirmed booking can activate previously captured consent, accepted members can opt in from their account, and revocation is retained as an audited state. The Guild Hall query independently requires an active viewer membership, an active subject membership, Guild-level display enablement, and a recent join date.
+
 ## 12. Acceptance criteria
 
 - Anonymous users cannot access any individual Ride Passport or newcomer tile.

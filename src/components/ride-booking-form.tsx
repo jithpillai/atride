@@ -20,6 +20,7 @@ export function RideBookingForm({
   accessibilityNotes,
   soldOut,
   newcomerConsentAvailable,
+  guildName,
   upiAvailable,
 }: {
   rideId: string;
@@ -32,6 +33,7 @@ export function RideBookingForm({
   accessibilityNotes: string;
   soldOut: boolean;
   newcomerConsentAvailable: boolean;
+  guildName: string;
   upiAvailable: boolean;
 }) {
   const [state, action] = useActionState<ReserveRideState, FormData>(reserveRideAction, {});
@@ -75,7 +77,7 @@ export function RideBookingForm({
     {soldOut && <><input type="hidden" name="paymentMethod" value={upiAvailable ? "UPI" : "BANK_TRANSFER"} /><label className="flex cursor-pointer gap-3 rounded-2xl border border-amber-400/20 bg-amber-400/[.04] p-4 text-sm"><input required type="checkbox" name="joinWaitlistWhenFull" className="mt-1 accent-orange-500" /><span><strong>Join the waitlist</strong><span className="mt-1 block text-xs text-zinc-500">This does not reserve a slot or request payment. The Guild can contact you if capacity becomes available.</span></span></label></>}
     <label className="flex cursor-pointer gap-3 text-sm leading-6"><input required type="checkbox" name="waiverAccepted" className="mt-1.5 accent-orange-500" /><span>I have reviewed and accept the ride rules, safety requirements, and waiver shown on this page.</span></label>
     <label className="flex cursor-pointer gap-3 text-sm leading-6"><input required type="checkbox" name="commercialTermsAccepted" className="mt-1.5 accent-orange-500" /><span>I accept the displayed price, inclusions, exclusions, payment schedule, cancellation, refund, and replacement policies.</span></label>
-    {newcomerConsentAvailable && <label className="flex cursor-pointer gap-3 text-sm leading-6 text-zinc-400"><input type="checkbox" name="newcomerDisplayConsent" className="mt-1.5 accent-orange-500" /><span>If this becomes my first confirmed ride with this Guild, allow a member-only welcome tile using my display name and profile image.</span></label>}
+    {newcomerConsentAvailable && <label className="flex cursor-pointer gap-3 text-sm leading-6 text-zinc-400"><input type="checkbox" name="newcomerDisplayConsent" className="mt-1.5 accent-orange-500" /><span>If this becomes my first confirmed ride with {guildName}, allow a member-only welcome tile using my first name, profile image, and city.</span></label>}
     {state.error && <p role="alert" className="rounded-2xl border border-red-400/25 bg-red-400/10 p-4 text-sm font-bold text-red-300">{state.error}</p>}
     <FormPendingSubmit idleLabel={soldOut ? "Join waitlist" : "Reserve my slot"} pendingLabel={soldOut ? "Joining…" : "Reserving…"} overlayLabel={soldOut ? "Adding you to the waitlist…" : "Securing your ride slot…"} className="w-full rounded-2xl bg-orange-500 px-5 py-3.5 text-sm font-black text-white hover:bg-orange-400" />
   </form>;

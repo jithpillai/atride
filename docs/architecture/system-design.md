@@ -811,6 +811,7 @@ The client must show pending, successful, and retry states so captains can opera
 - No public individual participant profile mode in the initial release
 - Relationship-scoped Ride Passport summaries with a preview of disclosed fields
 - Per-Guild consent for newcomer and award display
+- Member-only newcomer queries that require active viewer and subject memberships, retain revocation, and expose only first name, optional avatar, city, and join date
 - No cross-Guild negative notes or rider score
 
 ### 17.4 Provider callbacks

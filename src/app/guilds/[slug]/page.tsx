@@ -7,6 +7,7 @@ import { notFound } from "next/navigation";
 import { formatMoney, formatRideDate } from "@/lib/format";
 import { canManageGuild } from "@/server/auth/permissions";
 import { getCurrentSession } from "@/server/auth/session";
+import { listGuildNewcomersForMember } from "@/server/guild/newcomers";
 import {
   listPublishedRidesForTenant,
   listStaticGuildSlugs,
@@ -63,6 +64,9 @@ export default async function GuildPage({ params }: Props) {
   }
 
   const guildRides = await listPublishedRidesForTenant(tenant);
+  const newcomers = session && guild.newcomerDisplayEnabled
+    ? await listGuildNewcomersForMember(guild.slug, session.userId)
+    : [];
 
   return (
     <>
@@ -105,6 +109,24 @@ export default async function GuildPage({ params }: Props) {
           </div>
         </div>
       </section>
+
+      {!!newcomers.length && <section className="mx-auto max-w-7xl px-5 pb-16 lg:px-8">
+        <div className="rounded-[2rem] border border-orange-400/15 bg-orange-400/[.025] p-7 sm:p-9">
+          <p className="eyebrow">New to this Guild</p>
+          <div className="mt-3 flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
+            <div><h2 className="text-3xl font-black">Welcome to {guild.shortName}</h2><p className="mt-2 text-sm text-zinc-500">Recent members who chose to introduce themselves inside this Guild Hall.</p></div>
+            <p className="text-xs font-bold text-zinc-600">Visible to Guild members only</p>
+          </div>
+          <div className="mt-7 flex gap-5 overflow-x-auto pb-2">
+            {newcomers.map((newcomer) => <article key={newcomer.membershipId} className="w-36 shrink-0 text-center">
+              <ImageWithFallback src={newcomer.avatarUrl ?? "/defaults/user-avatar.png"} fallbackSrc="/defaults/user-avatar.png" alt="" width={112} height={112} className="mx-auto size-28 rounded-3xl border border-white/10 object-cover" />
+              <h3 className="mt-3 truncate text-sm font-black">{newcomer.firstName}</h3>
+              <p className="mt-1 truncate text-xs text-zinc-500">{newcomer.homeCity ?? "AtRide member"}</p>
+              <p className="mt-1 text-[10px] font-bold uppercase tracking-wide text-orange-300">Joined {newcomer.joinedAt.toLocaleDateString("en-IN", { day: "numeric", month: "short", timeZone: "Asia/Kolkata" })}</p>
+            </article>)}
+          </div>
+        </div>
+      </section>}
 
       {!!guild.galleryUrls.length && <section className="mx-auto max-w-7xl px-5 pb-16 lg:px-8"><p className="eyebrow">From the road</p><h2 className="mt-3 text-3xl font-black">Guild gallery</h2><div className="mt-6 grid gap-4 sm:grid-cols-2 lg:grid-cols-3">{guild.galleryUrls.map((url, index) => <Image key={url} src={url} alt={`${guild.name} gallery image ${index + 1}`} width={800} height={600} className="aspect-[4/3] w-full rounded-3xl object-cover" />)}</div></section>}
     </>

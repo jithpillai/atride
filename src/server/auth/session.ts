@@ -33,6 +33,7 @@ export async function getSessionByToken(token?: string) {
                 },
               },
               roles: true,
+              welcomeConsent: true,
             },
           },
         },
