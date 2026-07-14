@@ -461,7 +461,7 @@ When a ride/group is sold out, the participant may join a waitlist. Released cap
 
 1. Select ride and starting group.
 2. Validate eligibility and availability.
-3. Select participant(s), vehicle, occupant roles, pricing, accommodation, and add-ons.
+3. Select participant(s), occupant roles, pricing, accommodation, add-ons, and one vehicle mode: saved garage vehicle, ride-only basic details, privacy-preserving own vehicle with no details, or no vehicle for a pillion/passenger.
 4. Review inclusions, exclusions, safety requirements, cancellation rules, and total.
 5. Accept the current waiver and consent.
 6. Create a time-limited capacity reservation.
@@ -486,7 +486,7 @@ Payment progress is modelled independently rather than duplicated in the booking
 **Rules:**
 
 - Concurrent requests cannot oversell a slot.
-- The booking records participant, contact, vehicle, occupant roles, group, price, policy, and waiver snapshots.
+- The booking records participant, contact, vehicle choice, occupant roles, group, price, policy, and waiver snapshots. Ride-only vehicle details do not populate the participant's global garage, and a rider/driver may state that they are bringing a compatible vehicle without disclosing identifying details.
 - Profile edits do not silently rewrite historical bookings.
 
 ## 9. Payments

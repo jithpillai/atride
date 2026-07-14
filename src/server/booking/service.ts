@@ -1,10 +1,10 @@
 import "server-only";
 
-import type { Prisma } from "@/generated/prisma/client";
+import { Prisma } from "@/generated/prisma/client";
 import { db } from "@/lib/db";
 import { AuthError } from "@/server/auth/auth-service";
 import { buildBookingSnapshot } from "./snapshot";
-import { reservationExpiry, type OccupantRole, type OfflinePaymentMethod } from "./validation";
+import { reservationExpiry, type BookingVehicleMode, type OccupantRole, type OfflinePaymentMethod } from "./validation";
 
 const CAPACITY_HOLDING_STATUSES = ["RESERVED", "CONFIRMED", "TRANSFER_PENDING"] as const;
 
@@ -13,6 +13,8 @@ export type ReserveRideInput = {
   userId: string;
   originId: string;
   vehicleId: string | null;
+  vehicleMode: BookingVehicleMode;
+  rideOnlyVehicle: { manufacturer: string | null; model: string | null; registrationLast4: string | null };
   occupantRole: OccupantRole;
   dietaryPreference: string | null;
   accessibilityNotes: string | null;
@@ -46,12 +48,42 @@ export async function reserveRide(input: ReserveRideInput) {
     const origin = ride.origins.find((candidate) => candidate.id === input.originId);
     if (!origin) throw new AuthError("INVALID_ORIGIN", "Choose a valid starting group.");
 
+    const operatesVehicle = input.occupantRole === "RIDER" || input.occupantRole === "DRIVER";
+    if (operatesVehicle && input.vehicleMode === "NO_VEHICLE") {
+      throw new AuthError("VEHICLE_REQUIRED", "Choose how you are bringing your vehicle for this ride.");
+    }
+    if (!operatesVehicle && input.vehicleMode !== "NO_VEHICLE") {
+      throw new AuthError("VEHICLE_NOT_APPLICABLE", "Only riders and drivers can bring a vehicle with this booking.");
+    }
+
     let vehicleId: string | null = null;
-    if (input.occupantRole === "RIDER" || input.occupantRole === "DRIVER") {
-      if (!input.vehicleId) throw new AuthError("VEHICLE_REQUIRED", "Choose the vehicle you will bring.");
+    let vehicleSnapshot: Prisma.InputJsonValue | Prisma.NullableJsonNullValueInput = Prisma.DbNull;
+    if (input.vehicleMode === "SAVED_VEHICLE") {
+      if (!input.vehicleId) throw new AuthError("VEHICLE_REQUIRED", "Choose a vehicle from your garage.");
       const vehicle = await tx.vehicle.findFirst({ where: { id: input.vehicleId, userId: input.userId } });
       if (!vehicle || vehicle.type !== ride.vehicleType) throw new AuthError("INVALID_VEHICLE", `Choose one of your ${ride.vehicleType.toLowerCase()} vehicles.`);
       vehicleId = vehicle.id;
+      vehicleSnapshot = {
+        source: "SAVED_VEHICLE",
+        type: vehicle.type,
+        manufacturer: vehicle.manufacturer,
+        model: vehicle.model,
+        nickname: vehicle.nickname,
+        registrationLast4: vehicle.registrationLast4,
+      };
+    } else if (input.vehicleMode === "RIDE_ONLY_DETAILS") {
+      if (!input.rideOnlyVehicle.manufacturer || !input.rideOnlyVehicle.model) {
+        throw new AuthError("VEHICLE_DETAILS_REQUIRED", "Enter the vehicle manufacturer and model, or choose the private vehicle option.");
+      }
+      vehicleSnapshot = {
+        source: "RIDE_ONLY_DETAILS",
+        type: ride.vehicleType,
+        manufacturer: input.rideOnlyVehicle.manufacturer,
+        model: input.rideOnlyVehicle.model,
+        registrationLast4: input.rideOnlyVehicle.registrationLast4,
+      };
+    } else if (input.vehicleMode === "PRIVATE_VEHICLE") {
+      vehicleSnapshot = { source: "PRIVATE_VEHICLE", type: ride.vehicleType, detailsShared: false };
     }
 
     const selectedAddOns = ride.packageItems.filter((item) => item.type === "ADD_ON" && input.addOnIds.includes(item.id));
@@ -99,6 +131,8 @@ export async function reserveRide(input: ReserveRideInput) {
       communityId: ride.communityId,
       originId: origin.id,
       vehicleId,
+      vehicleMode: input.vehicleMode,
+      vehicleSnapshot,
       status,
       occupantRole: input.occupantRole,
       dietaryPreference: input.dietaryPreference,
