@@ -5,6 +5,16 @@ export type BookingVehicleMode = typeof BOOKING_VEHICLE_MODES[number];
 export const OFFLINE_PAYMENT_METHODS = ["UPI", "BANK_TRANSFER", "CASH"] as const;
 export type OfflinePaymentMethod = typeof OFFLINE_PAYMENT_METHODS[number];
 
+// Neon can add several hundred milliseconds to each round trip. The reservation
+// transaction deliberately locks the ride and performs all capacity, snapshot,
+// payment-obligation, and audit writes atomically, so Prisma's 5-second default
+// is too short for normal production latency.
+export const RESERVATION_TRANSACTION_OPTIONS = {
+  isolationLevel: "Serializable" as const,
+  maxWait: 5_000,
+  timeout: 15_000,
+};
+
 export function isOccupantRole(value: string): value is OccupantRole {
   return OCCUPANT_ROLES.includes(value as OccupantRole);
 }

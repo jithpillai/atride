@@ -1,15 +1,12 @@
 import { redirect } from "next/navigation";
 
 import { db } from "@/lib/db";
+import {
+  canManageGuild,
+  canManageGuildRides,
+  rideEditorStaffRoles,
+} from "@/server/auth/permissions";
 import { getCurrentSession } from "@/server/auth/session";
-
-const GUILD_MANAGEMENT_ROLES = new Set([
-  "OWNER",
-  "ADMIN",
-  "RIDE_MANAGER",
-  "FINANCE",
-  "MEMBER_MANAGER",
-]);
 
 export async function requireSession(returnTo = "/account") {
   const session = await getCurrentSession();
@@ -30,7 +27,7 @@ export async function requireGuildManager(slug: string) {
   const membership = session.user.communityMemberships.find(
     ({ community }) => community.slug === slug,
   );
-  if (!membership || !membership.roles.some(({ role }) => GUILD_MANAGEMENT_ROLES.has(role))) {
+  if (!membership || !canManageGuild(membership)) {
     redirect("/account?access=denied");
   }
   return { session, membership };
@@ -46,7 +43,7 @@ export async function requireGuildAdmin(slug: string) {
 
 export async function requireRideManager(slug: string) {
   const result = await requireGuildManager(slug);
-  if (!result.membership.roles.some(({ role }) => role === "OWNER" || role === "ADMIN" || role === "RIDE_MANAGER")) {
+  if (!canManageGuildRides(result.membership)) {
     redirect("/account?access=denied");
   }
   return result;
@@ -60,19 +57,17 @@ export async function requireGuildFinance(slug: string) {
   return result;
 }
 
-const RIDE_EDITOR_STAFF_ROLES = new Set(["LEAD_CAPTAIN", "CAPTAIN", "VICE_CAPTAIN"]);
-
 export async function requireRideEditor(slug: string, rideId: string) {
   const session = await requireSession(`/guilds/${slug}/rides/${rideId}/edit`);
   const membership = session.user.communityMemberships.find(({ community }) => community.slug === slug);
-  const managesGuildRides = membership?.roles.some(({ role }) => role === "OWNER" || role === "ADMIN" || role === "RIDE_MANAGER");
+  const managesGuildRides = canManageGuildRides(membership);
   if (managesGuildRides) return { session, membership, access: "GUILD" as const };
 
   const assignment = await db.rideStaffAssignment.findFirst({
     where: {
       rideId,
       userId: session.userId,
-      role: { in: Array.from(RIDE_EDITOR_STAFF_ROLES) as Array<"LEAD_CAPTAIN" | "CAPTAIN" | "VICE_CAPTAIN"> },
+      role: { in: rideEditorStaffRoles() },
       ride: { community: { slug } },
     },
     select: { id: true, role: true },

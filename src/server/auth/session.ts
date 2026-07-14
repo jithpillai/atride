@@ -22,7 +22,18 @@ export async function getSessionByToken(token?: string) {
           platformRoles: true,
           communityMemberships: {
             where: { status: "ACTIVE" },
-            include: { community: { select: { slug: true, name: true } }, roles: true },
+            include: {
+              community: {
+                select: {
+                  slug: true,
+                  name: true,
+                  logoAsset: {
+                    select: { publicId: true, version: true, format: true, deliveryType: true },
+                  },
+                },
+              },
+              roles: true,
+            },
           },
         },
       },

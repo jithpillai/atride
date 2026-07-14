@@ -10,6 +10,7 @@ import { MediaUploader } from "@/components/media-uploader";
 import { cloudinaryImageUrl } from "@/server/media/cloudinary";
 import { findPublicRidePackageBySlug, listPublicRideSlugs } from "@/server/repositories/discovery-repository";
 import { getCurrentSession } from "@/server/auth/session";
+import { canEditRide } from "@/server/auth/permissions";
 import { findUserBookingForRide } from "@/server/booking/service";
 import { summarizeBookingPayments } from "@/server/booking/payment-summary";
 import { UpiPaymentPanel } from "@/components/upi-payment-panel";
@@ -30,6 +31,10 @@ export default async function RidePage({ params, searchParams }: Props) {
   const booking = session ? await findUserBookingForRide(session.userId, ride.id) : null;
   const bookingNotice = (await searchParams).booking;
   const paymentSummary = booking ? summarizeBookingPayments(booking) : null;
+  const membership = session?.user.communityMemberships.find(
+    ({ community }) => community.slug === ride.community.slug,
+  );
+  const showManageRide = canEditRide(membership, ride.staffAssignments, session?.userId);
   const slotsLeft = ride.totalSlots + ride.bufferSlots - ride.bookedSlots;
   const soldOut = slotsLeft <= 0;
   const items = (type: "INCLUSION" | "EXCLUSION" | "ADD_ON" | "MEAL" | "ACTIVITY") => ride.packageItems.filter((item) => item.type === type);
@@ -37,7 +42,7 @@ export default async function RidePage({ params, searchParams }: Props) {
 
   return <>
     <section className="relative overflow-hidden border-b border-white/10" style={{ background: ride.heroGradient }}>{ride.coverAsset && <ImageWithFallback src={cloudinaryImageUrl(ride.coverAsset)} fallbackSrc="/defaults/guild-hall-cover.png" alt="" fill sizes="100vw" priority className="object-cover opacity-55" />}<div className="absolute inset-0 bg-gradient-to-r from-black/80 via-black/35 to-transparent" /><div className="relative mx-auto max-w-7xl px-5 py-24 lg:px-8">
-      <Link href={`/guilds/${ride.community.slug}`} className="text-sm font-bold text-white/70 hover:text-white">← {ride.community.name}</Link>
+      <div className="flex flex-wrap items-center justify-between gap-4"><Link href={`/guilds/${ride.community.slug}`} className="text-sm font-bold text-white/70 hover:text-white">← {ride.community.name}</Link>{showManageRide && <Link href={`/guilds/${ride.community.slug}/rides/${ride.id}/edit`} className="rounded-full bg-orange-500 px-6 py-3 text-sm font-black text-white shadow-lg shadow-orange-950/30 hover:bg-orange-400">Manage Ride</Link>}</div>
       <p className="mt-10 text-xs font-bold uppercase tracking-[.18em] text-orange-200">{ride.origins.map((origin) => origin.city).join(" · ")} → {ride.destination}</p>
       <h1 className="mt-3 max-w-4xl text-5xl font-black tracking-[-.05em] sm:text-6xl">{ride.title}</h1><p className="mt-5 max-w-3xl text-lg leading-8 text-white/75">{ride.summary}</p>
       <div className="mt-7 flex flex-wrap items-center gap-3"><span className={`rounded-full px-4 py-2 text-xs font-black ${ride.status === "PUBLISHED" ? "bg-emerald-500 text-black" : ride.status === "CANCELLED" ? "bg-red-500 text-white" : "bg-amber-400 text-black"}`}>{ride.status}</span>{ride.staffAssignments.map((staff) => <span key={staff.id} className="rounded-full border border-white/20 bg-black/20 px-4 py-2 text-xs font-bold">{staff.role.replaceAll("_", " ")} · {staff.user.displayName}{staff.origin ? ` · ${staff.origin.city}` : ""}</span>)}</div>

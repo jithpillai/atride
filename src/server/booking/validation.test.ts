@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { isBookingVehicleMode, isOccupantRole, isOfflinePaymentMethod, reservationExpiry } from "./validation";
+import { isBookingVehicleMode, isOccupantRole, isOfflinePaymentMethod, RESERVATION_TRANSACTION_OPTIONS, reservationExpiry } from "./validation";
 
 describe("booking validation", () => {
   it("accepts only supported participant and offline payment choices", () => {
@@ -16,5 +16,13 @@ describe("booking validation", () => {
     const now = new Date("2026-08-01T00:00:00.000Z");
     expect(reservationExpiry(now, null).toISOString()).toBe("2026-08-02T00:00:00.000Z");
     expect(reservationExpiry(now, new Date("2026-08-01T12:00:00.000Z")).toISOString()).toBe("2026-08-01T12:00:00.000Z");
+  });
+
+  it("allows the atomic reservation workflow to tolerate normal serverless database latency", () => {
+    expect(RESERVATION_TRANSACTION_OPTIONS).toEqual({
+      isolationLevel: "Serializable",
+      maxWait: 5_000,
+      timeout: 15_000,
+    });
   });
 });
