@@ -102,12 +102,22 @@ export default async function AccountPage({ searchParams }: Props) {
         <article className="rounded-3xl border border-white/10 bg-white/[.025] p-7">
           <p className="eyebrow">Guild relationships</p>
           <h2 className="mt-3 text-2xl font-black">Memberships</h2>
-          <div className="mt-5 grid gap-3">
+          <div className="mt-5 grid grid-cols-2 gap-x-5 gap-y-7 sm:grid-cols-3">
             {session.user.communityMemberships.length ? session.user.communityMemberships.map((membership) => (
-              <div key={membership.id} className="rounded-2xl border border-white/8 p-4">
-                <p className="font-bold text-white">{membership.community.name}</p>
-                <p className="mt-1 text-xs text-zinc-500">{membership.roles.map(({ role }) => role.replaceAll("_", " ")).join(" · ") || "Member"}</p>
-              </div>
+              <Link key={membership.id} href={`/guilds/${membership.community.slug}`} className="group flex min-w-0 flex-col items-center text-center">
+                <span className="grid size-20 place-items-center overflow-hidden rounded-2xl border border-white/10 bg-white/[.035] transition group-hover:border-orange-400/40 group-hover:bg-orange-400/[.05]">
+                  <ImageWithFallback
+                    src={membership.community.logoAsset ? cloudinaryImageUrl(membership.community.logoAsset) : "/defaults/guild-avatar.png"}
+                    fallbackSrc="/defaults/guild-avatar.png"
+                    alt={`${membership.community.name} logo`}
+                    width={80}
+                    height={80}
+                    className="size-full object-contain"
+                  />
+                </span>
+                <span className="mt-3 line-clamp-2 text-sm font-black text-white transition group-hover:text-orange-300">{membership.community.name}</span>
+                <span className="mt-1 text-[11px] font-semibold uppercase tracking-wide text-zinc-500">{membership.roles.map(({ role }) => role.replaceAll("_", " ")).join(" · ") || "Member"}</span>
+              </Link>
             )) : <p className="text-sm text-zinc-500">Your confirmed Guild relationships will appear here.</p>}
           </div>
         </article>

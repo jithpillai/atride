@@ -4,7 +4,7 @@ import { Prisma } from "@/generated/prisma/client";
 import { db } from "@/lib/db";
 import { AuthError } from "@/server/auth/auth-service";
 import { buildBookingSnapshot } from "./snapshot";
-import { reservationExpiry, type BookingVehicleMode, type OccupantRole, type OfflinePaymentMethod } from "./validation";
+import { RESERVATION_TRANSACTION_OPTIONS, reservationExpiry, type BookingVehicleMode, type OccupantRole, type OfflinePaymentMethod } from "./validation";
 
 const CAPACITY_HOLDING_STATUSES = ["RESERVED", "CONFIRMED", "TRANSFER_PENDING"] as const;
 
@@ -203,7 +203,7 @@ export async function reserveRide(input: ReserveRideInput) {
       metadata: { rideId: ride.id, bookingId: booking.id, originId: origin.id, expiredReservationsReleased: expired.count },
     } });
     return { booking, outcome: hasCapacity ? "RESERVED" as const : "WAITLISTED" as const };
-  }, { isolationLevel: "Serializable" });
+  }, RESERVATION_TRANSACTION_OPTIONS);
 }
 
 export async function findUserBookingForRide(userId: string, rideId: string) {

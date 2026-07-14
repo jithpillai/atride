@@ -600,7 +600,7 @@ Within a database transaction:
 
 Online or verified offline payment later confirms the booking atomically. Expiry releases abandoned capacity. Concurrency tests must prove that simultaneous requests cannot consume the final slot twice.
 
-The current PostgreSQL implementation serializes reservation attempts by locking the canonical ride row with `SELECT ... FOR UPDATE`, expires stale holds for that ride before counting capacity, and computes occupancy from capacity-holding booking states. The ride-level `bookedSlots` value is maintained as a denormalized display counter; it is never the sole source of truth for accepting a reservation. Audit events are written in the same transaction. A scheduled global expiry sweep is still required so abandoned holds are released even when no subsequent booking request reaches that ride.
+The current PostgreSQL implementation serializes reservation attempts by locking the canonical ride row with `SELECT ... FOR UPDATE`, expires stale holds for that ride before counting capacity, and computes occupancy from capacity-holding booking states. The ride-level `bookedSlots` value is maintained as a denormalized display counter; it is never the sole source of truth for accepting a reservation. Audit events are written in the same transaction. Because this atomic workflow performs several Neon round trips while holding the ride lock, it uses a scoped 15-second interactive-transaction timeout and a five-second acquisition wait rather than Prisma's five-second runtime default. No external network calls occur inside the transaction. A scheduled global expiry sweep is still required so abandoned holds are released even when no subsequent booking request reaches that ride.
 
 ### 12.2 Optional gateway payment confirmation
 
