@@ -5,6 +5,8 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 
 import { formatMoney, formatRideDate } from "@/lib/format";
+import { canManageGuild } from "@/server/auth/permissions";
+import { getCurrentSession } from "@/server/auth/session";
 import {
   listPublishedRidesForTenant,
   listStaticGuildSlugs,
@@ -40,6 +42,11 @@ export default async function GuildPage({ params }: Props) {
   const resolved = await resolveGuildTenant(slug);
   if (!resolved) notFound();
   const { guild, tenant } = resolved;
+  const session = await getCurrentSession();
+  const membership = session?.user.communityMemberships.find(
+    ({ community }) => community.slug === guild.slug,
+  );
+  const showManageGuild = canManageGuild(membership);
 
   if (guild.access === "INVITE_ONLY") {
     return (
@@ -49,7 +56,7 @@ export default async function GuildPage({ params }: Props) {
           <p className="mt-7 text-xs font-bold uppercase tracking-[.18em] text-violet-200">Private Guild Hall</p>
           <h1 className="mt-3 text-4xl font-black">{guild.name}</h1>
           <p className="mx-auto mt-4 max-w-lg text-sm leading-7 text-white/70">This Guild is unlisted and invite-only. Sign in with an invited account to view its rides and member information.</p>
-          <div className="mt-8 flex justify-center gap-3"><Link href="/login" className="rounded-full bg-white px-6 py-3 text-sm font-black text-black">Sign in</Link><Link href="/" className="rounded-full border border-white/20 px-6 py-3 text-sm font-black">Return home</Link></div>
+          <div className="mt-8 flex flex-wrap justify-center gap-3">{showManageGuild ? <Link href={`/guilds/${guild.slug}/manage`} className="rounded-full bg-orange-500 px-6 py-3 text-sm font-black text-white hover:bg-orange-400">Manage Guild</Link> : <Link href={`/login?returnTo=${encodeURIComponent(`/guilds/${guild.slug}`)}`} className="rounded-full bg-white px-6 py-3 text-sm font-black text-black">Sign in</Link>}<Link href="/" className="rounded-full border border-white/20 px-6 py-3 text-sm font-black">Return home</Link></div>
         </div>
       </section>
     );
@@ -67,6 +74,7 @@ export default async function GuildPage({ params }: Props) {
           <p className="mt-8 text-xs font-bold uppercase tracking-[.18em] text-orange-200">Guild Hall · {guild.homeCity}</p>
           <h1 className="mt-3 max-w-3xl text-5xl font-black tracking-[-.05em] sm:text-6xl">{guild.name}</h1>
           <p className="mt-5 max-w-2xl text-lg leading-8 text-white/75">{guild.tagline}</p>
+          {showManageGuild && <Link href={`/guilds/${guild.slug}/manage`} className="mt-7 inline-flex rounded-full bg-orange-500 px-6 py-3 text-sm font-black text-white shadow-lg shadow-orange-950/30 hover:bg-orange-400">Manage Guild</Link>}
           <div className="mt-8 flex flex-wrap gap-3">
             {guild.specialties.map((item) => <span key={item} className="rounded-full border border-white/20 bg-black/20 px-4 py-2 text-xs font-bold backdrop-blur">{item}</span>)}
           </div>
