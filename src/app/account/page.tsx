@@ -7,6 +7,7 @@ import { FormPendingSubmit } from "@/components/pending-feedback";
 import { db } from "@/lib/db";
 import { getCurrentSession } from "@/server/auth/session";
 import { acceptGuildInvitation } from "@/server/guild/actions";
+import { setGuildWelcomeConsent } from "@/server/guild/welcome-actions";
 import { cloudinaryImageUrl } from "@/server/media/cloudinary";
 
 export const metadata = { title: "Your account", robots: { index: false, follow: false } };
@@ -103,23 +104,37 @@ export default async function AccountPage({ searchParams }: Props) {
           <p className="eyebrow">Guild relationships</p>
           <h2 className="mt-3 text-2xl font-black">Memberships</h2>
           <div className="mt-5 grid grid-cols-2 gap-x-5 gap-y-7 sm:grid-cols-3">
-            {session.user.communityMemberships.length ? session.user.communityMemberships.map((membership) => (
-              <Link key={membership.id} href={`/guilds/${membership.community.slug}`} className="group flex min-w-0 flex-col items-center text-center">
-                <span className="grid size-20 place-items-center overflow-hidden rounded-2xl border border-white/10 bg-white/[.035] transition group-hover:border-orange-400/40 group-hover:bg-orange-400/[.05]">
-                  <ImageWithFallback
-                    src={membership.community.logoAsset ? cloudinaryImageUrl(membership.community.logoAsset) : "/defaults/guild-avatar.png"}
-                    fallbackSrc="/defaults/guild-avatar.png"
-                    alt={`${membership.community.name} logo`}
-                    width={80}
-                    height={80}
-                    className="size-full object-contain"
+            {session.user.communityMemberships.length ? session.user.communityMemberships.map((membership) => {
+              const welcomeEnabled = Boolean(membership.welcomeConsent && !membership.welcomeConsent.revokedAt);
+              return <article key={membership.id} className="flex min-w-0 flex-col items-center text-center">
+                <Link href={`/guilds/${membership.community.slug}`} className="group flex min-w-0 flex-col items-center text-center">
+                  <span className="grid size-20 place-items-center overflow-hidden rounded-2xl border border-white/10 bg-white/[.035] transition group-hover:border-orange-400/40 group-hover:bg-orange-400/[.05]">
+                    <ImageWithFallback
+                      src={membership.community.logoAsset ? cloudinaryImageUrl(membership.community.logoAsset) : "/defaults/guild-avatar.png"}
+                      fallbackSrc="/defaults/guild-avatar.png"
+                      alt={`${membership.community.name} logo`}
+                      width={80}
+                      height={80}
+                      className="size-full object-contain"
+                    />
+                  </span>
+                  <span className="mt-3 line-clamp-2 text-sm font-black text-white transition group-hover:text-orange-300">{membership.community.name}</span>
+                  <span className="mt-1 text-[11px] font-semibold uppercase tracking-wide text-zinc-500">{membership.roles.map(({ role }) => role.replaceAll("_", " ")).join(" · ") || "Member"}</span>
+                </Link>
+                <form action={setGuildWelcomeConsent} className="relative mt-3">
+                  <input type="hidden" name="membershipId" value={membership.id} />
+                  <input type="hidden" name="enabled" value={welcomeEnabled ? "false" : "true"} />
+                  <FormPendingSubmit
+                    idleLabel={welcomeEnabled ? "Hide my welcome tile" : "Allow welcome tile"}
+                    pendingLabel="Saving…"
+                    overlayLabel="Updating Guild Hall privacy…"
+                    className={`rounded-full border px-3 py-1.5 text-[11px] font-black ${welcomeEnabled ? "border-emerald-400/25 text-emerald-300" : "border-white/15 text-zinc-300"}`}
                   />
-                </span>
-                <span className="mt-3 line-clamp-2 text-sm font-black text-white transition group-hover:text-orange-300">{membership.community.name}</span>
-                <span className="mt-1 text-[11px] font-semibold uppercase tracking-wide text-zinc-500">{membership.roles.map(({ role }) => role.replaceAll("_", " ")).join(" · ") || "Member"}</span>
-              </Link>
-            )) : <p className="text-sm text-zinc-500">Your confirmed Guild relationships will appear here.</p>}
+                </form>
+              </article>;
+            }) : <p className="text-sm text-zinc-500">Your confirmed Guild relationships will appear here.</p>}
           </div>
+          {!!session.user.communityMemberships.length && <p className="mt-6 text-xs leading-5 text-zinc-600">Welcome tiles show only your first name, optional profile image, and city—and only to authenticated members of that Guild. You can withdraw consent here at any time.</p>}
         </article>
       </div>
 

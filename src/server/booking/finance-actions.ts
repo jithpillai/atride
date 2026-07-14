@@ -40,11 +40,21 @@ export async function reviewBookingPayment(formData: FormData) {
         await tx.bookingPayment.update({ where: { id: payment.id }, data: { status: "CONFIRMED", reviewedById: session.userId, reviewedAt: now, rejectionReason: null } });
         if (payment.purpose === "CONFIRMATION_DEPOSIT" || payment.purpose === "FULL_PAYMENT") {
           await tx.rideBooking.update({ where: { id: payment.bookingId }, data: { status: "CONFIRMED", confirmedAt: now, reservationExpiresAt: null } });
-          await tx.communityMembership.upsert({
+          const membership = await tx.communityMembership.upsert({
             where: { communityId_userId: { communityId: payment.booking.communityId, userId: payment.booking.userId } },
             create: { communityId: payment.booking.communityId, userId: payment.booking.userId, status: "ACTIVE", joinedAt: now },
-            update: { status: "ACTIVE", joinedAt: now },
+            update: { status: "ACTIVE" },
           });
+          if (!membership.joinedAt) {
+            await tx.communityMembership.update({ where: { id: membership.id }, data: { joinedAt: now } });
+          }
+          if (payment.booking.newcomerDisplayConsentAt) {
+            await tx.guildWelcomeConsent.upsert({
+              where: { membershipId: membership.id },
+              create: { membershipId: membership.id, consentedAt: payment.booking.newcomerDisplayConsentAt },
+              update: { consentedAt: payment.booking.newcomerDisplayConsentAt, revokedAt: null },
+            });
+          }
         }
       } else {
         await tx.bookingPayment.update({ where: { id: payment.id }, data: { status: "REJECTED", reviewedById: session.userId, reviewedAt: now, rejectionReason } });

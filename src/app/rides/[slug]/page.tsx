@@ -34,6 +34,9 @@ export default async function RidePage({ params, searchParams }: Props) {
   const membership = session?.user.communityMemberships.find(
     ({ community }) => community.slug === ride.community.slug,
   );
+  const welcomeConsentActive = Boolean(
+    membership?.welcomeConsent && !membership.welcomeConsent.revokedAt,
+  );
   const showManageRide = canEditRide(membership, ride.staffAssignments, session?.userId);
   const slotsLeft = ride.totalSlots + ride.bufferSlots - ride.bookedSlots;
   const soldOut = slotsLeft <= 0;
@@ -104,7 +107,8 @@ export default async function RidePage({ params, searchParams }: Props) {
           dietaryPreference={session.user.profile?.dietaryPreference ?? ""}
           accessibilityNotes={session.user.profile?.accessibilityNotes ?? ""}
           soldOut={soldOut}
-          newcomerConsentAvailable={ride.community.shortName.length > 0}
+          newcomerConsentAvailable={ride.community.newcomerDisplayEnabled && !welcomeConsentActive}
+          guildName={ride.community.name}
           upiAvailable={ride.community.paymentSettings?.upiEnabled ?? false}
         /> : <Link href={`/login?returnTo=${encodeURIComponent(`/rides/${ride.slug}#booking`)}`} className="mt-5 block rounded-2xl bg-orange-500 px-5 py-3.5 text-center text-sm font-black text-white hover:bg-orange-400">Sign in to reserve</Link>
       : <p className="mt-5 rounded-2xl border border-white/10 p-4 text-center text-sm font-black text-zinc-300">This ride is {ride.status.toLowerCase()} and is not accepting reservations.</p>}

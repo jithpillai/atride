@@ -22,6 +22,7 @@ export type GuildView = {
   websiteUrl: string | null;
   instagramUrl: string | null;
   whatsappUrl: string | null;
+  newcomerDisplayEnabled: boolean;
 };
 
 export type RideView = {
