@@ -3,11 +3,7 @@
 import { useMemo, useState } from "react";
 import { QRCodeSVG } from "qrcode.react";
 
-import { buildUpiPaymentUri, upiTransactionReference } from "@/lib/upi";
-
-function paymentLabel(purpose: string) {
-  return purpose === "BALANCE" ? "balance" : purpose === "CONFIRMATION_DEPOSIT" ? "confirmation advance" : "ride payment";
-}
+import { buildUpiPaymentUri, upiPaymentNote, upiTransactionReference } from "@/lib/upi";
 
 export function UpiPaymentPanel({
   paymentId,
@@ -15,7 +11,7 @@ export function UpiPaymentPanel({
   payeeName,
   amountPaise,
   rideTitle,
-  purpose,
+  participantName,
   instructions,
 }: {
   paymentId: string;
@@ -23,7 +19,7 @@ export function UpiPaymentPanel({
   payeeName: string;
   amountPaise: number;
   rideTitle: string;
-  purpose: string;
+  participantName: string;
   instructions?: string | null;
 }) {
   const [copied, setCopied] = useState<"vpa" | "amount" | null>(null);
@@ -34,8 +30,8 @@ export function UpiPaymentPanel({
     payeeName,
     amountPaise,
     transactionReference,
-    note: `@Ride ${paymentLabel(purpose)} · ${rideTitle}`,
-  }), [amountPaise, payeeName, purpose, rideTitle, transactionReference, vpa]);
+    note: upiPaymentNote(participantName, rideTitle),
+  }), [amountPaise, participantName, payeeName, rideTitle, transactionReference, vpa]);
 
   async function copy(value: string, field: "vpa" | "amount") {
     await navigator.clipboard.writeText(value);
@@ -45,7 +41,7 @@ export function UpiPaymentPanel({
 
   return <section className="mt-4 rounded-2xl border border-orange-400/20 bg-orange-400/[.035] p-4">
     <p className="text-xs font-black uppercase tracking-wider text-orange-300">Pay directly to the Guild</p>
-    <div className="mt-4 grid gap-5 sm:grid-cols-[9rem_1fr] sm:items-center">
+    <div className="mt-4 grid gap-5">
       <div className="w-fit rounded-2xl bg-white p-3" aria-label="UPI payment QR code">
         <QRCodeSVG value={uri} size={120} level="M" includeMargin={false} />
       </div>
@@ -58,6 +54,6 @@ export function UpiPaymentPanel({
     </div>
     {instructions && <p className="mt-4 whitespace-pre-line text-xs leading-5 text-zinc-400">{instructions}</p>}
     <p className="mt-4 text-xs font-bold leading-5 text-amber-300">Before authorizing, verify that your UPI app shows <strong>{payeeName}</strong> and exactly ₹{Number(amount).toLocaleString("en-IN", { minimumFractionDigits: 2 })}. @Ride never receives this money.</p>
-    <p className="mt-2 text-[11px] leading-5 text-zinc-500">After payment, enter the bank-generated UPI transaction/UTR reference in the proof form below. The QR&apos;s @Ride reference is only for matching this booking.</p>
+    <p className="mt-2 text-[11px] leading-5 text-zinc-500">After payment, enter the bank-generated UTR or UPI Transaction ID in the proof form below. The QR&apos;s @Ride reference is only for matching this booking.</p>
   </section>;
 }

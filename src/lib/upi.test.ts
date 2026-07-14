@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { buildUpiPaymentUri, isValidUpiVpa, normalizeUpiVpa, upiTransactionReference } from "./upi";
+import { buildUpiPaymentUri, isValidUpiVpa, normalizeUpiVpa, upiPaymentNote, upiTransactionReference } from "./upi";
 
 describe("UPI payment utilities", () => {
   it("normalizes and validates common Indian UPI IDs", () => {
@@ -28,5 +28,12 @@ describe("UPI payment utilities", () => {
 
   it("rejects an invalid recipient or amount", () => {
     expect(() => buildUpiPaymentUri({ vpa: "bad", payeeName: "X", amountPaise: 0, transactionReference: "ATR1", note: "Test" })).toThrow();
+  });
+
+  it("puts the booked rider first in the bank-visible payment note", () => {
+    const note = upiPaymentNote("  Aryan   Jith  ", "Nandi Hills Breakfast Ride");
+    expect(note).toBe("Aryan Jith @Ride Nandi Hills Breakfast Ride");
+    expect(note).not.toContain("confirmation advance");
+    expect(upiPaymentNote("A very long participant name that banks may truncate", "A very long ride title that must also remain safe").length).toBeLessThanOrEqual(80);
   });
 });

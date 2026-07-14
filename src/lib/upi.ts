@@ -22,6 +22,12 @@ export function upiTransactionReference(paymentId: string) {
   return `ATR${compact.slice(0, 25)}`;
 }
 
+export function upiPaymentNote(participantName: string, rideTitle: string) {
+  const rider = participantName.trim().replace(/\s+/g, " ").slice(0, 28) || "Rider";
+  const ride = rideTitle.trim().replace(/\s+/g, " ");
+  return `${rider} @Ride ${ride}`.slice(0, 80);
+}
+
 export function buildUpiPaymentUri(input: UpiPaymentInput) {
   const vpa = normalizeUpiVpa(input.vpa);
   const payeeName = input.payeeName.trim();
