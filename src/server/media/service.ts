@@ -167,7 +167,7 @@ export async function completeMediaUpload(session: NonNullable<SessionShape>, in
       }
     } else if (input.purpose === "PAYMENT_PROOF" && context.bookingPaymentId) {
       const payerReference = input.payerReference?.trim().slice(0, 80) ?? "";
-      if (payerReference.length < 6) throw new AuthError("PAYMENT_REFERENCE_REQUIRED", "Enter the UPI or bank transaction reference shown in your payment app.");
+      if (payerReference.length < 6) throw new AuthError("PAYMENT_REFERENCE_REQUIRED", "Enter the UTR or UPI Transaction ID shown in your payment app.");
       const payment = await tx.bookingPayment.findUnique({ where: { id: context.bookingPaymentId }, select: { proofAssetId: true, bookingId: true } });
       if (!payment) throw new AuthError("PAYMENT_REQUIRED", "This payment is unavailable.");
       await tx.bookingPayment.update({

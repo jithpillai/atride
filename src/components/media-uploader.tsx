@@ -50,7 +50,7 @@ export function MediaUploader({
   async function upload() {
     const files = Array.from(inputRef.current?.files ?? []);
     if (!files.length) return setError("Choose at least one image first.");
-    if (purpose === "PAYMENT_PROOF" && payerReference.trim().length < 6) return setError("Enter the UPI or bank transaction reference shown in your payment app.");
+    if (purpose === "PAYMENT_PROOF" && payerReference.trim().length < 6) return setError("Enter the UTR or UPI Transaction ID shown in your payment app.");
     if (files.some((file) => !new Set(["image/jpeg", "image/png", "image/webp"]).has(file.type))) return setError("Use only JPEG, PNG, or WebP images.");
     if (galleryPurpose && files.length > 12) return setError("Select no more than 12 images at once.");
     setBusyLabel(`Uploading ${files.length === 1 ? label.toLowerCase() : `${files.length} images`}…`);
@@ -111,7 +111,7 @@ export function MediaUploader({
       <p className="text-sm font-black text-white">{label}</p>
       <p className="mt-1 text-xs leading-5 text-zinc-500">{help}</p>
       {(currentAsset?.url || fallbackUrl) && <ImageWithFallback src={currentAsset?.url ?? fallbackUrl!} fallbackSrc={fallbackUrl ?? "/defaults/guild-avatar.png"} alt={currentAsset ? label : `Default ${label.toLowerCase()}`} width={640} height={360} className={`mt-4 rounded-2xl bg-white/[.035] object-contain ${previewClass}`} />}
-      {purpose === "PAYMENT_PROOF" && <label className="mt-4 block text-xs font-bold text-zinc-300">UPI / bank transaction reference<input value={payerReference} onChange={(event) => setPayerReference(event.target.value)} minLength={6} maxLength={80} placeholder="For example: 624518739201" className="field mt-2 py-2.5 text-sm" /></label>}
+      {purpose === "PAYMENT_PROOF" && <label className="mt-4 block text-xs font-bold text-zinc-300">UTR or UPI Transaction ID<input value={payerReference} onChange={(event) => setPayerReference(event.target.value)} minLength={6} maxLength={80} placeholder="For example: 624518739201" className="field mt-2 py-2.5 text-sm" /></label>}
       {!removeOnly && <input ref={inputRef} type="file" multiple={galleryPurpose} accept="image/jpeg,image/png,image/webp" onChange={previewSelection} className="mt-4 block w-full text-xs text-zinc-400 file:mr-3 file:rounded-full file:border-0 file:bg-white/10 file:px-4 file:py-2 file:font-bold file:text-white" />}
       {!!previews.length && <div className={`mt-4 grid gap-3 ${galleryPurpose ? "grid-cols-2 sm:grid-cols-3" : "grid-cols-1"}`}>{previews.map((preview) => <div key={preview.url}><Image src={preview.url} alt={`Selected preview: ${preview.name}`} width={320} height={240} unoptimized className={`${galleryPurpose ? "aspect-[4/3] w-full" : previewClass} rounded-2xl bg-white/[.035] object-contain`} /><p className="mt-1 truncate text-[10px] text-zinc-600">{preview.name}</p></div>)}</div>}
       <div className="mt-4 flex flex-wrap gap-2">
