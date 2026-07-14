@@ -5,7 +5,7 @@ import { redirect } from "next/navigation";
 
 import { db } from "@/lib/db";
 import { requireRideEditor, requireRideManager } from "@/server/auth/authorization";
-import { moneyToPaise, optionalDate, parseDayItems, parseItinerary, parseOrigins, parseSimpleItems, positiveInteger, requiredDate, validRideSlug } from "@/server/ride/validation";
+import { moneyToPaise, optionalDate, parseAccommodationOptions, parseDayItems, parseItinerary, parseOrigins, parseSimpleItems, positiveInteger, requiredDate, validRideSlug } from "@/server/ride/validation";
 import { DEFAULT_GUILD_RIDE_POLICIES } from "@/server/guild/default-ride-policies";
 import { generateAnnouncementText } from "@/server/ride/announcement";
 import { isRideStatusTransitionAllowed } from "@/server/ride/status";
@@ -31,6 +31,7 @@ function rideEditorErrorCode(error: unknown) {
   if (error.message.startsWith("Invalid origin capacity:")) return `origin-capacity-${error.message.split(":")[1]}`;
   if (error.message.startsWith("Invalid origin buffer:")) return `origin-buffer-${error.message.split(":")[1]}`;
   if (error.message.startsWith("Invalid package day:")) return `package-day-${error.message.split(":")[1]}`;
+  if (error.message.startsWith("Invalid accommodation option:")) return `room-option-${error.message.split(":")[1]}`;
   if (error.message.startsWith("Invalid integer:")) return `integer-${error.message.split(":")[1]}`;
   if (error.message === "capacity") return "capacity";
   if (error.message === "booked-capacity") return "booked-capacity";
@@ -111,7 +112,11 @@ export async function updateRidePackage(formData: FormData) {
   const guildSlug = value(formData, "guildSlug", 80);
   const rideId = value(formData, "rideId", 36);
   const { session } = await requireRideEditor(guildSlug, rideId);
-  const ride = await db.ride.findFirst({ where: { id: rideId, community: { slug: guildSlug } }, include: { origins: true, policies: { orderBy: { version: "desc" } } } });
+  const ride = await db.ride.findFirst({ where: { id: rideId, community: { slug: guildSlug } }, include: {
+    origins: true,
+    accommodations: { include: { options: true }, orderBy: { checkInAt: "asc" } },
+    policies: { orderBy: { version: "desc" } },
+  } });
   if (!ride) redirect("/account?access=denied");
   try {
     const title = value(formData, "title", 180);
@@ -146,6 +151,7 @@ export async function updateRidePackage(formData: FormData) {
     const checkOutAt = propertyName ? requiredDate(value(formData, "checkOutAt", 40)) : null;
     const roomSummary = value(formData, "roomSummary", 2000);
     const amenities = value(formData, "amenities", 1000).split(",").map((item) => item.trim()).filter(Boolean).slice(0, 30);
+    const accommodationOptions = propertyName ? parseAccommodationOptions(value(formData, "accommodationOptions", 8000)) : [];
     if (propertyName && (!locality || !checkInAt || !checkOutAt || checkOutAt <= checkInAt || roomSummary.length < 5)) throw new Error("stay");
 
     const policyInputs = [
@@ -167,7 +173,7 @@ export async function updateRidePackage(formData: FormData) {
       } });
       await Promise.all([
         tx.rideItineraryDay.deleteMany({ where: { rideId: ride.id } }),
-        tx.rideAccommodation.deleteMany({ where: { rideId: ride.id } }), tx.ridePackageItem.deleteMany({ where: { rideId: ride.id } }),
+        tx.ridePackageItem.deleteMany({ where: { rideId: ride.id } }),
       ]);
       const unusedOriginIds = new Set(ride.origins.map((origin) => origin.id));
       for (const origin of origins) {
@@ -181,7 +187,25 @@ export async function updateRidePackage(formData: FormData) {
       }
       if (unusedOriginIds.size) await tx.rideOrigin.deleteMany({ where: { id: { in: Array.from(unusedOriginIds) }, rideId: ride.id } });
       await tx.rideItineraryDay.createMany({ data: itineraryDays.map((day) => ({ ...day, rideId: ride.id })) });
-      if (propertyName && checkInAt && checkOutAt) await tx.rideAccommodation.create({ data: { rideId: ride.id, propertyName, locality, checkInAt, checkOutAt, roomSummary, amenities, participantNote: value(formData, "participantNote", 3000) || null, exactLocationRestricted: formData.get("exactLocationRestricted") === "on" } });
+      if (propertyName && checkInAt && checkOutAt) {
+        const accommodationData = { propertyName, locality, checkInAt, checkOutAt, roomSummary, amenities, participantNote: value(formData, "participantNote", 3000) || null, exactLocationRestricted: formData.get("exactLocationRestricted") === "on" };
+        const existingAccommodation = ride.accommodations[0];
+        const accommodation = existingAccommodation
+          ? await tx.rideAccommodation.update({ where: { id: existingAccommodation.id }, data: accommodationData })
+          : await tx.rideAccommodation.create({ data: { ...accommodationData, rideId: ride.id } });
+
+        await tx.rideAccommodationOption.updateMany({ where: { accommodationId: accommodation.id }, data: { active: false } });
+        for (const option of accommodationOptions) {
+          const existingOption = existingAccommodation?.options.find((candidate) => candidate.name.toLocaleLowerCase("en-IN") === option.name.toLocaleLowerCase("en-IN"));
+          if (existingOption) {
+            await tx.rideAccommodationOption.update({ where: { id: existingOption.id }, data: { ...option, active: true } });
+          } else {
+            await tx.rideAccommodationOption.create({ data: { ...option, accommodationId: accommodation.id, active: true } });
+          }
+        }
+      } else if (ride.accommodations.length) {
+        await tx.rideAccommodation.deleteMany({ where: { rideId: ride.id } });
+      }
       const packageData = [
         ...inclusions.map((item) => ({ ...item, rideId: ride.id, type: "INCLUSION" as const })),
         ...exclusions.map((item) => ({ ...item, rideId: ride.id, type: "EXCLUSION" as const })),

@@ -24,6 +24,7 @@ function indiaLocal(date: Date | null) {
 function indiaDate(date: Date) { return indiaLocal(date).slice(0, 10); }
 function packageRows(items: Array<{ title: string; description: string | null }>) { return items.map((item) => [item.title, item.description].filter(Boolean).join(" | ")).join("\n"); }
 function dayRows(items: Array<{ dayNumber: number | null; title: string; description: string | null }>) { return items.map((item) => [item.dayNumber, item.title, item.description].filter((value) => value !== null && value !== "").join(" | ")).join("\n"); }
+function roomOptionRows(items: Array<{ name: string; pricingMode: string; pricePaise: number; maxOccupancy: number; availableRooms: number | null; description: string | null; active: boolean }>) { return items.filter((item) => item.active).map((item) => [item.name, item.pricingMode, item.pricePaise / 100, item.maxOccupancy, item.availableRooms ?? "", item.description ?? ""].join(" | ")).join("\n"); }
 
 export default async function EditRidePage({ params, searchParams }: Props) {
   const { slug, rideId } = await params;
@@ -31,7 +32,7 @@ export default async function EditRidePage({ params, searchParams }: Props) {
   const [ride, state] = await Promise.all([
     db.ride.findFirst({ where: { id: rideId, community: { slug } }, include: {
       origins: { orderBy: { sortOrder: "asc" } }, itineraryDays: { orderBy: { sortOrder: "asc" } },
-      accommodations: { orderBy: { checkInAt: "asc" } }, packageItems: { orderBy: [{ type: "asc" }, { sortOrder: "asc" }] },
+      accommodations: { orderBy: { checkInAt: "asc" }, include: { options: { orderBy: { sortOrder: "asc" } } } }, packageItems: { orderBy: [{ type: "asc" }, { sortOrder: "asc" }] },
       policies: { orderBy: { version: "desc" } }, staffAssignments: { include: { user: { select: { displayName: true } }, origin: { select: { city: true, meetingPoint: true } } }, orderBy: { role: "asc" } },
       coverAsset: true, mediaAssets: { where: { purpose: "RIDE_GALLERY" }, orderBy: [{ sortOrder: "asc" }, { createdAt: "asc" }] },
       announcements: { orderBy: { createdAt: "desc" }, take: 1 },
@@ -45,9 +46,12 @@ export default async function EditRidePage({ params, searchParams }: Props) {
   const originCapacityRow = state.error?.startsWith("origin-capacity-") ? state.error.slice("origin-capacity-".length) : null;
   const originBufferRow = state.error?.startsWith("origin-buffer-") ? state.error.slice("origin-buffer-".length) : null;
   const packageDayRow = state.error?.startsWith("package-day-") ? state.error.slice("package-day-".length) : null;
+  const roomOptionRow = state.error?.startsWith("room-option-") ? state.error.slice("room-option-".length) : null;
   const integerField = state.error?.startsWith("integer-") ? state.error.slice("integer-".length) : null;
   const integerLabels: Record<string, string> = { totalSlots: "Total slots", bufferSlots: "Buffer slots", distanceKm: "Distance" };
-  const errorMessage = originCapacityRow
+  const errorMessage = roomOptionRow
+    ? `Accommodation option row ${roomOptionRow} is invalid. Use: Name | INCLUDED, PER_PERSON, or PER_ROOM | price | maximum people per room | optional available rooms | description.`
+    : originCapacityRow
     ? `Starting-group row ${originCapacityRow} has an invalid capacity. Enter a whole number of at least 1, or leave the optional column blank.`
     : originBufferRow
       ? `Starting-group row ${originBufferRow} has an invalid buffer. Enter a whole number of 0 or more, or leave the optional column blank.`
@@ -118,6 +122,7 @@ export default async function EditRidePage({ params, searchParams }: Props) {
         <label className="text-sm font-semibold">Check-in<input type="datetime-local" name="checkInAt" defaultValue={indiaLocal(stay?.checkInAt ?? null)} className="field" /></label><label className="text-sm font-semibold">Check-out<input type="datetime-local" name="checkOutAt" defaultValue={indiaLocal(stay?.checkOutAt ?? null)} className="field" /></label>
         <label className="text-sm font-semibold sm:col-span-2">Room/occupancy summary<textarea rows={3} name="roomSummary" defaultValue={stay?.roomSummary ?? ""} className="field" /></label><label className="text-sm font-semibold sm:col-span-2">Amenities<input name="amenities" defaultValue={stay?.amenities.join(", ") ?? ""} placeholder="Campfire, parking, hot water, Wi-Fi" className="field" /></label>
         <label className="text-sm font-semibold sm:col-span-2">Participant instructions<textarea rows={3} name="participantNote" defaultValue={stay?.participantNote ?? ""} className="field" /></label><label className="flex items-center gap-3 text-sm font-semibold"><input type="checkbox" name="exactLocationRestricted" defaultChecked={stay?.exactLocationRestricted ?? true} className="size-5 accent-orange-500" />Hide exact stay details until confirmation</label>
+        <label className="text-sm font-semibold sm:col-span-2">Room choices and pricing<span className="mt-2 block text-xs font-normal leading-6 text-zinc-500">One per line: Name | INCLUDED, PER_PERSON, or PER_ROOM | price in ₹ | maximum people per room | optional available rooms | description</span><span className={exampleBox}>Examples:{"\n"}Shared room | INCLUDED | 0 | 4 | 8 | Shared four-person room included in the ride fee{"\n"}Couple room | PER_ROOM | 1800 | 2 | 4 | Private double-occupancy room surcharge{"\n"}No accommodation | INCLUDED | 0 | 6 |  | Participant arranges their own stay</span><textarea rows={6} name="accommodationOptions" defaultValue={roomOptionRows(stay?.options ?? [])} className="field mt-3 font-mono text-xs" /></label>
       </div></div>
 
       <RideAiAssistant guildSlug={slug} rideId={ride.id} enabled={process.env.AI_ASSIST_ENABLED === "true" && Boolean(process.env.GEMINI_API_KEY)} />

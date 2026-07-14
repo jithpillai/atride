@@ -339,7 +339,7 @@ Commercial policies can define:
 - Confirmation deposit, remaining balance, and due dates
 - Refundability by payment stage or date
 - Cancellation and no-show handling
-- Participant-requested replacement or transfer workflow
+- Admin-controlled cancellation and replacement; participants contact the Guild instead of transferring a booking themselves
 - Organizer cancellation/postponement handling
 - Whether a confirmed price includes taxes and add-ons
 
@@ -477,9 +477,11 @@ WAITLISTED
 CANCELLED
 EXPIRED
 PAYMENT_REJECTED
-TRANSFER_PENDING
-TRANSFERRED
 ```
+
+The signed-in booking lead may include named pillion/passenger companions without creating separate platform accounts for them. Every party member consumes a ride slot. Ride fees, confirmation deposits, and selected per-person add-ons scale by party size. Accommodation may be included, charged per person, or charged per room; per-room quantities round up by maximum occupancy and respect configured room inventory. The booking stores immutable participant and accommodation snapshots.
+
+Participant self-transfer is intentionally unsupported. When a replacement is necessary, authorized Guild staff cancel the original record and create or approve a new booking so capacity, payment evidence, consent, and audit history remain explicit.
 
 Payment progress is modelled independently rather than duplicated in the booking status. A booking payment uses `PENDING`, `SUBMITTED`, `CONFIRMED`, or `REJECTED`, and identifies whether it is a confirmation deposit, balance, full payment, or another obligation. A future completed-ride lifecycle may add `COMPLETED` after verified participation.
 

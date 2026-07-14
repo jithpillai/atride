@@ -13,9 +13,17 @@ type AnnouncementRide = {
 };
 
 function date(date: Date) { return new Intl.DateTimeFormat("en-IN", { dateStyle: "medium", timeZone: "Asia/Kolkata" }).format(date); }
+function dateRange(startsAt: Date, endsAt: Date) {
+  const start = date(startsAt);
+  const end = date(endsAt);
+  return start === end ? start : `${start} to ${end}`;
+}
 function time(dateValue: Date) { return new Intl.DateTimeFormat("en-IN", { dateStyle: "medium", timeStyle: "short", timeZone: "Asia/Kolkata" }).format(dateValue); }
 function money(paise: number) { return `₹${(paise / 100).toLocaleString("en-IN")}`; }
 function itemLine(item: { dayNumber: number | null; title: string; description: string | null }) { return `- ${item.dayNumber ? `Day ${item.dayNumber}: ` : ""}${item.title}${item.description ? ` — ${item.description}` : ""}`; }
+function vehicleIcon(vehicleType: string) {
+  return ({ BIKE: "🏍️", CAR: "🚗", SUV: "🚙", JEEP: "🚙", OTHER: "🚗" } as Record<string, string>)[vehicleType] ?? "🏍️";
+}
 
 export function generateAnnouncementText(ride: AnnouncementRide, appUrl = "https://atride.in") {
   const byType = (type: string) => ride.packageItems.filter((item) => item.type === type);
@@ -26,9 +34,9 @@ export function generateAnnouncementText(ride: AnnouncementRide, appUrl = "https
     `🏍️ *${ride.community.name} — ${ride.title}*`,
     ride.summary,
     `📍 *Destination:* ${ride.destination}`,
-    `📅 *Dates:* ${date(ride.startsAt)} to ${date(ride.endsAt)}`,
+    `📅 *Dates:* ${dateRange(ride.startsAt, ride.endsAt)}`,
     `🛣️ *Distance:* ${ride.distanceKm.toLocaleString("en-IN")} km`,
-    `🚘 *Vehicle:* ${ride.vehicleType.replaceAll("_", " ")}`,
+    `${vehicleIcon(ride.vehicleType)} *Vehicle:* ${ride.vehicleType.replaceAll("_", " ")}`,
     `💰 *Ride fee:* ${money(ride.pricePaise)} per person${ride.confirmationDepositPaise ? `\n*Confirmation amount:* ${money(ride.confirmationDepositPaise)}` : ""}`,
     `🎟️ *Availability:* ${available > 0 ? `${available} slot${available === 1 ? "" : "s"} currently available` : "Slots closed"}`,
     `*Starting groups*\n${ride.origins.map((origin) => `- ${origin.city}: ${origin.meetingPoint}, ${time(origin.departureAt)}${origin.mergePoint ? `; merges at ${origin.mergePoint}` : ""}${origin.routeSummary ? `\n  Route: ${origin.routeSummary}` : ""}`).join("\n")}`,

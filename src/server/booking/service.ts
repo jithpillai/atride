@@ -3,8 +3,11 @@ import "server-only";
 import { Prisma } from "@/generated/prisma/client";
 import { db } from "@/lib/db";
 import { AuthError } from "@/server/auth/auth-service";
+import { processExpiredReservations } from "./expiry-service";
+import { accommodationCharge, partyBookingPrice } from "./party-pricing";
+import { buildPaymentObligations } from "./payment-obligations";
 import { buildBookingSnapshot } from "./snapshot";
-import { RESERVATION_TRANSACTION_OPTIONS, reservationExpiry, type BookingVehicleMode, type OccupantRole, type OfflinePaymentMethod } from "./validation";
+import { RESERVATION_TRANSACTION_OPTIONS, reservationExpiry, type BookingVehicleMode, type CompanionRole, type OccupantRole, type OfflinePaymentMethod } from "./validation";
 
 const CAPACITY_HOLDING_STATUSES = ["RESERVED", "CONFIRMED", "TRANSFER_PENDING"] as const;
 
@@ -18,6 +21,15 @@ export type ReserveRideInput = {
   occupantRole: OccupantRole;
   dietaryPreference: string | null;
   accessibilityNotes: string | null;
+  companions: Array<{
+    displayName: string;
+    role: CompanionRole;
+    dietaryPreference: string | null;
+    accessibilityNotes: string | null;
+    emergencyContactName: string;
+    emergencyContactPhone: string;
+  }>;
+  accommodationOptionIds: string[];
   addOnIds: string[];
   paymentMethod: OfflinePaymentMethod;
   joinWaitlistWhenFull: boolean;
@@ -28,12 +40,13 @@ const bookingRideInclude = {
   community: { select: { id: true, slug: true, name: true, paymentSettings: true } },
   origins: { orderBy: { sortOrder: "asc" as const } },
   itineraryDays: { orderBy: { sortOrder: "asc" as const } },
-  accommodations: { orderBy: { checkInAt: "asc" as const } },
+  accommodations: { orderBy: { checkInAt: "asc" as const }, include: { options: { where: { active: true }, orderBy: { sortOrder: "asc" as const } } } },
   packageItems: { orderBy: [{ type: "asc" as const }, { sortOrder: "asc" as const }] },
   policies: { orderBy: [{ type: "asc" as const }, { version: "desc" as const }] },
 } satisfies Prisma.RideInclude;
 
 export async function reserveRide(input: ReserveRideInput) {
+  await processExpiredReservations({ rideId: input.rideId });
   const now = new Date();
   return db.$transaction(async (tx) => {
     await tx.$queryRaw`SELECT "id" FROM "rides" WHERE "id" = ${input.rideId}::uuid FOR UPDATE`;
@@ -43,7 +56,7 @@ export async function reserveRide(input: ReserveRideInput) {
       throw new AuthError("REGISTRATION_CLOSED", "Registration for this ride has closed.", 409);
     }
 
-    const profile = await tx.participantProfile.findUnique({ where: { userId: input.userId } });
+    const profile = await tx.participantProfile.findUnique({ where: { userId: input.userId }, include: { user: { select: { displayName: true } } } });
     if (!profile?.onboardingCompletedAt) throw new AuthError("PROFILE_REQUIRED", "Complete your participant profile before reserving.", 409);
     const origin = ride.origins.find((candidate) => candidate.id === input.originId);
     if (!origin) throw new AuthError("INVALID_ORIGIN", "Choose a valid starting group.");
@@ -86,17 +99,32 @@ export async function reserveRide(input: ReserveRideInput) {
       vehicleSnapshot = { source: "PRIVATE_VEHICLE", type: ride.vehicleType, detailsShared: false };
     }
 
+    const partySize = 1 + input.companions.length;
     const selectedAddOns = ride.packageItems.filter((item) => item.type === "ADD_ON" && input.addOnIds.includes(item.id));
     if (selectedAddOns.length !== new Set(input.addOnIds).size) throw new AuthError("INVALID_ADD_ON", "One of the selected add-ons is unavailable.");
-    const addOnTotalPaise = selectedAddOns.reduce((total, item) => total + (item.pricePaise ?? 0), 0);
-    const totalPricePaise = ride.pricePaise + addOnTotalPaise;
-    const depositPaise = Math.min(ride.confirmationDepositPaise || totalPricePaise, totalPricePaise);
-    const balanceDuePaise = totalPricePaise - depositPaise;
-
-    const expired = await tx.rideBooking.updateMany({
-      where: { rideId: ride.id, status: "RESERVED", reservationExpiresAt: { lte: now } },
-      data: { status: "EXPIRED" },
+    const accommodationOptions = ride.accommodations.map((stay) => {
+      if (!stay.options.length) return null;
+      const option = stay.options.find((candidate) => input.accommodationOptionIds.includes(candidate.id));
+      if (!option) throw new AuthError("ACCOMMODATION_REQUIRED", `Choose an accommodation option for ${stay.locality}.`);
+      const { units, totalPricePaise } = accommodationCharge(option, partySize);
+      return { stay, option, units, totalPricePaise };
+    }).filter((selection): selection is NonNullable<typeof selection> => Boolean(selection));
+    if (new Set(input.accommodationOptionIds).size !== accommodationOptions.length) throw new AuthError("INVALID_ACCOMMODATION", "One of the selected accommodation options is unavailable.");
+    const accommodationTotalPaise = accommodationOptions.reduce((total, selection) => total + selection.totalPricePaise, 0);
+    const {
+      basePricePaise,
+      addOnTotalPaise,
+      totalPricePaise,
+      confirmationDepositPaise: depositPaise,
+      balanceDuePaise,
+    } = partyBookingPrice({
+      partySize,
+      ridePricePaise: ride.pricePaise,
+      confirmationDepositPaise: ride.confirmationDepositPaise,
+      addOnUnitPricesPaise: selectedAddOns.map((item) => item.pricePaise ?? 0),
+      accommodationTotalPaise,
     });
+
     const occupied = await tx.rideBooking.aggregate({
       where: { rideId: ride.id, status: { in: [...CAPACITY_HOLDING_STATUSES] } },
       _sum: { seatCount: true },
@@ -110,8 +138,25 @@ export async function reserveRide(input: ReserveRideInput) {
 
     const existingHeldSeat = existing && CAPACITY_HOLDING_STATUSES.includes(existing.status as typeof CAPACITY_HOLDING_STATUSES[number]) ? existing.seatCount : 0;
     const effectiveOccupied = occupiedSeats - existingHeldSeat;
-    const hasCapacity = effectiveOccupied < ride.totalSlots + ride.bufferSlots;
+    const hasCapacity = effectiveOccupied + partySize <= ride.totalSlots + ride.bufferSlots;
     if (!hasCapacity && !input.joinWaitlistWhenFull) throw new AuthError("RIDE_FULL", "This ride is full. Join the waitlist instead.", 409);
+
+    if (hasCapacity) {
+      for (const selection of accommodationOptions) {
+        if (selection.option.availableRooms === null) continue;
+        const used = await tx.bookingAccommodationSelection.aggregate({
+          where: {
+            optionId: selection.option.id,
+            bookingId: existing ? { not: existing.id } : undefined,
+            booking: { status: { in: [...CAPACITY_HOLDING_STATUSES] } },
+          },
+          _sum: { units: true },
+        });
+        if ((used._sum.units ?? 0) + selection.units > selection.option.availableRooms) {
+          throw new AuthError("ACCOMMODATION_FULL", `${selection.option.name} at ${selection.stay.locality} no longer has enough rooms for this party.`, 409);
+        }
+      }
+    }
 
     const status = hasCapacity ? "RESERVED" as const : "WAITLISTED" as const;
     const expiresAt = hasCapacity ? reservationExpiry(now, ride.registrationClosesAt) : null;
@@ -133,12 +178,15 @@ export async function reserveRide(input: ReserveRideInput) {
       vehicleId,
       vehicleMode: input.vehicleMode,
       vehicleSnapshot,
+      paymentMethodPreference: input.paymentMethod,
       status,
       occupantRole: input.occupantRole,
       dietaryPreference: input.dietaryPreference,
       accessibilityNotes: input.accessibilityNotes,
-      basePricePaise: ride.pricePaise,
+      seatCount: partySize,
+      basePricePaise,
       addOnTotalPaise,
+      accommodationTotalPaise,
       totalPricePaise,
       confirmationDepositPaise: depositPaise,
       balanceDuePaise,
@@ -161,46 +209,57 @@ export async function reserveRide(input: ReserveRideInput) {
         packageItemId: item.id,
         titleSnapshot: item.title,
         descriptionSnapshot: item.description,
-        pricePaise: item.pricePaise ?? 0,
+        pricePaise: (item.pricePaise ?? 0) * partySize,
       })) });
     }
+    await tx.bookingParticipant.deleteMany({ where: { bookingId: booking.id } });
+    await tx.bookingParticipant.createMany({ data: [
+      {
+        bookingId: booking.id,
+        linkedUserId: input.userId,
+        displayName: profile.user.displayName,
+        role: input.occupantRole,
+        dietaryPreference: input.dietaryPreference,
+        accessibilityNotes: input.accessibilityNotes,
+        emergencyContactName: profile.emergencyContactName,
+        emergencyContactPhone: profile.emergencyContactPhone,
+        isBookingLead: true,
+        sortOrder: 0,
+      },
+      ...input.companions.map((companion, index) => ({ bookingId: booking.id, linkedUserId: null, isBookingLead: false, sortOrder: index + 1, ...companion })),
+    ] });
+    await tx.bookingAccommodationSelection.deleteMany({ where: { bookingId: booking.id } });
+    if (accommodationOptions.length) await tx.bookingAccommodationSelection.createMany({ data: accommodationOptions.map(({ stay, option, units, totalPricePaise: selectionTotal }) => ({
+      bookingId: booking.id,
+      accommodationId: stay.id,
+      optionId: option.id,
+      accommodationName: stay.propertyName,
+      optionName: option.name,
+      pricingModeSnapshot: option.pricingMode,
+      unitPricePaise: option.pricePaise,
+      units,
+      guestCount: partySize,
+      totalPricePaise: selectionTotal,
+    })) });
     await tx.bookingPayment.deleteMany({ where: { bookingId: booking.id, status: { in: ["PENDING", "REJECTED"] } } });
     if (hasCapacity) {
-      const payments = ride.confirmationDepositPaise > 0
-        ? [
-            {
-              bookingId: booking.id,
-              purpose: "CONFIRMATION_DEPOSIT" as const,
-              method: input.paymentMethod,
-              amountPaise: depositPaise,
-              dueAt: expiresAt,
-              ...(input.paymentMethod === "UPI" ? upiRecipient! : {}),
-            },
-            ...(balanceDuePaise > 0 ? [{
-              bookingId: booking.id,
-              purpose: "BALANCE" as const,
-              method: input.paymentMethod,
-              amountPaise: balanceDuePaise,
-              dueAt: ride.balanceDueAt ?? ride.registrationClosesAt ?? ride.startsAt,
-              ...(input.paymentMethod === "UPI" ? upiRecipient! : {}),
-            }] : []),
-          ]
-        : [{
-            bookingId: booking.id,
-            purpose: "FULL_PAYMENT" as const,
-            method: input.paymentMethod,
-            amountPaise: totalPricePaise,
-            dueAt: expiresAt,
-            ...(input.paymentMethod === "UPI" ? upiRecipient! : {}),
-          }];
-      await tx.bookingPayment.createMany({ data: payments });
+      await tx.bookingPayment.createMany({ data: buildPaymentObligations({
+        bookingId: booking.id,
+        method: input.paymentMethod,
+        totalPricePaise,
+        confirmationDepositPaise: depositPaise,
+        balanceDuePaise,
+        reservationExpiresAt: expiresAt,
+        balanceDueAt: ride.balanceDueAt ?? ride.registrationClosesAt ?? ride.startsAt,
+        upiRecipient,
+      }) });
     }
-    await tx.ride.update({ where: { id: ride.id }, data: { bookedSlots: hasCapacity ? effectiveOccupied + 1 : effectiveOccupied } });
+    await tx.ride.update({ where: { id: ride.id }, data: { bookedSlots: hasCapacity ? effectiveOccupied + partySize : effectiveOccupied } });
     await tx.communityAuditEvent.create({ data: {
       communityId: ride.communityId,
       actorUserId: input.userId,
       action: hasCapacity ? "BOOKING_RESERVED" : "BOOKING_WAITLISTED",
-      metadata: { rideId: ride.id, bookingId: booking.id, originId: origin.id, expiredReservationsReleased: expired.count },
+      metadata: { rideId: ride.id, bookingId: booking.id, originId: origin.id, partySize, accommodationTotalPaise },
     } });
     return { booking, outcome: hasCapacity ? "RESERVED" as const : "WAITLISTED" as const };
   }, RESERVATION_TRANSACTION_OPTIONS);
@@ -209,6 +268,6 @@ export async function reserveRide(input: ReserveRideInput) {
 export async function findUserBookingForRide(userId: string, rideId: string) {
   return db.rideBooking.findUnique({
     where: { rideId_userId: { rideId, userId } },
-    include: { origin: true, addOns: true, payments: { orderBy: { createdAt: "asc" } } },
+    include: { origin: true, addOns: true, participants: { orderBy: { sortOrder: "asc" } }, accommodationSelections: { orderBy: { createdAt: "asc" } }, payments: { orderBy: { createdAt: "asc" } } },
   });
 }

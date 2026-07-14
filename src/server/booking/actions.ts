@@ -6,7 +6,7 @@ import { redirect } from "next/navigation";
 import { AuthError } from "@/server/auth/auth-service";
 import { requireSession } from "@/server/auth/authorization";
 import { reserveRide } from "./service";
-import { cleanBookingText, isBookingVehicleMode, isOccupantRole, isOfflinePaymentMethod } from "./validation";
+import { cleanBookingText, isBookingVehicleMode, isCompanionRole, isOccupantRole, isOfflinePaymentMethod, isOperationalPhone } from "./validation";
 
 export type ReserveRideState = { error?: string };
 
@@ -20,6 +20,26 @@ export async function reserveRideAction(_state: ReserveRideState, formData: Form
   if (!isOccupantRole(occupantRole) || !isOfflinePaymentMethod(paymentMethod) || !isBookingVehicleMode(vehicleMode)) return { error: "Choose valid participant, vehicle, and payment options." };
   if (formData.get("waiverAccepted") !== "on" || formData.get("commercialTermsAccepted") !== "on") {
     return { error: "Accept the waiver, ride rules, and commercial policies before continuing." };
+  }
+  const companionNames = formData.getAll("companionName").map((item) => cleanBookingText(item, 120));
+  const companionRoles = formData.getAll("companionRole").map((item) => cleanBookingText(item, 20));
+  const companionDiets = formData.getAll("companionDietaryPreference").map((item) => cleanBookingText(item, 120));
+  const companionNotes = formData.getAll("companionAccessibilityNotes").map((item) => cleanBookingText(item, 1000));
+  const companionEmergencyNames = formData.getAll("companionEmergencyName").map((item) => cleanBookingText(item, 120));
+  const companionEmergencyPhones = formData.getAll("companionEmergencyPhone").map((item) => cleanBookingText(item, 32));
+  if (companionNames.length > 5 || [companionRoles, companionDiets, companionNotes, companionEmergencyNames, companionEmergencyPhones].some((items) => items.length !== companionNames.length)) {
+    return { error: "A booking can contain the lead participant and up to five accompanying people." };
+  }
+  const companions = companionNames.map((displayName, index) => ({
+    displayName,
+    role: companionRoles[index],
+    dietaryPreference: companionDiets[index] || null,
+    accessibilityNotes: companionNotes[index] || null,
+    emergencyContactName: companionEmergencyNames[index],
+    emergencyContactPhone: companionEmergencyPhones[index].replace(/[\s()-]/g, ""),
+  }));
+  if (companions.some((companion) => companion.displayName.length < 2 || !isCompanionRole(companion.role) || companion.emergencyContactName.length < 2 || !isOperationalPhone(companion.emergencyContactPhone))) {
+    return { error: "Complete each companion’s name, role, and valid emergency contact details." };
   }
   try {
     const result = await reserveRide({
@@ -36,6 +56,8 @@ export async function reserveRideAction(_state: ReserveRideState, formData: Form
       occupantRole,
       dietaryPreference: cleanBookingText(formData.get("dietaryPreference"), 120) || null,
       accessibilityNotes: cleanBookingText(formData.get("accessibilityNotes"), 2000) || null,
+      companions: companions.map((companion) => ({ ...companion, role: companion.role as "PILLION" | "PASSENGER" | "OTHER" })),
+      accommodationOptionIds: formData.getAll("accommodationOptionIds").map((item) => cleanBookingText(item, 36)).filter(Boolean),
       addOnIds: formData.getAll("addOnIds").map((item) => cleanBookingText(item, 36)).filter(Boolean),
       paymentMethod,
       joinWaitlistWhenFull: formData.get("joinWaitlistWhenFull") === "on",
