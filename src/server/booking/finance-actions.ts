@@ -86,6 +86,7 @@ export async function reviewBookingPayment(formData: FormData) {
     });
   }
   revalidatePath(`/guilds/${guildSlug}/manage`);
+  revalidatePath(`/guilds/${guildSlug}`);
   if (rideSlug) revalidatePath(`/rides/${rideSlug}`);
   revalidatePath("/");
   redirect(`/guilds/${guildSlug}/manage?section=finance&paymentSaved=${decision.toLowerCase()}`);

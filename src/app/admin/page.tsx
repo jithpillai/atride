@@ -3,10 +3,11 @@ import Link from "next/link";
 import { FormPendingSubmit } from "@/components/pending-feedback";
 import { db } from "@/lib/db";
 import { requirePlatformAdmin } from "@/server/auth/authorization";
+import { runReservationExpiry } from "@/server/booking/expiry-actions";
 import { createGuild, setGuildStatus } from "@/server/guild/actions";
 import { DEFAULT_GUILD_RIDE_POLICIES } from "@/server/guild/default-ride-policies";
 
-type Props = { searchParams: Promise<{ guildCreated?: string; guildError?: string }> };
+type Props = { searchParams: Promise<{ guildCreated?: string; guildError?: string; expiryProcessed?: string; waitlistPromoted?: string }> };
 
 export const metadata = { title: "Platform administration", robots: { index: false, follow: false } };
 
@@ -48,6 +49,7 @@ export default async function PlatformAdminPage({ searchParams }: Props) {
         ))}
       </div>
       {state.guildCreated === "1" && <p className="mt-6 rounded-2xl border border-emerald-400/20 bg-emerald-400/10 px-4 py-3 text-sm font-semibold text-emerald-300">Guild created in draft state and its first Owner assigned.</p>}
+      {state.expiryProcessed !== undefined && <p className="mt-6 rounded-2xl border border-emerald-400/20 bg-emerald-400/10 px-4 py-3 text-sm font-semibold text-emerald-300">Reservation processing completed: {state.expiryProcessed} expired seat(s) released and {state.waitlistPromoted ?? "0"} waitlisted seat(s) promoted.</p>}
       {state.guildError && <p role="alert" className="mt-6 rounded-2xl border border-red-400/20 bg-red-400/10 px-4 py-3 text-sm font-semibold text-red-300">{state.guildError === "owner" ? "The Owner must already have an active AtRide account with a verified email." : state.guildError === "duplicate" ? "That Guild slug is already in use." : "Check the Guild details and try again."}</p>}
 
       <form action={createGuild} className="relative mt-10 overflow-hidden rounded-3xl border border-white/10 bg-white/[.025] p-7">
@@ -81,6 +83,12 @@ export default async function PlatformAdminPage({ searchParams }: Props) {
           ))}
         </div>
       </div>
+      <form action={runReservationExpiry} className="relative mt-10 rounded-3xl border border-white/10 bg-white/[.025] p-7">
+        <p className="eyebrow">Booking maintenance</p>
+        <h2 className="mt-3 text-2xl font-black">Process expired reservation holds</h2>
+        <p className="mt-2 max-w-3xl text-sm leading-6 text-zinc-500">Releases unpaid holds, protects submitted payment proofs, promotes the oldest eligible waitlisted riders, and sends the resulting participant emails. This action is safe to run more than once.</p>
+        <FormPendingSubmit idleLabel="Run reservation processing" pendingLabel="Processing…" overlayLabel="Releasing holds and promoting waitlisted riders…" className="mt-6 rounded-full bg-orange-500 px-6 py-3 text-sm font-black text-white" />
+      </form>
       <Link href="/account" className="mt-8 inline-flex rounded-full border border-white/15 px-5 py-2.5 text-sm font-bold">Back to account</Link>
     </section>
   );

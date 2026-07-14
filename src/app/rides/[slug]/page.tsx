@@ -29,8 +29,9 @@ export default async function RidePage({ params, searchParams }: Props) {
   if (!ride) notFound();
   const session = await getCurrentSession();
   const booking = session ? await findUserBookingForRide(session.userId, ride.id) : null;
+  const activeBooking = booking && !["EXPIRED", "CANCELLED", "TRANSFERRED"].includes(booking.status) ? booking : null;
   const bookingNotice = (await searchParams).booking;
-  const paymentSummary = booking ? summarizeBookingPayments(booking) : null;
+  const paymentSummary = activeBooking ? summarizeBookingPayments(activeBooking) : null;
   const membership = session?.user.communityMemberships.find(
     ({ community }) => community.slug === ride.community.slug,
   );
@@ -72,19 +73,20 @@ export default async function RidePage({ params, searchParams }: Props) {
       <div className="mt-6 grid gap-3 border-y border-white/8 py-5 text-sm"><p className="flex justify-between"><span className="text-zinc-500">Starts</span><span className="font-bold">{formatRideDate(ride.startsAt.toISOString())}</span></p><p className="flex justify-between"><span className="text-zinc-500">Distance</span><span className="font-bold">{ride.distanceKm} km</span></p><p className="flex justify-between"><span className="text-zinc-500">Vehicle</span><span className="font-bold">{ride.vehicleType}</span></p><p className="flex justify-between"><span className="text-zinc-500">Difficulty</span><span className="font-bold">{ride.difficulty}</span></p></div>
       <p className={`mt-5 text-sm font-bold ${soldOut ? "text-amber-400" : "text-emerald-400"}`}>{soldOut ? "Ride capacity reached" : `${slotsLeft} of ${ride.totalSlots + ride.bufferSlots} slots available`}</p>
       {bookingNotice && <p className="mt-4 rounded-2xl border border-emerald-400/20 bg-emerald-400/[.06] p-4 text-sm font-bold text-emerald-300">{bookingNotice === "waitlisted" ? "You joined the waitlist." : bookingNotice === "already_confirmed" ? "Your booking is already confirmed." : "Your ride reservation is saved."}</p>}
-      {booking ? <div className="mt-5 rounded-2xl border border-white/10 bg-black/20 p-5">
+      {booking?.status === "EXPIRED" && <p className="mt-5 rounded-2xl border border-amber-400/20 bg-amber-400/[.05] p-4 text-sm leading-6 text-amber-200">Your earlier payment hold expired and its seat was released. You may reserve again below; current capacity and waitlist rules apply.</p>}
+      {activeBooking ? <div className="mt-5 rounded-2xl border border-white/10 bg-black/20 p-5">
         <p className="text-xs font-bold uppercase tracking-widest text-orange-300">Your booking</p>
-        <p className="mt-2 text-xl font-black">{booking.status.replaceAll("_", " ")}</p>
-        <p className="mt-2 text-sm text-zinc-400">Starting with {booking.origin?.city ?? "the selected group"} · {booking.occupantRole.toLowerCase()}</p>
-        <p className={`mt-2 text-xs font-bold ${booking.vehicleMode === "PRIVATE_VEHICLE" ? "text-emerald-300" : "text-zinc-500"}`}>{booking.vehicleMode === "SAVED_VEHICLE" ? `Saved ${ride.vehicleType.toLowerCase()} selected` : booking.vehicleMode === "RIDE_ONLY_DETAILS" ? `${ride.vehicleType} details shared for this ride only` : booking.vehicleMode === "PRIVATE_VEHICLE" ? `Own ${ride.vehicleType.toLowerCase()} · details kept private` : "No vehicle attached to this booking"}</p>
-        {booking.status === "RESERVED" && booking.reservationExpiresAt && <p className="mt-3 text-xs leading-5 text-amber-300">Slot held until {when(booking.reservationExpiresAt)} while the Guild reviews your confirmation payment.</p>}
-        {booking.status === "WAITLISTED" && <p className="mt-3 text-xs leading-5 text-zinc-500">No slot or payment is reserved. The Guild can contact you if capacity opens.</p>}
-        {booking.status === "CONFIRMED" && <p className="mt-3 text-xs leading-5 text-emerald-300">Your place is confirmed{paymentSummary?.fullyPaid ? " and the booking is fully paid." : ". Any remaining balance is tracked separately below."}</p>}
-        {booking.status !== "WAITLISTED" && paymentSummary && <div className="mt-5 border-t border-white/10 pt-5">
+        <p className="mt-2 text-xl font-black">{activeBooking.status.replaceAll("_", " ")}</p>
+        <p className="mt-2 text-sm text-zinc-400">Starting with {activeBooking.origin?.city ?? "the selected group"} · {activeBooking.occupantRole.toLowerCase()}</p>
+        <p className={`mt-2 text-xs font-bold ${activeBooking.vehicleMode === "PRIVATE_VEHICLE" ? "text-emerald-300" : "text-zinc-500"}`}>{activeBooking.vehicleMode === "SAVED_VEHICLE" ? `Saved ${ride.vehicleType.toLowerCase()} selected` : activeBooking.vehicleMode === "RIDE_ONLY_DETAILS" ? `${ride.vehicleType} details shared for this ride only` : activeBooking.vehicleMode === "PRIVATE_VEHICLE" ? `Own ${ride.vehicleType.toLowerCase()} · details kept private` : "No vehicle attached to this booking"}</p>
+        {activeBooking.status === "RESERVED" && activeBooking.reservationExpiresAt && <p className="mt-3 text-xs leading-5 text-amber-300">Slot held until {when(activeBooking.reservationExpiresAt)} while the Guild reviews your confirmation payment.</p>}
+        {activeBooking.status === "WAITLISTED" && <p className="mt-3 text-xs leading-5 text-zinc-500">No slot or payment is reserved. If capacity opens, the oldest eligible waitlisted rider receives a time-limited reservation and email.</p>}
+        {activeBooking.status === "CONFIRMED" && <p className="mt-3 text-xs leading-5 text-emerald-300">Your place is confirmed{paymentSummary?.fullyPaid ? " and the booking is fully paid." : ". Any remaining balance is tracked separately below."}</p>}
+        {activeBooking.status !== "WAITLISTED" && paymentSummary && <div className="mt-5 border-t border-white/10 pt-5">
           <div className="grid grid-cols-2 gap-3 text-sm"><div className="rounded-xl bg-white/[.035] p-3"><p className="text-xs text-zinc-500">Paid</p><p className="mt-1 font-black text-emerald-300">₹{(paymentSummary.paidPaise / 100).toLocaleString("en-IN")}</p></div><div className="rounded-xl bg-white/[.035] p-3"><p className="text-xs text-zinc-500">Outstanding</p><p className={`mt-1 font-black ${paymentSummary.outstandingPaise ? "text-amber-300" : "text-emerald-300"}`}>₹{(paymentSummary.outstandingPaise / 100).toLocaleString("en-IN")}</p></div></div>
-          <div className="mt-4 grid gap-3">{booking.payments.map((payment) => {
+          <div className="mt-4 grid gap-3">{activeBooking.payments.map((payment) => {
             const active = paymentSummary.activePayment?.id === payment.id;
-            const locked = payment.purpose === "BALANCE" && booking.status !== "CONFIRMED";
+            const locked = payment.purpose === "BALANCE" && activeBooking.status !== "CONFIRMED";
             return <div key={payment.id} className={`rounded-2xl border p-4 ${active && paymentSummary.overdue ? "border-red-400/25 bg-red-400/[.035]" : "border-white/10 bg-white/[.02]"}`}>
               <div className="flex items-start justify-between gap-3"><div><p className="text-xs font-black uppercase tracking-wider text-zinc-400">{payment.purpose.replaceAll("_", " ")}</p><p className="mt-1 text-lg font-black">₹{(payment.amountPaise / 100).toLocaleString("en-IN")}</p></div><span className={`rounded-full px-2.5 py-1 text-[10px] font-black ${payment.status === "CONFIRMED" ? "bg-emerald-400/15 text-emerald-300" : payment.status === "REJECTED" ? "bg-red-400/15 text-red-300" : payment.status === "SUBMITTED" ? "bg-amber-400/15 text-amber-300" : "bg-white/10 text-zinc-300"}`}>{locked ? "AFTER ADVANCE" : payment.status}</span></div>
               {payment.dueAt && !locked && payment.status !== "CONFIRMED" && <p className={`mt-2 text-xs ${active && paymentSummary.overdue ? "font-bold text-red-300" : "text-zinc-500"}`}>{active && paymentSummary.overdue ? "Overdue · " : "Due · "}{when(payment.dueAt)}</p>}

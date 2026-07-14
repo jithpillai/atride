@@ -16,6 +16,12 @@ const guildInclude = {
   logoAsset: true,
   coverAsset: true,
   mediaAssets: { where: { purpose: "GUILD_GALLERY" }, orderBy: [{ sortOrder: "asc" }, { createdAt: "asc" }] },
+  _count: {
+    select: {
+      memberships: { where: { status: "ACTIVE" } },
+      rides: { where: { status: "COMPLETED" } },
+    },
+  },
 } satisfies Prisma.CommunityInclude;
 
 const rideInclude = {
@@ -42,8 +48,8 @@ function toGuildView(guild: GuildRecord): GuildView {
     foundedYear: guild.foundedYear,
     homeCity: guild.locations.find((location) => location.isHome)?.city ?? guild.locations[0]?.city ?? "India",
     cities: guild.locations.map((location) => location.city),
-    memberCount: guild.memberCount,
-    completedRides: guild.completedRides,
+    memberCount: guild._count.memberships,
+    completedRides: guild._count.rides,
     directoryVisibility: guild.visibility.directoryVisibility,
     access: guild.visibility.guildHallAccess,
     accent: guild.accentColor,

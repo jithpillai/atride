@@ -3,6 +3,8 @@ import "server-only";
 import { Prisma } from "@/generated/prisma/client";
 import { db } from "@/lib/db";
 import { AuthError } from "@/server/auth/auth-service";
+import { processExpiredReservations } from "./expiry-service";
+import { buildPaymentObligations } from "./payment-obligations";
 import { buildBookingSnapshot } from "./snapshot";
 import { RESERVATION_TRANSACTION_OPTIONS, reservationExpiry, type BookingVehicleMode, type OccupantRole, type OfflinePaymentMethod } from "./validation";
 
@@ -34,6 +36,7 @@ const bookingRideInclude = {
 } satisfies Prisma.RideInclude;
 
 export async function reserveRide(input: ReserveRideInput) {
+  await processExpiredReservations({ rideId: input.rideId });
   const now = new Date();
   return db.$transaction(async (tx) => {
     await tx.$queryRaw`SELECT "id" FROM "rides" WHERE "id" = ${input.rideId}::uuid FOR UPDATE`;
@@ -93,10 +96,6 @@ export async function reserveRide(input: ReserveRideInput) {
     const depositPaise = Math.min(ride.confirmationDepositPaise || totalPricePaise, totalPricePaise);
     const balanceDuePaise = totalPricePaise - depositPaise;
 
-    const expired = await tx.rideBooking.updateMany({
-      where: { rideId: ride.id, status: "RESERVED", reservationExpiresAt: { lte: now } },
-      data: { status: "EXPIRED" },
-    });
     const occupied = await tx.rideBooking.aggregate({
       where: { rideId: ride.id, status: { in: [...CAPACITY_HOLDING_STATUSES] } },
       _sum: { seatCount: true },
@@ -133,6 +132,7 @@ export async function reserveRide(input: ReserveRideInput) {
       vehicleId,
       vehicleMode: input.vehicleMode,
       vehicleSnapshot,
+      paymentMethodPreference: input.paymentMethod,
       status,
       occupantRole: input.occupantRole,
       dietaryPreference: input.dietaryPreference,
@@ -166,41 +166,23 @@ export async function reserveRide(input: ReserveRideInput) {
     }
     await tx.bookingPayment.deleteMany({ where: { bookingId: booking.id, status: { in: ["PENDING", "REJECTED"] } } });
     if (hasCapacity) {
-      const payments = ride.confirmationDepositPaise > 0
-        ? [
-            {
-              bookingId: booking.id,
-              purpose: "CONFIRMATION_DEPOSIT" as const,
-              method: input.paymentMethod,
-              amountPaise: depositPaise,
-              dueAt: expiresAt,
-              ...(input.paymentMethod === "UPI" ? upiRecipient! : {}),
-            },
-            ...(balanceDuePaise > 0 ? [{
-              bookingId: booking.id,
-              purpose: "BALANCE" as const,
-              method: input.paymentMethod,
-              amountPaise: balanceDuePaise,
-              dueAt: ride.balanceDueAt ?? ride.registrationClosesAt ?? ride.startsAt,
-              ...(input.paymentMethod === "UPI" ? upiRecipient! : {}),
-            }] : []),
-          ]
-        : [{
-            bookingId: booking.id,
-            purpose: "FULL_PAYMENT" as const,
-            method: input.paymentMethod,
-            amountPaise: totalPricePaise,
-            dueAt: expiresAt,
-            ...(input.paymentMethod === "UPI" ? upiRecipient! : {}),
-          }];
-      await tx.bookingPayment.createMany({ data: payments });
+      await tx.bookingPayment.createMany({ data: buildPaymentObligations({
+        bookingId: booking.id,
+        method: input.paymentMethod,
+        totalPricePaise,
+        confirmationDepositPaise: depositPaise,
+        balanceDuePaise,
+        reservationExpiresAt: expiresAt,
+        balanceDueAt: ride.balanceDueAt ?? ride.registrationClosesAt ?? ride.startsAt,
+        upiRecipient,
+      }) });
     }
     await tx.ride.update({ where: { id: ride.id }, data: { bookedSlots: hasCapacity ? effectiveOccupied + 1 : effectiveOccupied } });
     await tx.communityAuditEvent.create({ data: {
       communityId: ride.communityId,
       actorUserId: input.userId,
       action: hasCapacity ? "BOOKING_RESERVED" : "BOOKING_WAITLISTED",
-      metadata: { rideId: ride.id, bookingId: booking.id, originId: origin.id, expiredReservationsReleased: expired.count },
+      metadata: { rideId: ride.id, bookingId: booking.id, originId: origin.id },
     } });
     return { booking, outcome: hasCapacity ? "RESERVED" as const : "WAITLISTED" as const };
   }, RESERVATION_TRANSACTION_OPTIONS);

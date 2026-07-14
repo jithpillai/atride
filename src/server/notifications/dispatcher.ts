@@ -2,6 +2,7 @@ import "server-only";
 
 import { db } from "@/lib/db";
 import { getEmailProvider } from "@/server/email/provider";
+import { renderBookingEventEmail, type BookingEmailPayload } from "@/server/email/booking-template";
 import { renderPaymentEventEmail, type PaymentEmailPayload } from "@/server/email/payment-template";
 
 const MAX_ATTEMPTS = 5;
@@ -35,8 +36,9 @@ export async function dispatchNotificationOutbox(options: { eventKeys?: string[]
     });
     if (!claimed.count) continue;
     try {
-      const payload = event.payload as unknown as PaymentEmailPayload;
-      const message = renderPaymentEventEmail(event.eventType, event.recipientName, payload);
+      const message = event.eventType === "BOOKING_RESERVATION_EXPIRED" || event.eventType === "BOOKING_WAITLIST_PROMOTED"
+        ? renderBookingEventEmail(event.eventType, event.recipientName, event.payload as unknown as BookingEmailPayload)
+        : renderPaymentEventEmail(event.eventType, event.recipientName, event.payload as unknown as PaymentEmailPayload);
       const result = await getEmailProvider(event.recipientEmail).sendTransactional({ to: event.recipientEmail, ...message });
       await db.notificationOutboxEvent.update({
         where: { id: event.id },
