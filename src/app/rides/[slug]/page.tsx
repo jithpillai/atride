@@ -68,6 +68,7 @@ export default async function RidePage({ params, searchParams }: Props) {
         <p className="text-xs font-bold uppercase tracking-widest text-orange-300">Your booking</p>
         <p className="mt-2 text-xl font-black">{booking.status.replaceAll("_", " ")}</p>
         <p className="mt-2 text-sm text-zinc-400">Starting with {booking.origin?.city ?? "the selected group"} · {booking.occupantRole.toLowerCase()}</p>
+        <p className={`mt-2 text-xs font-bold ${booking.vehicleMode === "PRIVATE_VEHICLE" ? "text-emerald-300" : "text-zinc-500"}`}>{booking.vehicleMode === "SAVED_VEHICLE" ? `Saved ${ride.vehicleType.toLowerCase()} selected` : booking.vehicleMode === "RIDE_ONLY_DETAILS" ? `${ride.vehicleType} details shared for this ride only` : booking.vehicleMode === "PRIVATE_VEHICLE" ? `Own ${ride.vehicleType.toLowerCase()} · details kept private` : "No vehicle attached to this booking"}</p>
         {booking.status === "RESERVED" && booking.reservationExpiresAt && <p className="mt-3 text-xs leading-5 text-amber-300">Slot held until {when(booking.reservationExpiresAt)} while the Guild reviews your confirmation payment.</p>}
         {booking.status === "WAITLISTED" && <p className="mt-3 text-xs leading-5 text-zinc-500">No slot or payment is reserved. The Guild can contact you if capacity opens.</p>}
         {booking.status === "CONFIRMED" && <p className="mt-3 text-xs leading-5 text-emerald-300">Your place is confirmed{paymentSummary?.fullyPaid ? " and the booking is fully paid." : ". Any remaining balance is tracked separately below."}</p>}
@@ -93,6 +94,7 @@ export default async function RidePage({ params, searchParams }: Props) {
           rideSlug={ride.slug}
           origins={ride.origins.map((origin) => ({ id: origin.id, label: `${origin.city} · ${origin.meetingPoint}` }))}
           vehicles={session.user.vehicles.filter((vehicle) => vehicle.type === ride.vehicleType).map((vehicle) => ({ id: vehicle.id, label: `${vehicle.manufacturer} ${vehicle.model}${vehicle.nickname ? ` · ${vehicle.nickname}` : ""}` }))}
+          vehicleType={ride.vehicleType}
           addOns={items("ADD_ON").map((item) => ({ id: item.id, title: item.title, description: item.description, pricePaise: item.pricePaise }))}
           dietaryPreference={session.user.profile?.dietaryPreference ?? ""}
           accessibilityNotes={session.user.profile?.accessibilityNotes ?? ""}

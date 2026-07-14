@@ -181,6 +181,13 @@ enum BookingOccupantRole {
   OTHER
 }
 
+enum BookingVehicleMode {
+  SAVED_VEHICLE
+  RIDE_ONLY_DETAILS
+  PRIVATE_VEHICLE
+  NO_VEHICLE
+}
+
 enum BookingPaymentMethod {
   UPI
   BANK_TRANSFER
@@ -833,6 +840,8 @@ model RideBooking {
   userId                    String              @map("user_id") @db.Uuid
   originId                  String?             @map("origin_id") @db.Uuid
   vehicleId                 String?             @map("vehicle_id") @db.Uuid
+  vehicleMode               BookingVehicleMode  @default(NO_VEHICLE) @map("vehicle_mode")
+  vehicleSnapshot           Json?               @map("vehicle_snapshot")
   status                    BookingStatus       @default(RESERVED)
   occupantRole              BookingOccupantRole @default(RIDER) @map("occupant_role")
   dietaryPreference         String?             @map("dietary_preference") @db.VarChar(120)

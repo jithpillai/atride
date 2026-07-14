@@ -6,7 +6,7 @@ import { redirect } from "next/navigation";
 import { AuthError } from "@/server/auth/auth-service";
 import { requireSession } from "@/server/auth/authorization";
 import { reserveRide } from "./service";
-import { cleanBookingText, isOccupantRole, isOfflinePaymentMethod } from "./validation";
+import { cleanBookingText, isBookingVehicleMode, isOccupantRole, isOfflinePaymentMethod } from "./validation";
 
 export type ReserveRideState = { error?: string };
 
@@ -16,7 +16,8 @@ export async function reserveRideAction(_state: ReserveRideState, formData: Form
   const session = await requireSession(`/rides/${rideSlug}#booking`);
   const occupantRole = cleanBookingText(formData.get("occupantRole"), 20);
   const paymentMethod = cleanBookingText(formData.get("paymentMethod"), 30);
-  if (!isOccupantRole(occupantRole) || !isOfflinePaymentMethod(paymentMethod)) return { error: "Choose valid participant and payment options." };
+  const vehicleMode = cleanBookingText(formData.get("vehicleMode"), 30);
+  if (!isOccupantRole(occupantRole) || !isOfflinePaymentMethod(paymentMethod) || !isBookingVehicleMode(vehicleMode)) return { error: "Choose valid participant, vehicle, and payment options." };
   if (formData.get("waiverAccepted") !== "on" || formData.get("commercialTermsAccepted") !== "on") {
     return { error: "Accept the waiver, ride rules, and commercial policies before continuing." };
   }
@@ -26,6 +27,12 @@ export async function reserveRideAction(_state: ReserveRideState, formData: Form
       userId: session.userId,
       originId: cleanBookingText(formData.get("originId"), 36),
       vehicleId: cleanBookingText(formData.get("vehicleId"), 36) || null,
+      vehicleMode,
+      rideOnlyVehicle: {
+        manufacturer: cleanBookingText(formData.get("rideOnlyVehicleManufacturer"), 80) || null,
+        model: cleanBookingText(formData.get("rideOnlyVehicleModel"), 80) || null,
+        registrationLast4: cleanBookingText(formData.get("rideOnlyVehicleRegistrationLast4"), 4).toUpperCase() || null,
+      },
       occupantRole,
       dietaryPreference: cleanBookingText(formData.get("dietaryPreference"), 120) || null,
       accessibilityNotes: cleanBookingText(formData.get("accessibilityNotes"), 2000) || null,
@@ -44,4 +51,3 @@ export async function reserveRideAction(_state: ReserveRideState, formData: Form
     return { error: "The reservation could not be completed. Your slot was not charged or confirmed; please try again." };
   }
 }
-
