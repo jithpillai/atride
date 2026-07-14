@@ -181,6 +181,12 @@ enum BookingOccupantRole {
   OTHER
 }
 
+enum AccommodationPricingMode {
+  INCLUDED
+  PER_PERSON
+  PER_ROOM
+}
+
 enum BookingVehicleMode {
   SAVED_VEHICLE
   RIDE_ONLY_DETAILS
@@ -427,6 +433,26 @@ model RideItineraryDay {
   @@map("ride_itinerary_days")
 }
 
+model RideAccommodationOption {
+  id              String                   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  accommodationId String                   @map("accommodation_id") @db.Uuid
+  name            String                   @db.VarChar(160)
+  description     String?                  @db.Text
+  pricingMode     AccommodationPricingMode @map("pricing_mode")
+  pricePaise      Int                      @default(0) @map("price_paise")
+  maxOccupancy    Int                      @default(2) @map("max_occupancy") @db.SmallInt
+  availableRooms  Int?                     @map("available_rooms") @db.SmallInt
+  sortOrder       Int                      @default(0) @map("sort_order")
+  active          Boolean                  @default(true)
+
+  accommodation RideAccommodation               @relation(fields: [accommodationId], references: [id], onDelete: Cascade)
+  selections    BookingAccommodationSelection[]
+
+  @@unique([accommodationId, name])
+  @@index([accommodationId, sortOrder])
+  @@map("ride_accommodation_options")
+}
+
 model RideAccommodation {
   id                      String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
   rideId                  String   @map("ride_id") @db.Uuid
@@ -439,7 +465,8 @@ model RideAccommodation {
   participantNote         String?  @map("participant_note") @db.Text
   exactLocationRestricted Boolean  @default(true) @map("exact_location_restricted")
 
-  ride Ride @relation(fields: [rideId], references: [id], onDelete: Cascade)
+  ride    Ride                      @relation(fields: [rideId], references: [id], onDelete: Cascade)
+  options RideAccommodationOption[]
 
   @@index([rideId, checkInAt])
   @@map("ride_accommodations")
@@ -500,6 +527,7 @@ model User {
   rideAiGenerations           RideAiGeneration[]
   rideAnnouncements           RideAnnouncement[]
   rideBookings                RideBooking[]
+  bookingParticipants         BookingParticipant[]
   reviewedBookingPayments     BookingPayment[]             @relation("BookingPaymentReviewer")
   notificationEvents          NotificationOutboxEvent[]
 
@@ -868,6 +896,7 @@ model RideBooking {
   seatCount                 Int                  @default(1) @map("seat_count") @db.SmallInt
   basePricePaise            Int                  @map("base_price_paise")
   addOnTotalPaise           Int                  @default(0) @map("add_on_total_paise")
+  accommodationTotalPaise   Int                  @default(0) @map("accommodation_total_paise")
   totalPricePaise           Int                  @map("total_price_paise")
   confirmationDepositPaise  Int                  @default(0) @map("confirmation_deposit_paise")
   balanceDuePaise           Int                  @default(0) @map("balance_due_paise")
@@ -881,20 +910,67 @@ model RideBooking {
   createdAt                 DateTime             @default(now()) @map("created_at") @db.Timestamptz(3)
   updatedAt                 DateTime             @updatedAt @map("updated_at") @db.Timestamptz(3)
 
-  ride               Ride                      @relation(fields: [rideId, communityId], references: [id, communityId], onDelete: Restrict)
-  community          Community                 @relation(fields: [communityId], references: [id], onDelete: Restrict)
-  user               User                      @relation(fields: [userId], references: [id], onDelete: Restrict)
-  origin             RideOrigin?               @relation(fields: [originId], references: [id], onDelete: SetNull)
-  vehicle            Vehicle?                  @relation(fields: [vehicleId], references: [id], onDelete: SetNull)
-  addOns             BookingAddOn[]
-  payments           BookingPayment[]
-  notificationEvents NotificationOutboxEvent[]
+  ride                    Ride                            @relation(fields: [rideId, communityId], references: [id, communityId], onDelete: Restrict)
+  community               Community                       @relation(fields: [communityId], references: [id], onDelete: Restrict)
+  user                    User                            @relation(fields: [userId], references: [id], onDelete: Restrict)
+  origin                  RideOrigin?                     @relation(fields: [originId], references: [id], onDelete: SetNull)
+  vehicle                 Vehicle?                        @relation(fields: [vehicleId], references: [id], onDelete: SetNull)
+  addOns                  BookingAddOn[]
+  participants            BookingParticipant[]
+  accommodationSelections BookingAccommodationSelection[]
+  payments                BookingPayment[]
+  notificationEvents      NotificationOutboxEvent[]
 
   @@unique([rideId, userId])
   @@index([rideId, status, reservationExpiresAt])
   @@index([communityId, status, createdAt])
   @@index([userId, status, createdAt])
   @@map("ride_bookings")
+}
+
+model BookingParticipant {
+  id                    String              @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  bookingId             String              @map("booking_id") @db.Uuid
+  linkedUserId          String?             @map("linked_user_id") @db.Uuid
+  displayName           String              @map("display_name") @db.VarChar(120)
+  role                  BookingOccupantRole
+  dietaryPreference     String?             @map("dietary_preference") @db.VarChar(120)
+  accessibilityNotes    String?             @map("accessibility_notes") @db.Text
+  emergencyContactName  String?             @map("emergency_contact_name") @db.VarChar(120)
+  emergencyContactPhone String?             @map("emergency_contact_phone") @db.VarChar(32)
+  isBookingLead         Boolean             @default(false) @map("is_booking_lead")
+  sortOrder             Int                 @default(0) @map("sort_order")
+  createdAt             DateTime            @default(now()) @map("created_at") @db.Timestamptz(3)
+
+  booking    RideBooking @relation(fields: [bookingId], references: [id], onDelete: Cascade)
+  linkedUser User?       @relation(fields: [linkedUserId], references: [id], onDelete: SetNull)
+
+  @@unique([bookingId, linkedUserId])
+  @@index([bookingId, sortOrder])
+  @@index([linkedUserId, createdAt])
+  @@map("booking_participants")
+}
+
+model BookingAccommodationSelection {
+  id                  String                   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  bookingId           String                   @map("booking_id") @db.Uuid
+  accommodationId     String                   @map("accommodation_id") @db.Uuid
+  optionId            String?                  @map("option_id") @db.Uuid
+  accommodationName   String                   @map("accommodation_name") @db.VarChar(180)
+  optionName          String                   @map("option_name") @db.VarChar(160)
+  pricingModeSnapshot AccommodationPricingMode @map("pricing_mode_snapshot")
+  unitPricePaise      Int                      @map("unit_price_paise")
+  units               Int                      @default(1) @db.SmallInt
+  guestCount          Int                      @map("guest_count") @db.SmallInt
+  totalPricePaise     Int                      @map("total_price_paise")
+  createdAt           DateTime                 @default(now()) @map("created_at") @db.Timestamptz(3)
+
+  booking RideBooking              @relation(fields: [bookingId], references: [id], onDelete: Cascade)
+  option  RideAccommodationOption? @relation(fields: [optionId], references: [id], onDelete: SetNull)
+
+  @@unique([bookingId, accommodationId])
+  @@index([optionId, createdAt])
+  @@map("booking_accommodation_selections")
 }
 
 model BookingAddOn {

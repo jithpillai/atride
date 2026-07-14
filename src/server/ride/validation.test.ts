@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { moneyToPaise, parseDayItems, parseItinerary, parseOrigins, requiredCalendarDate, validRideSlug } from "./validation";
+import { moneyToPaise, parseAccommodationOptions, parseDayItems, parseItinerary, parseOrigins, requiredCalendarDate, validRideSlug } from "./validation";
 
 describe("ride package validation", () => {
   it("validates canonical slugs and exact money", () => {
@@ -39,5 +39,21 @@ describe("ride package validation", () => {
       { dayNumber: 1, sortOrder: 1 },
       { dayNumber: 2, sortOrder: 2 },
     ]);
+  });
+
+  it("parses included, per-person, and per-room accommodation choices", () => {
+    const options = parseAccommodationOptions([
+      "Shared stay | INCLUDED | 0 | 4 | 8 | Included in the ride fee",
+      "Couple room | PER_ROOM | 1800 | 2 | 4 | Private room surcharge",
+      "Extra bed | PER_PERSON | 500 | 1 | | Per participant",
+    ].join("\n"));
+    expect(options).toHaveLength(3);
+    expect(options[0]).toMatchObject({ pricingMode: "INCLUDED", pricePaise: 0, maxOccupancy: 4, availableRooms: 8 });
+    expect(options[1]).toMatchObject({ pricingMode: "PER_ROOM", pricePaise: 180_000, maxOccupancy: 2, availableRooms: 4 });
+    expect(options[2]).toMatchObject({ pricingMode: "PER_PERSON", pricePaise: 50_000, availableRooms: null });
+  });
+
+  it("rejects duplicate room choice names regardless of capitalization", () => {
+    expect(() => parseAccommodationOptions("Shared stay | INCLUDED | 0 | 4\nshared STAY | PER_ROOM | 1000 | 2")).toThrow("Invalid accommodation option:2");
   });
 });

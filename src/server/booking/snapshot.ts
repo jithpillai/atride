@@ -16,7 +16,7 @@ type SnapshotRide = {
   updatedAt: Date;
   origins: Array<{ id: string; city: string; meetingPoint: string; departureAt: Date; mergePoint: string | null; routeSummary: string | null }>;
   itineraryDays: Array<{ dayNumber: number; sortOrder: number; date: Date; scheduledAt: Date | null; title: string; summary: string }>;
-  accommodations: Array<{ propertyName: string; locality: string; checkInAt: Date; checkOutAt: Date; roomSummary: string; amenities: string[]; participantNote: string | null; exactLocationRestricted: boolean }>;
+  accommodations: Array<{ propertyName: string; locality: string; checkInAt: Date; checkOutAt: Date; roomSummary: string; amenities: string[]; participantNote: string | null; exactLocationRestricted: boolean; options: Array<{ id: string; name: string; description: string | null; pricingMode: string; pricePaise: number; maxOccupancy: number; availableRooms: number | null; sortOrder: number }> }>;
   packageItems: Array<{ id: string; type: string; dayNumber: number | null; title: string; description: string | null; pricePaise: number | null; sortOrder: number }>;
   policies: Array<{ id: string; type: string; title: string; content: string; version: number; sortOrder: number }>;
   community: {

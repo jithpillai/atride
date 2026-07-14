@@ -1,5 +1,7 @@
 export const OCCUPANT_ROLES = ["RIDER", "PILLION", "DRIVER", "PASSENGER", "OTHER"] as const;
 export type OccupantRole = typeof OCCUPANT_ROLES[number];
+export const COMPANION_ROLES = ["PILLION", "PASSENGER", "OTHER"] as const;
+export type CompanionRole = typeof COMPANION_ROLES[number];
 export const BOOKING_VEHICLE_MODES = ["SAVED_VEHICLE", "RIDE_ONLY_DETAILS", "PRIVATE_VEHICLE", "NO_VEHICLE"] as const;
 export type BookingVehicleMode = typeof BOOKING_VEHICLE_MODES[number];
 export const OFFLINE_PAYMENT_METHODS = ["UPI", "BANK_TRANSFER", "CASH"] as const;
@@ -17,6 +19,14 @@ export const RESERVATION_TRANSACTION_OPTIONS = {
 
 export function isOccupantRole(value: string): value is OccupantRole {
   return OCCUPANT_ROLES.includes(value as OccupantRole);
+}
+
+export function isCompanionRole(value: string): value is CompanionRole {
+  return COMPANION_ROLES.includes(value as CompanionRole);
+}
+
+export function isOperationalPhone(value: string) {
+  return /^\+?[1-9]\d{7,15}$/.test(value.replace(/[\s()-]/g, ""));
 }
 
 export function isBookingVehicleMode(value: string): value is BookingVehicleMode {

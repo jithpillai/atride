@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { isBookingVehicleMode, isOccupantRole, isOfflinePaymentMethod, RESERVATION_TRANSACTION_OPTIONS, reservationExpiry } from "./validation";
+import { isBookingVehicleMode, isCompanionRole, isOccupantRole, isOfflinePaymentMethod, isOperationalPhone, RESERVATION_TRANSACTION_OPTIONS, reservationExpiry } from "./validation";
 
 describe("booking validation", () => {
   it("accepts only supported participant and offline payment choices", () => {
@@ -10,6 +10,10 @@ describe("booking validation", () => {
     expect(isOfflinePaymentMethod("RAZORPAY")).toBe(false);
     expect(isBookingVehicleMode("PRIVATE_VEHICLE")).toBe(true);
     expect(isBookingVehicleMode("PUBLIC_VEHICLE")).toBe(false);
+    expect(isCompanionRole("PILLION")).toBe(true);
+    expect(isCompanionRole("RIDER")).toBe(false);
+    expect(isOperationalPhone("+91 98765 43210")).toBe(true);
+    expect(isOperationalPhone("123")).toBe(false);
   });
 
   it("caps the payment hold at registration close", () => {

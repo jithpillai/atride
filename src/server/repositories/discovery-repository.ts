@@ -247,7 +247,7 @@ export const findPublicRidePackageBySlug = cache(async (slug: string) => db.ride
   include: {
     community: { select: { slug: true, name: true, shortName: true, newcomerDisplayEnabled: true, paymentSettings: { select: { upiEnabled: true } } } },
     origins: { orderBy: { sortOrder: "asc" } }, itineraryDays: { orderBy: { sortOrder: "asc" } },
-    accommodations: { orderBy: { checkInAt: "asc" } }, packageItems: { orderBy: [{ type: "asc" }, { sortOrder: "asc" }] },
+    accommodations: { orderBy: { checkInAt: "asc" }, include: { options: { where: { active: true }, orderBy: { sortOrder: "asc" } } } }, packageItems: { orderBy: [{ type: "asc" }, { sortOrder: "asc" }] },
     policies: { orderBy: [{ type: "asc" }, { version: "desc" }] },
     coverAsset: true, mediaAssets: { where: { purpose: "RIDE_GALLERY" }, orderBy: [{ sortOrder: "asc" }, { createdAt: "asc" }] },
     staffAssignments: { include: { user: { select: { displayName: true } }, origin: { select: { city: true } } }, orderBy: { role: "asc" } },

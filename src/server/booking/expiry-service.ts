@@ -79,6 +79,7 @@ async function processRide(rideId: string, now: Date) {
     const waitlisted = availableSeats
       ? await tx.rideBooking.findMany({
           where: { rideId, status: "WAITLISTED", seatCount: { lte: availableSeats } },
+          include: { accommodationSelections: true },
           orderBy: [{ createdAt: "asc" }, { id: "asc" }],
           take: availableSeats,
         })
@@ -93,8 +94,23 @@ async function processRide(rideId: string, now: Date) {
         }
       : null;
     let promoted = 0;
-    for (const booking of waitlisted) {
+    promotionCandidate: for (const booking of waitlisted) {
       if (occupiedSeats + booking.seatCount > capacity) break;
+      for (const selection of booking.accommodationSelections) {
+        if (!selection.optionId) continue;
+        const option = await tx.rideAccommodationOption.findUnique({ where: { id: selection.optionId } });
+        if (!option) continue promotionCandidate;
+        if (option.availableRooms === null) continue;
+        const used = await tx.bookingAccommodationSelection.aggregate({
+          where: {
+            optionId: option.id,
+            bookingId: { not: booking.id },
+            booking: { status: { in: [...CAPACITY_HOLDING_STATUSES] } },
+          },
+          _sum: { units: true },
+        });
+        if ((used._sum.units ?? 0) + selection.units > option.availableRooms) continue promotionCandidate;
+      }
       const expiresAt = reservationExpiry(now, ride.registrationClosesAt);
       if (expiresAt <= now) break;
       const changed = await tx.rideBooking.updateMany({

@@ -527,16 +527,19 @@ The Ride Assistant is an optional server-side adapter around Gemini structured o
 - `waiver_versions`
 - `waiver_acceptances`
 
-The Phase 5 foundation currently maps this conceptual model into three executable Prisma aggregates:
+The Phase 5 foundation maps this conceptual model into executable Prisma aggregates:
 
-- `ride_bookings` owns the participant, ride, selected origin/occupant role, vehicle choice, dietary and accessibility choices, reservation expiry, consent timestamps, computed price, and immutable JSON package/policy snapshot. A participant may reference a saved garage vehicle, provide a booking-only minimal vehicle snapshot, or explicitly bring a compatible vehicle without disclosing its make, model, or registration. Pillion/passenger bookings store `NO_VEHICLE`. Booking-only details never create or update a global garage record. The first increment deliberately supports one account and one reserved seat per ride.
+- `ride_bookings` owns the booking lead, ride, selected origin/lead role, vehicle choice, reservation expiry, consent timestamps, party seat count, aggregate prices, and immutable JSON package/policy snapshot. A lead may reference a saved garage vehicle, provide a booking-only minimal vehicle snapshot, or explicitly bring a compatible vehicle without disclosing its make, model, or registration. Booking-only details never create or update a global garage record.
+- `booking_participants` stores the linked booking lead plus unregistered pillion/passenger companions with immutable display name, occupant role, diet, emergency-contact, accessibility, and ordering details. Companions do not become platform accounts or Guild members merely because a lead booked for them.
 - `booking_add_ons` stores selected package add-ons and their immutable quantity/unit-price/total snapshot.
+- `ride_accommodation_options` defines active included, per-person, or per-room offerings, occupancy, optional room inventory, and price. Retired options remain addressable for historical bookings.
+- `booking_accommodation_selections` stores immutable stay/option names, pricing mode, unit price, required rooms, guest count, and total. This preserves the commercial agreement when a Guild later edits or retires an offering.
 - `booking_payments` stores deposit, balance, full-payment, or other obligations independently from the booking lifecycle, including amount, due/submission timestamps, offline method, transaction reference, verification state, proof asset, finance reviewer, and review note. A confirmed advance confirms the reserved seat without falsely marking the later balance as paid.
 - `community_payment_settings` stores the tenant-owned assisted-UPI toggle, validated VPA, payee display name, and participant instructions. Only Guild Owner/Admin roles mutate it; Finance may view the active recipient.
 - Each UPI `booking_payments` obligation snapshots its VPA, payee name, and instructions when issued. The participant UI derives a standard exact-amount `upi://pay` intent and renders the same URI locally as a QR; no external QR service sees payment data. The bank-visible note begins with the booked participant's display name followed by `@Ride` and the ride title, making payments traceable when the payer account belongs to a parent, partner, or friend. Later Guild-setting changes never rewrite an existing non-null snapshot.
 - `notification_outbox_events` stores one idempotent, recipient-specific delivery event for payment submission, confirmation, or rejection. Owner/Admin/Finance recipients receive review links; participants receive the finance decision. Provider failure leaves a retryable durable record rather than rolling back or losing the business event.
 
-`media_assets` stores payment evidence using private authenticated Cloudinary delivery. `audit_logs` records reservation and finance decisions. The more normalized party-participant, status-history, capacity-reservation, refund, and waiver tables above remain the target for later Phase 5/6 increments where their separate lifecycles are required.
+`media_assets` stores payment evidence using private authenticated Cloudinary delivery. `audit_logs` records reservation and finance decisions. Separate status-history, capacity-reservation, refund, and waiver tables remain targets for later increments where their independent lifecycles are required.
 
 ### 10.5 Ride operations
 

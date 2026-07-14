@@ -92,3 +92,34 @@ export function parseDayItems(value: string) {
     return { dayNumber, title: parts[1], description: parts.slice(2).join(" | ") || null, sortOrder };
   });
 }
+
+export function parseAccommodationOptions(value: string) {
+  const names = new Set<string>();
+  return rows(value).map((parts, sortOrder) => {
+    if (parts.length < 4 || !parts[0]) throw new Error(`Invalid accommodation option:${sortOrder + 1}`);
+    const normalizedName = parts[0].toLocaleLowerCase("en-IN");
+    if (names.has(normalizedName)) throw new Error(`Invalid accommodation option:${sortOrder + 1}`);
+    names.add(normalizedName);
+    const pricingMode = parts[1]?.toUpperCase();
+    if (!new Set(["INCLUDED", "PER_PERSON", "PER_ROOM"]).has(pricingMode)) throw new Error(`Invalid accommodation option:${sortOrder + 1}`);
+    let pricePaise: number;
+    let maxOccupancy: number;
+    let availableRooms: number | null;
+    try {
+      pricePaise = moneyToPaise(parts[2] || "0");
+      maxOccupancy = positiveInteger(parts[3], 1);
+      availableRooms = parts[4] ? positiveInteger(parts[4], 1) : null;
+    } catch {
+      throw new Error(`Invalid accommodation option:${sortOrder + 1}`);
+    }
+    return {
+      name: parts[0],
+      pricingMode: pricingMode as "INCLUDED" | "PER_PERSON" | "PER_ROOM",
+      pricePaise: pricingMode === "INCLUDED" ? 0 : pricePaise,
+      maxOccupancy,
+      availableRooms,
+      description: parts.slice(5).join(" | ") || null,
+      sortOrder,
+    };
+  });
+}
