@@ -20,7 +20,7 @@ const prisma = new PrismaClient({
 });
 
 async function main() {
-  const [communityCount, rideCount, userCount, completedProfileCount, listedGuilds, privateGuild, platformAdmin, captain, postgis] = await Promise.all([
+  const [communityCount, rideCount, userCount, completedProfileCount, listedGuilds, privateGuild, platformAdmin, captain, postgis, bookingConstraints] = await Promise.all([
     prisma.community.count(),
     prisma.ride.count(),
     prisma.user.count(),
@@ -58,6 +58,12 @@ async function main() {
       },
     }),
     prisma.$queryRaw<Array<{ version: string }>>`SELECT PostGIS_Version() AS version`,
+    prisma.$queryRaw<Array<{ name: string; definition: string }>>`
+      SELECT conname AS name, pg_get_constraintdef(oid) AS definition
+      FROM pg_constraint
+      WHERE conrelid = 'ride_bookings'::regclass
+        AND conname IN ('ride_bookings_party_size_check', 'ride_bookings_price_check')
+    `,
   ]);
 
   if (communityCount < 3 || rideCount < 5) {
@@ -96,7 +102,16 @@ async function main() {
     throw new Error("PostGIS is not enabled.");
   }
 
-  console.log("Database verified: PostGIS, discovery boundaries, identities, RBAC, and ride staff assignments are valid.");
+  const partyConstraint = bookingConstraints.find(({ name }) => name === "ride_bookings_party_size_check")?.definition ?? "";
+  const priceConstraint = bookingConstraints.find(({ name }) => name === "ride_bookings_price_check")?.definition ?? "";
+  if (!partyConstraint.includes("seat_count") || !partyConstraint.includes("6")) {
+    throw new Error("The booking party-size constraint is missing or stale.");
+  }
+  if (!priceConstraint.includes("accommodation_total_paise")) {
+    throw new Error("The booking price constraint does not include accommodation charges.");
+  }
+
+  console.log("Database verified: PostGIS, discovery boundaries, identities, RBAC, ride staff assignments, and party-booking constraints are valid.");
 }
 
 main()
