@@ -232,6 +232,8 @@ enum BookingRefundStatus {
 }
 
 enum NotificationEventType {
+  BOOKING_RESERVED
+  BOOKING_WAITLISTED
   BOOKING_PAYMENT_SUBMITTED
   BOOKING_PAYMENT_CONFIRMED
   BOOKING_PAYMENT_REJECTED
@@ -284,6 +286,7 @@ model Community {
   rideStaffAssignments RideStaffAssignment[]
   bookings             RideBooking[]
   notificationEvents   NotificationOutboxEvent[]
+  notificationInboxItems NotificationInboxItem[]
   disruptions          RideDisruption[]
   bookingRefunds       BookingRefund[]
   embedOrigins         CommunityEmbedOrigin[]
@@ -552,6 +555,7 @@ model User {
   bookingParticipants         BookingParticipant[]
   reviewedBookingPayments     BookingPayment[]             @relation("BookingPaymentReviewer")
   notificationEvents          NotificationOutboxEvent[]
+  notificationInboxItems      NotificationInboxItem[]
   createdRideDisruptions      RideDisruption[]             @relation("RideDisruptionCreator")
   reviewedBookingRefunds      BookingRefund[]              @relation("BookingRefundReviewer")
 
@@ -968,6 +972,7 @@ model RideBooking {
   accommodationSelections BookingAccommodationSelection[]
   payments                BookingPayment[]
   notificationEvents      NotificationOutboxEvent[]
+  notificationInboxItems  NotificationInboxItem[]
   refund                  BookingRefund?
 
   @@unique([rideId, userId])
@@ -1126,4 +1131,26 @@ model NotificationOutboxEvent {
   @@index([bookingPaymentId, eventType])
   @@index([bookingId, eventType])
   @@map("notification_outbox_events")
+}
+
+model NotificationInboxItem {
+  id              String                @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  eventKey        String                @unique @map("event_key") @db.VarChar(240)
+  eventType       NotificationEventType @map("event_type")
+  communityId     String                @map("community_id") @db.Uuid
+  bookingId       String?               @map("booking_id") @db.Uuid
+  recipientUserId String                @map("recipient_user_id") @db.Uuid
+  title           String                @db.VarChar(180)
+  body            String                @db.VarChar(500)
+  actionUrl       String?               @map("action_url") @db.VarChar(500)
+  readAt          DateTime?             @map("read_at") @db.Timestamptz(3)
+  createdAt       DateTime              @default(now()) @map("created_at") @db.Timestamptz(3)
+
+  community Community    @relation(fields: [communityId], references: [id], onDelete: Cascade)
+  booking   RideBooking? @relation(fields: [bookingId], references: [id], onDelete: Cascade)
+  recipient User         @relation(fields: [recipientUserId], references: [id], onDelete: Cascade)
+
+  @@index([recipientUserId, readAt, createdAt])
+  @@index([communityId, createdAt])
+  @@map("notification_inbox_items")
 }

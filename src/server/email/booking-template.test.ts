@@ -10,6 +10,19 @@ const payload = {
 };
 
 describe("booking reservation email template", () => {
+  it("confirms a newly held multi-person reservation", () => {
+    const email = renderBookingEventEmail("BOOKING_RESERVED", "Demo Rider", { ...payload, partySize: 2, originName: "Bengaluru" });
+    expect(email.subject).toContain("reservation received");
+    expect(email.text).toContain("all 2 participants");
+    expect(email.text).toContain("from Bengaluru");
+  });
+
+  it("confirms that the complete party joined the waitlist", () => {
+    const email = renderBookingEventEmail("BOOKING_WAITLISTED", "Demo Rider", { ...payload, partySize: 2 });
+    expect(email.subject).toContain("waitlist joined");
+    expect(email.text).toContain("complete booking party");
+  });
+
   it("explains a time-limited waitlist promotion", () => {
     const email = renderBookingEventEmail("BOOKING_WAITLIST_PROMOTED", "Demo Rider", payload);
     expect(email.subject).toContain("waitlist slot");
