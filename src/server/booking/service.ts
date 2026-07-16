@@ -3,6 +3,8 @@ import "server-only";
 import { Prisma } from "@/generated/prisma/client";
 import { db } from "@/lib/db";
 import { AuthError } from "@/server/auth/auth-service";
+import { dispatchNotificationOutbox } from "@/server/notifications/dispatcher";
+import { queueParticipantBookingCreated } from "@/server/notifications/booking-events";
 import { processExpiredReservations } from "./expiry-service";
 import { accommodationCharge, partyBookingPrice } from "./party-pricing";
 import { buildPaymentObligations } from "./payment-obligations";
@@ -48,7 +50,7 @@ const bookingRideInclude = {
 export async function reserveRide(input: ReserveRideInput) {
   await processExpiredReservations({ rideId: input.rideId });
   const now = new Date();
-  return db.$transaction(async (tx) => {
+  const result = await db.$transaction(async (tx) => {
     await tx.$queryRaw`SELECT "id" FROM "rides" WHERE "id" = ${input.rideId}::uuid FOR UPDATE`;
     const ride = await tx.ride.findUnique({ where: { id: input.rideId }, include: bookingRideInclude });
     if (!ride || ride.status !== "PUBLISHED") throw new AuthError("RIDE_UNAVAILABLE", "This ride is not accepting reservations.", 409);
@@ -131,9 +133,9 @@ export async function reserveRide(input: ReserveRideInput) {
     });
     const occupiedSeats = occupied._sum.seatCount ?? 0;
     const existing = await tx.rideBooking.findUnique({ where: { rideId_userId: { rideId: ride.id, userId: input.userId } } });
-    if (existing?.status === "CONFIRMED") return { booking: existing, outcome: "ALREADY_CONFIRMED" as const };
+    if (existing?.status === "CONFIRMED") return { booking: existing, outcome: "ALREADY_CONFIRMED" as const, eventKeys: [] as string[] };
     if (existing?.status === "RESERVED" && existing.reservationExpiresAt && existing.reservationExpiresAt > now) {
-      return { booking: existing, outcome: "ALREADY_RESERVED" as const };
+      return { booking: existing, outcome: "ALREADY_RESERVED" as const, eventKeys: [] as string[] };
     }
 
     const existingHeldSeat = existing && CAPACITY_HOLDING_STATUSES.includes(existing.status as typeof CAPACITY_HOLDING_STATUSES[number]) ? existing.seatCount : 0;
@@ -276,8 +278,21 @@ export async function reserveRide(input: ReserveRideInput) {
       action: hasCapacity ? "BOOKING_RESERVED" : "BOOKING_WAITLISTED",
       metadata: { rideId: ride.id, bookingId: booking.id, originId: origin.id, partySize, accommodationTotalPaise },
     } });
-    return { booking, outcome: hasCapacity ? "RESERVED" as const : "WAITLISTED" as const };
+    const outcome = hasCapacity ? "RESERVED" as const : "WAITLISTED" as const;
+    const eventKeys = await queueParticipantBookingCreated(
+      tx,
+      booking.id,
+      hasCapacity ? "BOOKING_RESERVED" : "BOOKING_WAITLISTED",
+      `${booking.updatedAt.getTime()}`,
+    );
+    return { booking, outcome, eventKeys };
   }, RESERVATION_TRANSACTION_OPTIONS);
+  if (result.eventKeys.length) {
+    await dispatchNotificationOutbox({ eventKeys: result.eventKeys }).catch((error) => {
+      console.error("Immediate booking confirmation dispatch failed; the durable event remains queued", { bookingId: result.booking.id, error });
+    });
+  }
+  return { booking: result.booking, outcome: result.outcome };
 }
 
 export async function findUserBookingForRide(userId: string, rideId: string) {

@@ -5,6 +5,7 @@ import { getEmailProvider } from "@/server/email/provider";
 import { renderBookingEventEmail, type BookingEmailPayload } from "@/server/email/booking-template";
 import { renderPaymentEventEmail, type PaymentEmailPayload } from "@/server/email/payment-template";
 import { renderRideDisruptionEmail, type RideDisruptionEmailPayload } from "@/server/email/ride-disruption-template";
+import { notificationPresentation } from "@/server/notifications/presentation";
 
 const MAX_ATTEMPTS = 5;
 
@@ -37,9 +38,24 @@ export async function dispatchNotificationOutbox(options: { eventKeys?: string[]
     });
     if (!claimed.count) continue;
     try {
+      const inbox = notificationPresentation(event.eventType, event.payload);
+      await db.notificationInboxItem.upsert({
+        where: { eventKey: event.eventKey },
+        create: {
+          eventKey: event.eventKey,
+          eventType: event.eventType,
+          communityId: event.communityId,
+          bookingId: event.bookingId,
+          recipientUserId: event.recipientUserId,
+          title: inbox.title,
+          body: inbox.body,
+          actionUrl: inbox.actionUrl,
+        },
+        update: {},
+      });
       const message = event.eventType === "RIDE_POSTPONED" || event.eventType === "RIDE_CANCELLED"
         ? renderRideDisruptionEmail(event.eventType, event.recipientName, event.payload as unknown as RideDisruptionEmailPayload)
-        : event.eventType === "BOOKING_RESERVATION_EXPIRED" || event.eventType === "BOOKING_WAITLIST_PROMOTED"
+        : event.eventType === "BOOKING_RESERVED" || event.eventType === "BOOKING_WAITLISTED" || event.eventType === "BOOKING_RESERVATION_EXPIRED" || event.eventType === "BOOKING_WAITLIST_PROMOTED"
         ? renderBookingEventEmail(event.eventType, event.recipientName, event.payload as unknown as BookingEmailPayload)
         : renderPaymentEventEmail(event.eventType, event.recipientName, event.payload as unknown as PaymentEmailPayload);
       const result = await getEmailProvider(event.recipientEmail).sendTransactional({ to: event.recipientEmail, ...message });
