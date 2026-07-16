@@ -723,6 +723,22 @@ Security, transactional/service, and marketing communication are separate catego
 
 Casual conversation and participant social interaction may occur in an optional organizer-managed WhatsApp group.
 
+### 14.2 Notification retention and recycling
+
+The in-app inbox is a bounded operational feed, not a permanent mailbox. Canonical booking, payment, ride, policy, acknowledgement, and audit records remain the source of truth; an inbox item or delivery payload may be deleted without deleting the underlying business event.
+
+Initial retention defaults are intentionally conservative for the Neon storage budget:
+
+- Read ordinary inbox items: delete after 30 days.
+- Unread ordinary inbox items: delete after 90 days.
+- Ride-operational items: delete 30 days after the ride ends, but never before the ordinary unread limit has elapsed.
+- Critical items: retain until acknowledged or resolved, then delete after 90 days; store the compact acknowledgement/audit record separately.
+- Successfully delivered outbox rows and their provider payloads: delete after 14 days.
+- Permanently failed or dead-letter outbox rows: retain for 30 days for diagnosis, then delete after aggregate failure metrics are recorded.
+- Pending, retrying, unacknowledged-critical, or unresolved-action notifications are never removed merely because a cleanup job ran.
+
+A scheduled, idempotent cleanup job deletes eligible rows in small batches and records counts rather than copying message bodies into another archive. Notification content must remain compact and must link to canonical records instead of duplicating ride descriptions, booking snapshots, payment proofs, or media. Users see the applicable retention notice in the notification centre; @Ride does not promise a permanent communication archive.
+
 ```text
 RideCommunicationChannel
 - id

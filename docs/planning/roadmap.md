@@ -314,6 +314,7 @@ Build:
 - Retries and dead-letter processing
 - Delivery-status webhooks
 - Notification preferences and in-app inbox
+- Bounded notification retention with scheduled inbox/outbox cleanup
 - Authoritative ride announcement/activity feed
 - Critical announcement acknowledgements
 - Optional protected WhatsApp group invite-link configuration
@@ -334,6 +335,8 @@ Acceptance tests:
 - `ANNOUNCEMENTS_ONLY` requires the organizer to confirm that WhatsApp admin-only posting was configured manually.
 - Participants who do not join WhatsApp still receive essential information through @Ride.
 - The system never reports that a user joined WhatsApp based only on opening the link.
+- Read, expired, delivered, and dead-letter notification rows are recycled according to the documented retention policy without deleting canonical booking, payment, ride, acknowledgement, or audit records.
+- Pending retries, unresolved actions, and unacknowledged critical notices are protected from cleanup.
 
 External accounts needed:
 
