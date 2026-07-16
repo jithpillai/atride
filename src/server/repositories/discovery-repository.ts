@@ -386,6 +386,7 @@ export const findPublicRidePackageBySlug = cache(async (slug: string) => db.ride
     bookings: { where: { status: "WAITLISTED" }, select: { seatCount: true } },
     coverAsset: true, mediaAssets: { where: { purpose: "RIDE_GALLERY" }, orderBy: [{ sortOrder: "asc" }, { createdAt: "asc" }] },
     staffAssignments: { include: { user: { select: { displayName: true } }, origin: { select: { city: true } } }, orderBy: { role: "asc" } },
+    disruptions: { where: { status: "ACTIVE" }, orderBy: { createdAt: "desc" }, take: 1 },
   },
 }));
 

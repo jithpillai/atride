@@ -8,6 +8,7 @@ import { requireGuildFinance } from "@/server/auth/authorization";
 import { dispatchNotificationOutbox } from "@/server/notifications/dispatcher";
 import { queueParticipantPaymentReviewed } from "@/server/notifications/payment-events";
 import { cleanBookingText } from "./validation";
+import { moneyToPaise } from "@/server/ride/validation";
 
 export async function reviewBookingPayment(formData: FormData) {
   const guildSlug = cleanBookingText(formData.get("guildSlug"), 80);
@@ -26,7 +27,7 @@ export async function reviewBookingPayment(formData: FormData) {
         where: {
           id: paymentId,
           status: decision === "CONFIRM" ? { in: ["SUBMITTED", "PENDING"] } : "SUBMITTED",
-          booking: { community: { slug: guildSlug } },
+          booking: { community: { slug: guildSlug }, ride: { status: { in: ["PUBLISHED", "CLOSED"] } } },
           OR: [
             { purpose: { in: ["CONFIRMATION_DEPOSIT", "FULL_PAYMENT"] }, booking: { status: "RESERVED" } },
             { purpose: "BALANCE", booking: { status: "CONFIRMED" } },
@@ -90,4 +91,52 @@ export async function reviewBookingPayment(formData: FormData) {
   if (rideSlug) revalidatePath(`/rides/${rideSlug}`);
   revalidatePath("/");
   redirect(`/guilds/${guildSlug}/manage?section=finance&paymentSaved=${decision.toLowerCase()}`);
+}
+
+export async function reviewBookingRefund(formData: FormData) {
+  const guildSlug = cleanBookingText(formData.get("guildSlug"), 80);
+  const refundId = cleanBookingText(formData.get("refundId"), 36);
+  const reference = cleanBookingText(formData.get("reference"), 180);
+  const note = cleanBookingText(formData.get("note"), 1000);
+  const { session } = await requireGuildFinance(guildSlug);
+  let confirmedAmountPaise: number;
+  let refundedAmountPaise: number;
+  try {
+    confirmedAmountPaise = moneyToPaise(cleanBookingText(formData.get("confirmedAmount"), 20));
+    refundedAmountPaise = moneyToPaise(cleanBookingText(formData.get("refundedAmount"), 20));
+  } catch {
+    redirect(`/guilds/${guildSlug}/manage?section=finance&refundError=amount`);
+  }
+  if (refundedAmountPaise > confirmedAmountPaise || (refundedAmountPaise > 0 && reference.length < 6)) redirect(`/guilds/${guildSlug}/manage?section=finance&refundError=amount`);
+  try {
+    const refund = await db.bookingRefund.findFirst({
+      where: { id: refundId, community: { slug: guildSlug } },
+      include: { booking: { select: { id: true, userId: true, rideId: true, totalPricePaise: true, ride: { select: { slug: true } } } } },
+    });
+    if (!refund || confirmedAmountPaise > refund.booking.totalPricePaise) throw new Error("invalid-refund");
+    const status = confirmedAmountPaise === 0
+      ? "REVIEW_REQUIRED" as const
+      : refundedAmountPaise === 0
+      ? "PENDING" as const
+      : refundedAmountPaise < confirmedAmountPaise
+      ? "PARTIALLY_REFUNDED" as const
+      : "REFUNDED" as const;
+    await db.$transaction([
+      db.bookingRefund.update({ where: { id: refund.id }, data: { confirmedAmountPaise, refundedAmountPaise, status, reference: reference || null, note: note || null, reviewedById: session.userId, reviewedAt: new Date() } }),
+      db.communityAuditEvent.create({ data: {
+        communityId: refund.communityId,
+        actorUserId: session.userId,
+        targetUserId: refund.booking.userId,
+        action: "BOOKING_REFUND_REVIEWED",
+        metadata: { bookingId: refund.booking.id, rideId: refund.booking.rideId, refundId: refund.id, confirmedAmountPaise, refundedAmountPaise, status, reference: reference || null },
+      } }),
+    ]);
+    revalidatePath(`/rides/${refund.booking.ride.slug}`);
+    revalidatePath("/account/bookings");
+  } catch (error) {
+    console.error("Booking refund review failed", { guildSlug, refundId, error });
+    redirect(`/guilds/${guildSlug}/manage?section=finance&refundError=unavailable`);
+  }
+  revalidatePath(`/guilds/${guildSlug}/manage`);
+  redirect(`/guilds/${guildSlug}/manage?section=finance&refundSaved=1#refund-queue`);
 }

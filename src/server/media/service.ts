@@ -26,7 +26,7 @@ export async function resolveMediaContext(session: NonNullable<SessionShape>, pu
       where: {
         id: bookingPaymentId,
         status: { in: ["PENDING", "REJECTED"] },
-        booking: { userId: session.userId },
+        booking: { userId: session.userId, ride: { status: { in: ["PUBLISHED", "CLOSED"] } } },
         OR: [
           { purpose: { in: ["CONFIRMATION_DEPOSIT", "FULL_PAYMENT"] }, booking: { status: "RESERVED" } },
           { purpose: "BALANCE", booking: { status: "CONFIRMED" } },
@@ -178,12 +178,13 @@ export async function completeMediaUpload(session: NonNullable<SessionShape>, in
           booking: {
             select: {
               community: { select: { slug: true } },
-              ride: { select: { slug: true } },
+              ride: { select: { slug: true, status: true } },
             },
           },
         },
       });
       if (!payment) throw new AuthError("PAYMENT_REQUIRED", "This payment is unavailable.");
+      if (payment.booking.ride.status !== "PUBLISHED" && payment.booking.ride.status !== "CLOSED") throw new AuthError("PAYMENT_PAUSED", "Payments are paused while this ride is disrupted.", 409);
       await tx.bookingPayment.update({
         where: { id: context.bookingPaymentId },
         data: { proofAssetId: created.id, payerReference, status: "SUBMITTED", submittedAt: new Date(), reviewedById: null, reviewedAt: null, rejectionReason: null },

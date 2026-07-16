@@ -11,7 +11,7 @@ import { RideVehicleFields } from "@/components/ride-vehicle-fields";
 import { db } from "@/lib/db";
 import { requireRideEditor } from "@/server/auth/authorization";
 import { cloudinaryImageUrl } from "@/server/media/cloudinary";
-import { assignRideStaff, generateRideAnnouncement, removeRideStaff, setRideStatus, updateRidePackage } from "@/server/ride/actions";
+import { assignRideStaff, cancelRideAction, generateRideAnnouncement, postponeRideAction, removeRideStaff, setRideStatus, updateRidePackage } from "@/server/ride/actions";
 import { RIDE_STATUS_TRANSITIONS } from "@/server/ride/status";
 
 type Props = { params: Promise<{ slug: string; rideId: string }>; searchParams: Promise<{ saved?: string; statusSaved?: string; staffSaved?: string; announcementSaved?: string; error?: string }> };
@@ -36,10 +36,12 @@ export default async function EditRidePage({ params, searchParams }: Props) {
       policies: { orderBy: { version: "desc" } }, staffAssignments: { include: { user: { select: { displayName: true } }, origin: { select: { city: true, meetingPoint: true } } }, orderBy: { role: "asc" } },
       coverAsset: true, mediaAssets: { where: { purpose: "RIDE_GALLERY" }, orderBy: [{ sortOrder: "asc" }, { createdAt: "asc" }] },
       announcements: { orderBy: { createdAt: "desc" }, take: 1 },
+      disruptions: { orderBy: { createdAt: "desc" }, take: 5 },
       community: { include: { memberships: { where: { status: "ACTIVE" }, include: { user: { select: { displayName: true } } }, orderBy: { createdAt: "asc" } } } },
     } }), searchParams,
   ]);
   if (!ride) notFound();
+  const canDisruptRide = authorization.membership?.roles.some(({ role }) => role === "OWNER" || role === "ADMIN" || role === "RIDE_MANAGER") ?? false;
   const stay = ride.accommodations[0];
   const latestPolicy = (type: string) => ride.policies.find((policy) => policy.type === type)?.content ?? "";
   const packageOf = (type: string) => ride.packageItems.filter((item) => item.type === type);
@@ -85,7 +87,7 @@ export default async function EditRidePage({ params, searchParams }: Props) {
   });
   if (rideDayCount === 1) sampleRows.push(`${indiaLocal(ride.endsAt)} | Breakfast and return | Add the breakfast location, return stops, and expected completion plan`);
   const sampleItinerary = sampleRows.join("\n");
-  const allowedStatuses = RIDE_STATUS_TRANSITIONS[ride.status];
+  const allowedStatuses = RIDE_STATUS_TRANSITIONS[ride.status].filter((status) => status !== "POSTPONED" && status !== "CANCELLED");
   const exampleBox = "mt-3 block overflow-x-auto whitespace-pre-wrap rounded-xl border border-orange-400/15 bg-orange-400/[.035] p-3 font-mono text-[11px] leading-5 text-orange-200/80";
   return <section className="mx-auto min-h-[70vh] max-w-6xl px-5 py-16 lg:px-8">
     <div className="flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between"><div><Link href={authorization.access === "GUILD" ? `/guilds/${slug}/manage` : "/account"} className="text-sm font-bold text-zinc-500 hover:text-white">← {authorization.access === "GUILD" ? "Guild workspace" : "Account"}</Link><p className="eyebrow mt-8">Ride studio · {ride.status}</p><h1 className="mt-3 text-4xl font-black tracking-tight">{ride.title}</h1></div><div className="flex flex-wrap gap-3"><Link href={`/guilds/${slug}/rides/${ride.id}/participants`} className="rounded-full bg-orange-500 px-5 py-2.5 text-sm font-black text-white hover:bg-orange-400">Participants &amp; report</Link>{ride.status !== "DRAFT" && <Link href={`/rides/${ride.slug}`} className="rounded-full border border-white/15 px-5 py-2.5 text-sm font-bold">View public ride</Link>}</div></div>
@@ -153,6 +155,31 @@ export default async function EditRidePage({ params, searchParams }: Props) {
 
     <section id="announcement" className="mt-10 scroll-mt-24 rounded-3xl border border-white/10 p-7"><p className="eyebrow">Organizer export</p><h2 className="mt-3 text-2xl font-black">WhatsApp-ready ride announcement</h2><p className="mt-3 max-w-3xl text-sm leading-6 text-zinc-500">Generate this only after saving the ride package. It uses canonical ride details, hides restricted stay information, and removes common phone numbers, payment identifiers, participant rows, and private links. Regenerate whenever the ride changes.</p><form action={generateRideAnnouncement} className="relative mt-5"><input type="hidden" name="guildSlug" value={slug} /><input type="hidden" name="rideId" value={ride.id} /><FormPendingSubmit idleLabel={ride.announcements.length ? "Regenerate announcement" : "Generate announcement"} pendingLabel="Generating…" overlayLabel="Generating organizer announcement…" className="rounded-full bg-orange-500 px-6 py-3 text-sm font-black text-white" /></form>{ride.announcements[0] && <CopyAnnouncement content={ride.announcements[0].content} stale={ride.announcements[0].sourceVersion.getTime() < ride.updatedAt.getTime()} />}</section>
 
-    <section className="mt-10 rounded-3xl border border-orange-400/20 bg-orange-400/[.025] p-7"><p className="eyebrow">Publication</p><h2 className="mt-3 text-2xl font-black">Current state: {ride.status}</h2><p className="mt-3 text-sm leading-6 text-zinc-500">Publishing requires origins, itinerary, package items, a full description, and at least three policy types. State changes are deliberately limited so completed or cancelled records cannot be silently reopened.</p><div className="mt-6 flex flex-wrap gap-3">{allowedStatuses.map((status) => <form key={status} action={setRideStatus} className="relative"><input type="hidden" name="guildSlug" value={slug} /><input type="hidden" name="rideId" value={ride.id} /><input type="hidden" name="status" value={status} /><FormPendingSubmit idleLabel={status === "PUBLISHED" ? "Publish ride" : `Mark ${status.toLowerCase()}`} pendingLabel="Updating…" overlayLabel="Updating ride status…" className={`rounded-full px-5 py-2.5 text-sm font-black ${status === "PUBLISHED" ? "bg-emerald-500 text-black" : "border border-white/15"}`} /></form>)}</div>{!allowedStatuses.length && <p className="mt-5 text-sm font-semibold text-zinc-500">This is a terminal ride state. Its historical record remains read-only for status changes.</p>}</section>
+    {canDisruptRide && !["CANCELLED", "COMPLETED"].includes(ride.status) && <section id="disruption" className="mt-10 scroll-mt-24 rounded-3xl border border-amber-400/20 bg-amber-400/[.025] p-7">
+      <p className="eyebrow">Schedule disruption</p><h2 className="mt-3 text-2xl font-black">Postpone or cancel safely</h2>
+      <p className="mt-3 max-w-3xl text-sm leading-7 text-zinc-500">These actions stop new reservations and participant payment uploads. Postponement preserves bookings. Cancellation closes active bookings, creates refund-review records for confirmed or submitted payments, and keeps the financial history intact.</p>
+      {state.error === "disruption-details" && <p className="mt-4 rounded-2xl border border-red-400/25 bg-red-400/[.05] p-4 text-sm font-bold text-red-300">Add a clear reason of at least 20 characters and confirm the operational impact.</p>}
+      <div className="mt-6 grid gap-5 lg:grid-cols-2">
+        {["PUBLISHED", "CLOSED"].includes(ride.status) && <form action={postponeRideAction} className="relative rounded-3xl border border-amber-400/20 p-5">
+          <input type="hidden" name="guildSlug" value={slug} /><input type="hidden" name="rideId" value={ride.id} />
+          <h3 className="text-lg font-black text-amber-300">Postpone ride</h3><p className="mt-2 text-xs leading-5 text-zinc-500">Bookings remain active but all new booking and payment actions pause until the ride is republished.</p>
+          <label className="mt-4 block text-sm font-semibold">Reason visible to participants<textarea required minLength={20} maxLength={3000} rows={4} name="reason" className="field mt-2" /></label>
+          <label className="mt-4 block text-sm font-semibold">Proposed update date (optional)<input type="datetime-local" name="proposedResumeAt" className="field mt-2" /></label>
+          <label className="mt-4 flex items-start gap-3 text-xs leading-5 text-zinc-400"><input required type="checkbox" name="acknowledged" className="mt-1 size-4 accent-amber-500" />I understand participant emails are queued and payment actions pause immediately.</label>
+          <FormPendingSubmit idleLabel="Postpone ride" pendingLabel="Postponing…" overlayLabel="Postponing ride and notifying participants…" className="mt-5 rounded-full bg-amber-400 px-5 py-2.5 text-sm font-black text-black" />
+        </form>}
+        <form action={cancelRideAction} className="relative rounded-3xl border border-red-400/20 p-5">
+          <input type="hidden" name="guildSlug" value={slug} /><input type="hidden" name="rideId" value={ride.id} />
+          <h3 className="text-lg font-black text-red-300">Cancel ride</h3><p className="mt-2 text-xs leading-5 text-zinc-500">This is terminal. Active bookings are cancelled without deletion and paid/submitted amounts enter finance reconciliation.</p>
+          <label className="mt-4 block text-sm font-semibold">Reason visible to participants<textarea required minLength={20} maxLength={3000} rows={4} name="reason" className="field mt-2" /></label>
+          <label className="mt-4 flex items-start gap-3 text-xs leading-5 text-zinc-400"><input required type="checkbox" name="acknowledged" className="mt-1 size-4 accent-red-500" />I understand this cancels every active participant booking and may create refund obligations.</label>
+          <FormPendingSubmit idleLabel="Cancel ride" pendingLabel="Cancelling…" overlayLabel="Cancelling ride and preparing refund review…" className="mt-5 rounded-full border border-red-400/40 bg-red-400/10 px-5 py-2.5 text-sm font-black text-red-200" />
+        </form>
+      </div>
+    </section>}
+
+    {!!ride.disruptions.length && <section className="mt-10 rounded-3xl border border-white/10 p-7"><p className="eyebrow">Disruption history</p><div className="mt-5 grid gap-3">{ride.disruptions.map((disruption) => <article key={disruption.id} className="rounded-2xl border border-white/10 p-4"><div className="flex flex-wrap items-center justify-between gap-2"><p className="font-black">{disruption.type.replaceAll("_", " ")}</p><span className={`rounded-full px-3 py-1 text-[10px] font-black ${disruption.status === "ACTIVE" ? "bg-amber-400/15 text-amber-300" : "bg-white/10 text-zinc-400"}`}>{disruption.status}</span></div><p className="mt-2 text-sm leading-6 text-zinc-400">{disruption.reason}</p>{disruption.proposedResumeAt && <p className="mt-2 text-xs text-zinc-500">Proposed update: {disruption.proposedResumeAt.toLocaleString("en-IN", { timeZone: "Asia/Kolkata", dateStyle: "medium", timeStyle: "short" })}</p>}</article>)}</div></section>}
+
+    <section className="mt-10 rounded-3xl border border-orange-400/20 bg-orange-400/[.025] p-7"><p className="eyebrow">Publication</p><h2 className="mt-3 text-2xl font-black">Current state: {ride.status}</h2><p className="mt-3 text-sm leading-6 text-zinc-500">Publishing requires origins, itinerary, package items, a full description, and at least three policy types. State changes are deliberately limited so completed or cancelled records cannot be silently reopened.</p><div className="mt-6 flex flex-wrap gap-3">{allowedStatuses.map((status) => <form key={status} action={setRideStatus} className="relative"><input type="hidden" name="guildSlug" value={slug} /><input type="hidden" name="rideId" value={ride.id} /><input type="hidden" name="status" value={status} /><FormPendingSubmit idleLabel={status === "PUBLISHED" ? "Publish ride" : `Mark ${status.toLowerCase()}`} pendingLabel="Updating…" overlayLabel="Updating ride status…" className={`rounded-full px-5 py-2.5 text-sm font-black ${status === "PUBLISHED" ? "bg-emerald-500 text-black" : "border border-white/15"}`} /></form>)}</div>{!allowedStatuses.length && <p className="mt-5 text-sm font-semibold text-zinc-500">This state has no standard publication transition. Use the disruption controls or retain it as historical record.</p>}</section>
   </section>;
 }

@@ -214,12 +214,31 @@ enum BookingPaymentStatus {
   REJECTED
 }
 
+enum RideDisruptionType {
+  POSTPONEMENT
+  CANCELLATION
+}
+
+enum RideDisruptionStatus {
+  ACTIVE
+  RESOLVED
+}
+
+enum BookingRefundStatus {
+  REVIEW_REQUIRED
+  PENDING
+  PARTIALLY_REFUNDED
+  REFUNDED
+}
+
 enum NotificationEventType {
   BOOKING_PAYMENT_SUBMITTED
   BOOKING_PAYMENT_CONFIRMED
   BOOKING_PAYMENT_REJECTED
   BOOKING_RESERVATION_EXPIRED
   BOOKING_WAITLIST_PROMOTED
+  RIDE_POSTPONED
+  RIDE_CANCELLED
 }
 
 enum NotificationOutboxStatus {
@@ -265,6 +284,8 @@ model Community {
   rideStaffAssignments RideStaffAssignment[]
   bookings             RideBooking[]
   notificationEvents   NotificationOutboxEvent[]
+  disruptions          RideDisruption[]
+  bookingRefunds       BookingRefund[]
   embedOrigins         CommunityEmbedOrigin[]
   mediaAssets          MediaAsset[]                  @relation("CommunityMedia")
   logoAsset            MediaAsset?                   @relation("CommunityLogo", fields: [logoAssetId], references: [id], onDelete: SetNull)
@@ -373,6 +394,7 @@ model Ride {
   aiGenerations    RideAiGeneration[]
   announcements    RideAnnouncement[]
   bookings         RideBooking[]
+  disruptions      RideDisruption[]
 
   @@unique([communityId, slug])
   @@unique([id, communityId])
@@ -530,6 +552,8 @@ model User {
   bookingParticipants         BookingParticipant[]
   reviewedBookingPayments     BookingPayment[]             @relation("BookingPaymentReviewer")
   notificationEvents          NotificationOutboxEvent[]
+  createdRideDisruptions      RideDisruption[]             @relation("RideDisruptionCreator")
+  reviewedBookingRefunds      BookingRefund[]              @relation("BookingRefundReviewer")
 
   @@map("users")
 }
@@ -878,6 +902,30 @@ model RideAnnouncement {
   @@map("ride_announcements")
 }
 
+model RideDisruption {
+  id               String               @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  communityId      String               @map("community_id") @db.Uuid
+  rideId           String               @map("ride_id") @db.Uuid
+  type             RideDisruptionType
+  status           RideDisruptionStatus @default(ACTIVE)
+  reason           String               @db.Text
+  proposedResumeAt DateTime?            @map("proposed_resume_at") @db.Timestamptz(3)
+  createdById      String               @map("created_by_id") @db.Uuid
+  resolvedAt       DateTime?            @map("resolved_at") @db.Timestamptz(3)
+  resolutionNote   String?              @map("resolution_note") @db.Text
+  createdAt        DateTime             @default(now()) @map("created_at") @db.Timestamptz(3)
+  updatedAt        DateTime             @updatedAt @map("updated_at") @db.Timestamptz(3)
+
+  community Community       @relation(fields: [communityId], references: [id], onDelete: Restrict)
+  ride      Ride            @relation(fields: [rideId], references: [id], onDelete: Restrict)
+  createdBy User            @relation("RideDisruptionCreator", fields: [createdById], references: [id], onDelete: Restrict)
+  refunds   BookingRefund[]
+
+  @@index([rideId, status, createdAt])
+  @@index([communityId, type, createdAt])
+  @@map("ride_disruptions")
+}
+
 model RideBooking {
   id                        String               @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
   rideId                    String               @map("ride_id") @db.Uuid
@@ -920,6 +968,7 @@ model RideBooking {
   accommodationSelections BookingAccommodationSelection[]
   payments                BookingPayment[]
   notificationEvents      NotificationOutboxEvent[]
+  refund                  BookingRefund?
 
   @@unique([rideId, userId])
   @@index([rideId, status, reservationExpiresAt])
@@ -1018,6 +1067,32 @@ model BookingPayment {
   @@index([bookingId, status, createdAt])
   @@index([status, createdAt])
   @@map("booking_payments")
+}
+
+model BookingRefund {
+  id                   String              @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  bookingId            String              @unique @map("booking_id") @db.Uuid
+  communityId          String              @map("community_id") @db.Uuid
+  rideDisruptionId     String?             @map("ride_disruption_id") @db.Uuid
+  status               BookingRefundStatus
+  confirmedAmountPaise Int                 @default(0) @map("confirmed_amount_paise")
+  submittedAmountPaise Int                 @default(0) @map("submitted_amount_paise")
+  refundedAmountPaise  Int                 @default(0) @map("refunded_amount_paise")
+  reference            String?             @db.VarChar(180)
+  note                 String?             @db.Text
+  reviewedById         String?             @map("reviewed_by_id") @db.Uuid
+  reviewedAt           DateTime?           @map("reviewed_at") @db.Timestamptz(3)
+  createdAt            DateTime            @default(now()) @map("created_at") @db.Timestamptz(3)
+  updatedAt            DateTime            @updatedAt @map("updated_at") @db.Timestamptz(3)
+
+  booking        RideBooking     @relation(fields: [bookingId], references: [id], onDelete: Restrict)
+  community      Community       @relation(fields: [communityId], references: [id], onDelete: Restrict)
+  rideDisruption RideDisruption? @relation(fields: [rideDisruptionId], references: [id], onDelete: SetNull)
+  reviewedBy     User?           @relation("BookingRefundReviewer", fields: [reviewedById], references: [id], onDelete: SetNull)
+
+  @@index([communityId, status, createdAt])
+  @@index([rideDisruptionId, status])
+  @@map("booking_refunds")
 }
 
 model NotificationOutboxEvent {
