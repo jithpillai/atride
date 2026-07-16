@@ -231,7 +231,7 @@ External accounts needed:
 
 ### Phase 5 — Booking and offline payments
 
-Implementation status: **in progress, closure slice implemented**. Reservation, multi-person party booking, party-aware capacity and pricing, room-choice pricing/inventory, waitlist, consent snapshot, separate advance/balance obligations, offline UPI/bank/cash selection, Guild-level UPI configuration, immutable recipient snapshots, exact-amount UPI intents/local QR, transaction-reference capture, private proof upload, finance confirmation/rejection, durable payment email outbox, audit trail, personalized upcoming-rides integration, revocable member-only newcomer presentation, and the idempotent reservation-expiry/waitlist-promotion processor are implemented. Remaining closure work is production migration/deployment verification and connecting the protected expiry processor to an appropriately frequent production scheduler. Participant-requested transfer is deliberately excluded: authorized Guild staff cancel the old booking and create/approve the replacement through an audited admin workflow in a later operations increment.
+Implementation status: **in progress, closure slice implemented**. Reservation, multi-person party booking, party-aware capacity and pricing, room-choice pricing/inventory, waitlist, consent snapshot, separate advance/balance obligations, offline UPI/bank/cash selection, Guild-level UPI configuration, immutable recipient snapshots, exact-amount UPI intents/local QR, transaction-reference capture, private proof upload, finance confirmation/rejection, durable payment email outbox, audit trail, personalized upcoming-rides integration, revocable member-only newcomer presentation, an authorized participant manifest, an audited Excel-compatible report, a privacy-limited WhatsApp roster, audited staff cancellation, and the idempotent reservation-expiry/waitlist-promotion processor are implemented. Remaining closure work is production migration/deployment verification and connecting the protected expiry processor to an appropriately frequent production scheduler. Participant-requested transfer is deliberately excluded: authorized Guild staff cancel the old booking, while the replacement participant submits a fresh booking and accepts the current waiver and commercial terms.
 
 Build:
 
@@ -256,6 +256,10 @@ Build:
 - Admin-controlled cancellation and replacement; no participant self-transfer workflow
 - Booking relationships, payment state, role badges, and next actions in `Your upcoming rides`
 - Durable ride participation relationship and per-Guild newcomer consent capture
+- Participant manifest with booking-party, origin, operational, accommodation, vehicle, and payment details
+- Whole-ride access for Guild ride managers and origin-scoped access for assigned captains
+- Audited Excel-compatible participant report download
+- Numbered WhatsApp participant list that deliberately excludes contact, medical, emergency, vehicle, and payment details
 
 Acceptance tests:
 
@@ -279,6 +283,13 @@ Acceptance tests:
 - Live/action-required rides sort before ordinary upcoming rides, followed by nearest start time.
 - Clicking a card opens the canonical ride page and current server-side permissions control the visible panels/actions.
 - A first confirmed Guild relationship can create an opted-in member-only newcomer tile; cancelled/expired bookings cannot.
+- Authorized staff can view the participant manifest; an origin-assigned captain sees only participants from their assigned starting group.
+- Downloading a participant report creates an audit event identifying the actor, ride, scope, and row count.
+- The WhatsApp roster contains only confirmed participant names, starting cities, occupant roles, and diet preferences.
+- Authorized Guild ride managers can cancel an active booking with a required reason and acknowledgement; captains without Guild ride-management permission cannot.
+- Cancellation preserves the booking, participants, payment proofs, and audit history while releasing derived seat and room occupancy.
+- Confirmed or submitted money is never silently refunded or deleted, and cancellation cannot be reversed accidentally by the normal finance-review action.
+- Cancelling an inventory-holding booking attempts to promote the oldest eligible waitlisted party; a failed immediate promotion remains safely retryable by the idempotent processor.
 
 External accounts needed:
 
@@ -336,7 +347,9 @@ External accounts needed:
 Build:
 
 - Captain mobile console
-- Start and complete starting groups
+- Per-participant attendance records with `EXPECTED`, `CHECKED_IN`, `STARTED`, `COMPLETED`, `NO_SHOW`, `DID_NOT_START`, `DISCONTINUED`, and `REMOVED` states
+- Start and complete starting groups using auditable bulk transitions
+- Late joining at an authorized checkpoint with timestamp and checkpoint attribution
 - Checkpoint check-ins
 - Group counts
 - Notes, images, delays, and incidents
@@ -354,6 +367,11 @@ Build:
 Acceptance tests:
 
 - Each captain sees only assigned groups.
+- Checking in is participant-specific, including every person in a multi-person booking.
+- Starting a group changes `CHECKED_IN` participants to `STARTED`; participants still marked `EXPECTED` remain eligible for late entry and are not automatically marked `NO_SHOW`.
+- A late participant can move from `EXPECTED` to `STARTED` at a permitted checkpoint with an auditable join time and location.
+- Completing a group changes its `STARTED` participants to `COMPLETED`; `DISCONTINUED` and `REMOVED` exceptions remain unchanged.
+- Only final ride closure changes unresolved `EXPECTED` participants to `NO_SHOW`; unresolved `CHECKED_IN` participants require staff review and may become `DID_NOT_START`.
 - Bengaluru and Chennai groups progress independently.
 - Groups merge at the configured checkpoint.
 - Confirmed participants receive live updates.

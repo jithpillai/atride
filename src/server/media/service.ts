@@ -1,6 +1,7 @@
 import "server-only";
 
 import { randomUUID } from "node:crypto";
+import { revalidatePath } from "next/cache";
 
 import { db } from "@/lib/db";
 import { AuthError } from "@/server/auth/auth-service";
@@ -112,6 +113,7 @@ export async function completeMediaUpload(session: NonNullable<SessionShape>, in
 
   const oldPublicIds: string[] = [];
   const notificationEventKeys: string[] = [];
+  const pathsToRevalidate = new Set<string>();
   let asset;
   try {
     asset = await db.$transaction(async (tx) => {
@@ -168,7 +170,19 @@ export async function completeMediaUpload(session: NonNullable<SessionShape>, in
     } else if (input.purpose === "PAYMENT_PROOF" && context.bookingPaymentId) {
       const payerReference = input.payerReference?.trim().slice(0, 80) ?? "";
       if (payerReference.length < 6) throw new AuthError("PAYMENT_REFERENCE_REQUIRED", "Enter the UTR or UPI Transaction ID shown in your payment app.");
-      const payment = await tx.bookingPayment.findUnique({ where: { id: context.bookingPaymentId }, select: { proofAssetId: true, bookingId: true } });
+      const payment = await tx.bookingPayment.findUnique({
+        where: { id: context.bookingPaymentId },
+        select: {
+          proofAssetId: true,
+          bookingId: true,
+          booking: {
+            select: {
+              community: { select: { slug: true } },
+              ride: { select: { slug: true } },
+            },
+          },
+        },
+      });
       if (!payment) throw new AuthError("PAYMENT_REQUIRED", "This payment is unavailable.");
       await tx.bookingPayment.update({
         where: { id: context.bookingPaymentId },
@@ -183,6 +197,11 @@ export async function completeMediaUpload(session: NonNullable<SessionShape>, in
         metadata: { bookingPaymentId: context.bookingPaymentId, bookingId: payment.bookingId, rideId: context.rideId },
       } });
       notificationEventKeys.push(...await queueFinancePaymentSubmitted(tx, context.bookingPaymentId, created.id));
+      pathsToRevalidate.add(`/guilds/${payment.booking.community.slug}/manage`);
+      pathsToRevalidate.add(`/guilds/${payment.booking.community.slug}`);
+      pathsToRevalidate.add(`/rides/${payment.booking.ride.slug}`);
+      pathsToRevalidate.add("/account/bookings");
+      pathsToRevalidate.add("/");
     }
     return created;
     });
@@ -192,6 +211,7 @@ export async function completeMediaUpload(session: NonNullable<SessionShape>, in
   }
 
   await Promise.all(oldPublicIds.map((publicId) => cloudinary.uploader.destroy(publicId, { resource_type: "image", type: deliveryType, invalidate: true }).catch(() => undefined)));
+  pathsToRevalidate.forEach((path) => revalidatePath(path));
   if (notificationEventKeys.length) {
     await dispatchNotificationOutbox({ eventKeys: notificationEventKeys }).catch((error) => {
       console.error("Immediate payment notification dispatch failed; the durable event remains queued", { error });

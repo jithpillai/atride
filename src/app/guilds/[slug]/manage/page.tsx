@@ -110,7 +110,7 @@ export default async function GuildManagePage({ params, searchParams }: Props) {
           {guild.rides.length ? guild.rides.map((ride) => (
             <div key={ride.id} className="flex flex-col gap-2 rounded-2xl border border-white/8 p-4 sm:flex-row sm:items-center sm:justify-between">
               <div><p className="font-bold">{ride.title}</p><p className="mt-1 text-xs text-zinc-500">{ride.status} · {ride.startsAt.toLocaleDateString("en-IN")}</p></div>
-              <div className="flex items-center gap-3"><p className="text-sm font-bold text-orange-300">{ride.bookedSlots}/{ride.totalSlots} booked</p><Link href={`/guilds/${guild.slug}/rides/${ride.id}/edit`} className="rounded-full border border-white/15 px-4 py-2 text-xs font-bold">Edit package</Link></div>
+              <div className="flex flex-wrap items-center gap-3"><p className="text-sm font-bold text-orange-300">{ride.bookedSlots}/{ride.totalSlots} booked</p><Link href={`/guilds/${guild.slug}/rides/${ride.id}/participants`} className="rounded-full border border-orange-400/25 px-4 py-2 text-xs font-bold text-orange-200">Participants</Link><Link href={`/guilds/${guild.slug}/rides/${ride.id}/edit`} className="rounded-full border border-white/15 px-4 py-2 text-xs font-bold">Edit package</Link></div>
             </div>
           )) : <p className="rounded-2xl border border-dashed border-white/10 p-5 text-sm text-zinc-500">No rides yet. Create the Guild&apos;s first ride draft.</p>}
         </div>
