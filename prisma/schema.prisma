@@ -241,6 +241,13 @@ enum NotificationEventType {
   BOOKING_WAITLIST_PROMOTED
   RIDE_POSTPONED
   RIDE_CANCELLED
+  RIDE_ANNOUNCEMENT
+}
+
+enum RideAnnouncementUrgency {
+  NORMAL
+  IMPORTANT
+  CRITICAL
 }
 
 enum NotificationOutboxStatus {
@@ -551,6 +558,7 @@ model User {
   communityAuditEvents        CommunityAuditEvent[]        @relation("CommunityAuditActor")
   rideAiGenerations           RideAiGeneration[]
   rideAnnouncements           RideAnnouncement[]
+  rideAnnouncementAcknowledgements RideAnnouncementAcknowledgement[]
   rideBookings                RideBooking[]
   bookingParticipants         BookingParticipant[]
   reviewedBookingPayments     BookingPayment[]             @relation("BookingPaymentReviewer")
@@ -892,18 +900,37 @@ model RideAiGeneration {
 }
 
 model RideAnnouncement {
-  id            String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
-  rideId        String   @map("ride_id") @db.Uuid
-  createdById   String   @map("created_by_id") @db.Uuid
-  content       String   @db.Text
-  sourceVersion DateTime @map("source_version") @db.Timestamptz(3)
-  createdAt     DateTime @default(now()) @map("created_at") @db.Timestamptz(3)
+  id                      String                  @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  rideId                  String                  @map("ride_id") @db.Uuid
+  createdById             String                  @map("created_by_id") @db.Uuid
+  title                   String?                 @db.VarChar(180)
+  content                 String                  @db.Text
+  urgency                 RideAnnouncementUrgency @default(NORMAL)
+  requiresAcknowledgement Boolean                 @default(false) @map("requires_acknowledgement")
+  sourceVersion           DateTime                @map("source_version") @db.Timestamptz(3)
+  publishedAt             DateTime?               @map("published_at") @db.Timestamptz(3)
+  createdAt               DateTime                @default(now()) @map("created_at") @db.Timestamptz(3)
 
-  ride      Ride @relation(fields: [rideId], references: [id], onDelete: Cascade)
-  createdBy User @relation(fields: [createdById], references: [id], onDelete: Restrict)
+  ride             Ride                              @relation(fields: [rideId], references: [id], onDelete: Cascade)
+  createdBy        User                              @relation(fields: [createdById], references: [id], onDelete: Restrict)
+  acknowledgements RideAnnouncementAcknowledgement[]
 
-  @@index([rideId, createdAt])
+  @@index([rideId, publishedAt, createdAt])
   @@map("ride_announcements")
+}
+
+model RideAnnouncementAcknowledgement {
+  id             String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  announcementId String   @map("announcement_id") @db.Uuid
+  userId         String   @map("user_id") @db.Uuid
+  acknowledgedAt DateTime @default(now()) @map("acknowledged_at") @db.Timestamptz(3)
+
+  announcement RideAnnouncement @relation(fields: [announcementId], references: [id], onDelete: Cascade)
+  user         User             @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([announcementId, userId])
+  @@index([userId, acknowledgedAt])
+  @@map("ride_announcement_acknowledgements")
 }
 
 model RideDisruption {

@@ -32,5 +32,7 @@ export function notificationPresentation(eventType: NotificationEventType, rawPa
       return { title: `Ride postponed · ${ride}`, body: text(payload, "reason", `${guild} postponed this ride.`), actionUrl };
     case "RIDE_CANCELLED":
       return { title: `Ride cancelled · ${ride}`, body: text(payload, "reason", `${guild} cancelled this ride.`), actionUrl };
+    case "RIDE_ANNOUNCEMENT":
+      return { title: `${text(payload, "announcementTitle", "Ride update")} · ${ride}`, body: text(payload, "announcementBody", `${guild} published a ride update.`), actionUrl: text(payload, "rideUrl") || actionUrl };
   }
 }

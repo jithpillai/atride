@@ -14,8 +14,11 @@ import { canEditRide } from "@/server/auth/permissions";
 import { findUserBookingForRide } from "@/server/booking/service";
 import { summarizeBookingPayments } from "@/server/booking/payment-summary";
 import { UpiPaymentPanel } from "@/components/upi-payment-panel";
+import { FormPendingSubmit } from "@/components/pending-feedback";
+import { db } from "@/lib/db";
+import { acknowledgeRideAnnouncement } from "@/server/notifications/announcement-actions";
 
-type Props = { params: Promise<{ slug: string }>; searchParams: Promise<{ booking?: string }> };
+type Props = { params: Promise<{ slug: string }>; searchParams: Promise<{ booking?: string; announcementAcknowledged?: string }> };
 export const revalidate = 300;
 export async function generateStaticParams() { return (await listPublicRideSlugs()).map((slug) => ({ slug })); }
 export async function generateMetadata({ params }: Props): Promise<Metadata> {
@@ -30,7 +33,16 @@ export default async function RidePage({ params, searchParams }: Props) {
   const session = await getCurrentSession();
   const booking = session ? await findUserBookingForRide(session.userId, ride.id) : null;
   const activeBooking = booking && !["EXPIRED", "CANCELLED", "TRANSFERRED"].includes(booking.status) ? booking : null;
-  const bookingNotice = (await searchParams).booking;
+  const state = await searchParams;
+  const bookingNotice = state.booking;
+  const participantAnnouncements = session && activeBooking && ["RESERVED", "CONFIRMED"].includes(activeBooking.status)
+    ? await db.rideAnnouncement.findMany({
+        where: { rideId: ride.id, publishedAt: { not: null } },
+        include: { acknowledgements: { where: { userId: session.userId }, select: { id: true, acknowledgedAt: true } } },
+        orderBy: [{ publishedAt: "desc" }, { createdAt: "desc" }],
+        take: 50,
+      })
+    : [];
   const paymentSummary = activeBooking ? summarizeBookingPayments(activeBooking) : null;
   const membership = session?.user.communityMemberships.find(
     ({ community }) => community.slug === ride.community.slug,
@@ -60,6 +72,7 @@ export default async function RidePage({ params, searchParams }: Props) {
     {disruption && <section className={`border-b px-5 py-5 ${ride.status === "CANCELLED" ? "border-red-400/20 bg-red-400/[.06]" : "border-amber-400/20 bg-amber-400/[.05]"}`}><div className="mx-auto max-w-7xl"><p className={`text-sm font-black ${ride.status === "CANCELLED" ? "text-red-300" : "text-amber-300"}`}>{ride.status === "CANCELLED" ? "This ride has been cancelled." : "This ride has been postponed."}</p>{booking && <p className="mt-2 max-w-4xl text-sm leading-6 text-zinc-300">{disruption.reason}</p>}{booking && disruption.proposedResumeAt && <p className="mt-2 text-xs font-bold text-amber-200">Proposed update: {when(disruption.proposedResumeAt)}</p>}</div></section>}
 
     <section className="mx-auto grid max-w-7xl gap-10 px-5 py-16 lg:grid-cols-[minmax(0,1fr)_24rem] lg:px-8 xl:grid-cols-[minmax(0,1fr)_26rem]"><main className="min-w-0">
+      {!!participantAnnouncements.length && <section id="ride-updates" className="mb-12 scroll-mt-28 rounded-3xl border border-orange-400/20 bg-orange-400/[.025] p-6 sm:p-7"><div className="flex flex-wrap items-end justify-between gap-3"><div><p className="eyebrow">Participant feed</p><h2 className="mt-3 text-3xl font-black">Official ride updates</h2></div><Link href="/account/notifications" className="text-sm font-bold text-orange-300 hover:text-orange-200">Notification inbox →</Link></div>{state.announcementAcknowledged && <p className="mt-5 rounded-2xl border border-emerald-400/20 bg-emerald-400/[.06] p-4 text-sm font-bold text-emerald-300">Acknowledgement recorded.</p>}<div className="mt-6 grid gap-4">{participantAnnouncements.map((announcement) => { const acknowledged = announcement.acknowledgements[0]; return <article key={announcement.id} className={`rounded-2xl border p-5 ${announcement.urgency === "CRITICAL" ? "border-red-400/25 bg-red-400/[.04]" : announcement.urgency === "IMPORTANT" ? "border-amber-400/20 bg-amber-400/[.035]" : "border-white/10 bg-black/15"}`}><div className="flex flex-wrap items-start justify-between gap-3"><div><h3 className="text-lg font-black">{announcement.title}</h3><p className="mt-1 text-xs text-zinc-500">{announcement.publishedAt && when(announcement.publishedAt)}</p></div><span className={`rounded-full px-3 py-1 text-[10px] font-black ${announcement.urgency === "CRITICAL" ? "bg-red-400/15 text-red-300" : announcement.urgency === "IMPORTANT" ? "bg-amber-400/15 text-amber-300" : "bg-white/10 text-zinc-300"}`}>{announcement.urgency}</span></div><p className="mt-4 whitespace-pre-line text-sm leading-7 text-zinc-300">{announcement.content}</p>{announcement.requiresAcknowledgement && (acknowledged ? <p className="mt-4 text-sm font-black text-emerald-300">✓ Acknowledged {when(acknowledged.acknowledgedAt)}</p> : <form action={acknowledgeRideAnnouncement} className="relative mt-5"><input type="hidden" name="announcementId" value={announcement.id} /><input type="hidden" name="rideSlug" value={ride.slug} /><FormPendingSubmit idleLabel="I have read and understood" pendingLabel="Recording…" overlayLabel="Recording acknowledgement…" className="rounded-full bg-orange-500 px-5 py-2.5 text-sm font-black text-white" /></form>)}</article>; })}</div></section>}
       <p className="eyebrow">About this ride</p><p className="mt-5 whitespace-pre-line text-sm leading-7 text-zinc-400">{ride.description}</p>
       <div className="mt-6 rounded-2xl border border-orange-400/15 bg-orange-400/[.035] p-5"><p className="text-sm font-black text-orange-300">{ride.vehicleType} requirements</p><p className="mt-2 whitespace-pre-line text-sm leading-6 text-zinc-400">{ride.vehicleRequirements}</p></div>
 

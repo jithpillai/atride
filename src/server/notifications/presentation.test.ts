@@ -21,4 +21,15 @@ describe("in-app notification presentation", () => {
     });
     expect(item.body).toBe("Unsafe weather conditions");
   });
+
+  it("presents official ride announcements with their ride-feed action", () => {
+    const item = notificationPresentation("RIDE_ANNOUNCEMENT", {
+      announcementTitle: "Departure update",
+      announcementBody: "Report by 05:15.",
+      rideUrl: "/rides/agumbe-trail#ride-updates",
+    });
+    expect(item.title).toContain("Departure update");
+    expect(item.body).toBe("Report by 05:15.");
+    expect(item.actionUrl).toBe("/rides/agumbe-trail#ride-updates");
+  });
 });

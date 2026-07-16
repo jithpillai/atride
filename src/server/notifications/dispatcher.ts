@@ -5,6 +5,7 @@ import { getEmailProvider } from "@/server/email/provider";
 import { renderBookingEventEmail, type BookingEmailPayload } from "@/server/email/booking-template";
 import { renderPaymentEventEmail, type PaymentEmailPayload } from "@/server/email/payment-template";
 import { renderRideDisruptionEmail, type RideDisruptionEmailPayload } from "@/server/email/ride-disruption-template";
+import { renderRideAnnouncementEmail, type RideAnnouncementEmailPayload } from "@/server/email/announcement-template";
 import { notificationPresentation } from "@/server/notifications/presentation";
 
 const MAX_ATTEMPTS = 5;
@@ -53,7 +54,9 @@ export async function dispatchNotificationOutbox(options: { eventKeys?: string[]
         },
         update: {},
       });
-      const message = event.eventType === "RIDE_POSTPONED" || event.eventType === "RIDE_CANCELLED"
+      const message = event.eventType === "RIDE_ANNOUNCEMENT"
+        ? renderRideAnnouncementEmail(event.eventType, event.recipientName, event.payload as unknown as RideAnnouncementEmailPayload)
+        : event.eventType === "RIDE_POSTPONED" || event.eventType === "RIDE_CANCELLED"
         ? renderRideDisruptionEmail(event.eventType, event.recipientName, event.payload as unknown as RideDisruptionEmailPayload)
         : event.eventType === "BOOKING_RESERVED" || event.eventType === "BOOKING_WAITLISTED" || event.eventType === "BOOKING_RESERVATION_EXPIRED" || event.eventType === "BOOKING_WAITLIST_PROMOTED"
         ? renderBookingEventEmail(event.eventType, event.recipientName, event.payload as unknown as BookingEmailPayload)

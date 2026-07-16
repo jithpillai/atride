@@ -306,7 +306,7 @@ External accounts needed:
 
 ### Phase 6 — Email, in-app, and event notifications
 
-Implementation status: **in progress**. Phase 5 supplied the transactional email outbox, SES adapter, immediate best-effort dispatch, retry backoff, booking/payment/disruption templates, and protected retry endpoint. The first Phase 6 slice adds booking-created events and a bounded in-app notification centre before scheduled reminders, announcements, acknowledgements, provider callbacks, worker deployment, and cleanup automation.
+Implementation status: **in progress**. Phase 5 supplied the transactional email outbox, SES adapter, immediate best-effort dispatch, retry backoff, booking/payment/disruption templates, and protected retry endpoint. Phase 6 now includes booking-created events, a bounded in-app notification centre, authoritative ride announcements delivered to active participants through both inbox and transactional email, urgency levels, and durable acknowledgements for critical or acknowledgement-required updates. Scheduled reminders, notification preferences, protected WhatsApp invite controls, provider callbacks, worker deployment, and cleanup automation remain before the phase closes.
 
 Build:
 
