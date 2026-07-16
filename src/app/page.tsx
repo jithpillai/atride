@@ -4,6 +4,7 @@ import Link from "next/link";
 import { ImageWithFallback } from "@/components/image-with-fallback";
 import { MarketplaceExplorer } from "@/components/marketplace-explorer";
 import {
+  findPersonalizedFeaturedRide,
   listMarketplaceCities,
   listMarketplaceGuilds,
   listMarketplaceRides,
@@ -15,13 +16,16 @@ export const revalidate = 300;
 
 export default async function HomePage() {
   const session = await getCurrentSession();
-  const [cities, guilds, rides, staffRides] = await Promise.all([
+  const [cities, guilds, rides, staffRides, personalizedFeaturedRide] = await Promise.all([
     listMarketplaceCities(),
     listMarketplaceGuilds(),
     listMarketplaceRides(),
     session ? listUpcomingStaffRides(session.userId) : Promise.resolve([]),
+    session ? findPersonalizedFeaturedRide(session.userId) : Promise.resolve(null),
   ]);
-  const heroRide = rides[0];
+  const heroRide = personalizedFeaturedRide?.ride ?? rides[0];
+  const heroContextLabel = personalizedFeaturedRide?.contextLabel ?? "Next adventure";
+  const heroCompleted = personalizedFeaturedRide?.kind === "COMPLETED";
   const heroRideDuration = heroRide
     ? Math.max(
         1,
@@ -100,8 +104,8 @@ export default async function HomePage() {
                   <div className="relative h-48 overflow-hidden p-6" style={{ background: heroRide.gradient }}>
                     {heroRide.coverUrl && <ImageWithFallback src={heroRide.coverUrl} fallbackSrc="/defaults/guild-hall-cover.png" alt="" fill sizes="(min-width:1024px) 36rem, 100vw" className="object-cover" />}
                     <div className="absolute inset-0 bg-gradient-to-t from-black/90 via-black/25 to-black/20" />
-                    <div className="relative flex justify-between"><span className="rounded-full bg-black/45 px-3 py-1 text-xs font-bold backdrop-blur">{heroRide.city}</span><span className="rounded-full bg-orange-500 px-3 py-1 text-xs font-bold">{heroRide.totalSlots - heroRide.bookedSlots} slots left</span></div>
-                    <p className="relative mt-16 text-xs font-bold uppercase tracking-[.16em] text-white/70">Next adventure</p>
+                    <div className="relative flex justify-between"><span className="rounded-full bg-black/45 px-3 py-1 text-xs font-bold backdrop-blur">{heroRide.city}</span><span className="rounded-full bg-orange-500 px-3 py-1 text-xs font-bold">{heroCompleted ? "Completed" : `${Math.max(0, heroRide.totalSlots - heroRide.bookedSlots)} slots left`}</span></div>
+                    <p className="relative mt-16 text-xs font-bold uppercase tracking-[.16em] text-white/70">{heroContextLabel}</p>
                     <div className="relative mt-1 flex items-center justify-between gap-4">
                       <p className="text-2xl font-black">{heroRide.title}</p>
                       <span aria-hidden="true" className="text-xl font-black transition-transform group-hover:translate-x-1">→</span>

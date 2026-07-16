@@ -171,6 +171,82 @@ export const listUpcomingStaffRides = cache(async (userId: string) => {
   return mapped.sort((left, right) => priority(left) - priority(right) || new Date(left.startDate).getTime() - new Date(right.startDate).getTime()).slice(0, 6);
 });
 
+export type PersonalizedFeaturedRide = {
+  ride: RideView;
+  contextLabel: string;
+  kind: "UPCOMING" | "COMPLETED" | "GUILD_UPCOMING";
+};
+
+export const findPersonalizedFeaturedRide = cache(async (userId: string): Promise<PersonalizedFeaturedRide | null> => {
+  const now = new Date();
+  const visibleRide: Prisma.RideWhereInput = {
+    visibility: "PUBLIC",
+    community: {
+      status: "ACTIVE",
+      visibility: { guildHallAccess: "PUBLIC" },
+    },
+  };
+  const personalConnection: Prisma.RideWhereInput = {
+    OR: [
+      { staffAssignments: { some: { userId } } },
+      { bookings: { some: { userId, status: { in: ["RESERVED", "CONFIRMED", "WAITLISTED", "PAYMENT_REJECTED", "TRANSFER_PENDING"] } } } },
+    ],
+  };
+
+  const upcoming = await db.ride.findFirst({
+    where: {
+      ...visibleRide,
+      ...personalConnection,
+      startsAt: { gte: now },
+      status: { in: ["PUBLISHED", "CLOSED", "POSTPONED"] },
+    },
+    include: rideInclude,
+    orderBy: { startsAt: "asc" },
+  });
+  if (upcoming) return { ride: toRideView(upcoming), contextLabel: "Your upcoming ride", kind: "UPCOMING" };
+
+  const completed = await db.ride.findFirst({
+    where: {
+      ...visibleRide,
+      status: "COMPLETED",
+      OR: [
+        { staffAssignments: { some: { userId } } },
+        { bookings: { some: { userId, status: "CONFIRMED" } } },
+      ],
+    },
+    include: rideInclude,
+    orderBy: { endsAt: "desc" },
+  });
+  if (completed) return { ride: toRideView(completed), contextLabel: "From your ride history", kind: "COMPLETED" };
+
+  const membershipRide = await db.ride.findFirst({
+    where: {
+      ...visibleRide,
+      startsAt: { gte: now },
+      status: { in: ["PUBLISHED", "CLOSED", "POSTPONED"] },
+      community: {
+        status: "ACTIVE",
+        visibility: { guildHallAccess: "PUBLIC" },
+        memberships: { some: { userId, status: "ACTIVE" } },
+      },
+    },
+    include: {
+      community: { select: { slug: true, name: true } },
+      coverAsset: true,
+    },
+    orderBy: { startsAt: "asc" },
+  });
+  if (membershipRide) {
+    return {
+      ride: toRideView(membershipRide),
+      contextLabel: `From ${membershipRide.community.name}`,
+      kind: "GUILD_UPCOMING",
+    };
+  }
+
+  return null;
+});
+
 export const listMarketplaceCities = cache(async (): Promise<string[]> => {
   const locations = await db.communityLocation.findMany({
     where: {
@@ -221,6 +297,64 @@ export const listPublishedRidesForTenant = cache(
     return rides.map(toRideView);
   },
 );
+
+export type GuildRideHighlight = {
+  slug: string;
+  title: string;
+  destination: string;
+  startsAt: string;
+  status: "UPCOMING" | "COMPLETED";
+  imageUrls: string[];
+};
+
+export const listGuildRideHighlights = cache(async (tenant: TenantContext): Promise<{
+  upcoming: GuildRideHighlight[];
+  completed: GuildRideHighlight[];
+}> => {
+  const include = {
+    coverAsset: true,
+    mediaAssets: {
+      where: { purpose: "RIDE_GALLERY" as const, access: "PUBLIC" as const },
+      orderBy: [{ sortOrder: "asc" as const }, { createdAt: "asc" as const }],
+      take: 2,
+    },
+  } satisfies Prisma.RideInclude;
+  const [upcoming, completed] = await Promise.all([
+    db.ride.findMany({
+      where: {
+        communityId: tenant.communityId,
+        status: { in: ["PUBLISHED", "CLOSED"] },
+        visibility: "PUBLIC",
+        startsAt: { gte: new Date() },
+      },
+      include,
+      orderBy: { startsAt: "asc" },
+      take: 3,
+    }),
+    db.ride.findMany({
+      where: { communityId: tenant.communityId, status: "COMPLETED", visibility: "PUBLIC" },
+      include,
+      orderBy: { endsAt: "desc" },
+      take: 3,
+    }),
+  ]);
+  const mapRide = (ride: typeof upcoming[number], status: GuildRideHighlight["status"]): GuildRideHighlight => ({
+    slug: ride.slug,
+    title: ride.title,
+    destination: ride.destination,
+    startsAt: ride.startsAt.toISOString(),
+    status,
+    imageUrls: [
+      ...(ride.coverAsset ? [cloudinaryImageUrl(ride.coverAsset)] : []),
+      ...ride.mediaAssets.map((asset) => cloudinaryImageUrl(asset)),
+    ].slice(0, 3),
+  });
+
+  return {
+    upcoming: upcoming.map((ride) => mapRide(ride, "UPCOMING")),
+    completed: completed.map((ride) => mapRide(ride, "COMPLETED")),
+  };
+});
 
 export const findPublicRideBySlug = cache(async (slug: string): Promise<RideView | null> => {
   const ride = await db.ride.findFirst({

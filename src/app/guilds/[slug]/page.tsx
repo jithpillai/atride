@@ -9,6 +9,8 @@ import { canManageGuild } from "@/server/auth/permissions";
 import { getCurrentSession } from "@/server/auth/session";
 import { listGuildNewcomersForMember } from "@/server/guild/newcomers";
 import {
+  type GuildRideHighlight,
+  listGuildRideHighlights,
   listPublishedRidesForTenant,
   listStaticGuildSlugs,
   resolveGuildTenant,
@@ -63,10 +65,13 @@ export default async function GuildPage({ params }: Props) {
     );
   }
 
-  const guildRides = await listPublishedRidesForTenant(tenant);
-  const newcomers = session && guild.newcomerDisplayEnabled
-    ? await listGuildNewcomersForMember(guild.slug, session.userId)
-    : [];
+  const [guildRides, newcomers, rideHighlights] = await Promise.all([
+    listPublishedRidesForTenant(tenant),
+    session && guild.newcomerDisplayEnabled
+      ? listGuildNewcomersForMember(guild.slug, session.userId)
+      : Promise.resolve([]),
+    listGuildRideHighlights(tenant),
+  ]);
 
   return (
     <>
@@ -128,7 +133,25 @@ export default async function GuildPage({ params }: Props) {
         </div>
       </section>}
 
-      {!!guild.galleryUrls.length && <section className="mx-auto max-w-7xl px-5 pb-16 lg:px-8"><p className="eyebrow">From the road</p><h2 className="mt-3 text-3xl font-black">Guild gallery</h2><div className="mt-6 grid gap-4 sm:grid-cols-2 lg:grid-cols-3">{guild.galleryUrls.map((url, index) => <Image key={url} src={url} alt={`${guild.name} gallery image ${index + 1}`} width={800} height={600} className="aspect-[4/3] w-full rounded-3xl object-cover" />)}</div></section>}
+      {(guild.galleryUrls.length > 0 || rideHighlights.upcoming.length > 0 || rideHighlights.completed.length > 0) && <section className="mx-auto max-w-7xl px-5 pb-16 lg:px-8">
+        <p className="eyebrow">From the road</p><h2 className="mt-3 text-3xl font-black">Guild gallery</h2><p className="mt-3 max-w-3xl text-sm leading-6 text-zinc-500">Permanent Guild highlights sit alongside automatically refreshed images from current and recently completed rides.</p>
+        {!!guild.galleryUrls.length && <div className="mt-8"><div className="flex items-end justify-between gap-4"><div><h3 className="text-xl font-black">Guild highlights</h3><p className="mt-1 text-xs text-zinc-500">Curated by {guild.shortName}</p></div><span className="text-xs font-bold text-zinc-600">{guild.galleryUrls.length} images</span></div><div className="mt-5 grid gap-4 sm:grid-cols-2 lg:grid-cols-3">{guild.galleryUrls.map((url, index) => <Image key={url} src={url} alt={`${guild.name} gallery image ${index + 1}`} width={800} height={600} loading="lazy" className="aspect-[4/3] w-full rounded-3xl object-cover" />)}</div></div>}
+        <RideHighlightScroller title="Upcoming adventures" description="The nearest published rides from this Guild." rides={rideHighlights.upcoming} />
+        <RideHighlightScroller title="Recently completed" description="The latest completed rides and their visual highlights." rides={rideHighlights.completed} />
+      </section>}
     </>
   );
+}
+
+function RideHighlightScroller({ title, description, rides }: { title: string; description: string; rides: GuildRideHighlight[] }) {
+  if (!rides.length) return null;
+  return <div className="mt-10"><div><h3 className="text-xl font-black">{title}</h3><p className="mt-1 text-xs text-zinc-500">{description}</p></div><div className="-mx-5 mt-5 flex snap-x snap-mandatory gap-5 overflow-x-auto px-5 pb-3 lg:mx-0 lg:px-0">{rides.map((ride) => {
+    const images = ride.imageUrls.length ? ride.imageUrls : ["/defaults/guild-hall-cover.png"];
+    return <Link key={ride.slug} href={`/rides/${ride.slug}`} className="group w-[84vw] max-w-[28rem] shrink-0 snap-start overflow-hidden rounded-3xl border border-white/10 bg-[#13171d] transition hover:-translate-y-1 hover:border-orange-400/35">
+      <div className={`grid h-64 gap-1 bg-black ${images.length > 1 ? "grid-cols-3 grid-rows-2" : "grid-cols-1"}`}>
+        {images.map((url, index) => <div key={`${ride.slug}-${url}`} className={`relative overflow-hidden ${images.length > 1 && index === 0 ? "col-span-2 row-span-2" : ""} ${images.length === 2 && index === 1 ? "row-span-2" : ""}`}><ImageWithFallback src={url} fallbackSrc="/defaults/guild-hall-cover.png" alt={`${ride.title} highlight ${index + 1}`} fill sizes="(min-width: 640px) 28rem, 84vw" className="object-cover transition duration-500 group-hover:scale-[1.03]" /></div>)}
+      </div>
+      <div className="flex items-end justify-between gap-4 p-5"><div><p className={`text-xs font-bold uppercase tracking-wider ${ride.status === "COMPLETED" ? "text-emerald-400" : "text-orange-400"}`}>{ride.status === "COMPLETED" ? "Completed" : formatRideDate(ride.startsAt)} · {ride.destination}</p><h4 className="mt-2 text-lg font-black group-hover:text-orange-300">{ride.title}</h4></div><span aria-hidden="true" className="text-xl font-black transition group-hover:translate-x-1">→</span></div>
+    </Link>;
+  })}</div></div>;
 }

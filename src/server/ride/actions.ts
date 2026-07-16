@@ -89,7 +89,7 @@ export async function createRideDraft(_previousState: CreateRideDraftState, form
     ride = await db.$transaction(async (tx) => {
       const created = await tx.ride.create({
         data: {
-          communityId: community.id, slug, title, summary, description: summary,
+          communityId: community.id, slug, title, summary, description: "",
           originCity, destination, startsAt, endsAt, pricePaise: 0, totalSlots,
           vehicleType: "BIKE", vehicleRequirements: "Road-legal motorcycle in safe touring condition; full-face helmet and required riding gear.", difficulty: "MODERATE", status: "DRAFT", visibility: "PUBLIC",
           heroGradient: "linear-gradient(135deg, #17212b 0%, #7c2d12 55%, #101419 100%)", distanceKm: 1,
