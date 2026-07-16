@@ -347,7 +347,7 @@ model Ride {
   balanceDueAt             DateTime?      @map("balance_due_at") @db.Timestamptz(3)
   registrationClosesAt     DateTime?      @map("registration_closes_at") @db.Timestamptz(3)
   totalSlots               Int            @map("total_slots")
-  bufferSlots              Int            @default(0) @map("buffer_slots")
+  waitlistCapacity         Int            @default(0) @map("buffer_slots")
   bookedSlots              Int            @default(0) @map("booked_slots")
   vehicleType              VehicleType    @default(BIKE) @map("vehicle_type")
   vehicleRequirements      String         @default("") @map("vehicle_requirements") @db.Text

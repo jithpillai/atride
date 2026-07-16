@@ -39,8 +39,11 @@ export default async function RidePage({ params, searchParams }: Props) {
     membership?.welcomeConsent && !membership.welcomeConsent.revokedAt,
   );
   const showManageRide = canEditRide(membership, ride.staffAssignments, session?.userId);
-  const slotsLeft = ride.totalSlots + ride.bufferSlots - ride.bookedSlots;
+  const slotsLeft = Math.max(ride.totalSlots - ride.bookedSlots, 0);
   const soldOut = slotsLeft <= 0;
+  const waitlistedSeats = ride.bookings.reduce((total, queued) => total + queued.seatCount, 0);
+  const waitlistSlotsLeft = Math.max(ride.waitlistCapacity - waitlistedSeats, 0);
+  const waitlistOpen = soldOut && waitlistSlotsLeft > 0;
   const items = (type: "INCLUSION" | "EXCLUSION" | "ADD_ON" | "MEAL" | "ACTIVITY") => ride.packageItems.filter((item) => item.type === type);
   const latestPolicies = ride.policies.filter((policy, index, policies) => policies.findIndex((candidate) => candidate.type === policy.type) === index);
 
@@ -71,7 +74,7 @@ export default async function RidePage({ params, searchParams }: Props) {
 
     <aside id="booking" className="h-fit min-w-0 scroll-mt-28 rounded-3xl border border-orange-500/25 bg-[#15191f] p-6 lg:sticky lg:top-28 lg:max-h-[calc(100vh-8rem)] lg:overflow-y-auto xl:p-7"><p className="text-sm text-zinc-500">Ride fee per person</p><p className="mt-1 text-3xl font-black">{formatMoney(ride.pricePaise / 100)}</p>{ride.confirmationDepositPaise > 0 && <p className="mt-2 text-xs text-zinc-500">₹{(ride.confirmationDepositPaise / 100).toLocaleString("en-IN")} confirmation deposit per person</p>}
       <div className="mt-6 grid gap-3 border-y border-white/8 py-5 text-sm"><p className="flex justify-between"><span className="text-zinc-500">Starts</span><span className="font-bold">{formatRideDate(ride.startsAt.toISOString())}</span></p><p className="flex justify-between"><span className="text-zinc-500">Distance</span><span className="font-bold">{ride.distanceKm} km</span></p><p className="flex justify-between"><span className="text-zinc-500">Vehicle</span><span className="font-bold">{ride.vehicleType}</span></p><p className="flex justify-between"><span className="text-zinc-500">Difficulty</span><span className="font-bold">{ride.difficulty}</span></p></div>
-      <p className={`mt-5 text-sm font-bold ${soldOut ? "text-amber-400" : "text-emerald-400"}`}>{soldOut ? "Ride capacity reached" : `${slotsLeft} of ${ride.totalSlots + ride.bufferSlots} slots available`}</p>
+      <p className={`mt-5 text-sm font-bold ${soldOut ? "text-amber-400" : "text-emerald-400"}`}>{soldOut ? waitlistOpen ? `Ride full · ${waitlistSlotsLeft} waitlist ${waitlistSlotsLeft === 1 ? "place" : "places"} left` : "Ride and waitlist are full" : `${slotsLeft} of ${ride.totalSlots} participant slots available`}</p>
       {bookingNotice && <p className="mt-4 rounded-2xl border border-emerald-400/20 bg-emerald-400/[.06] p-4 text-sm font-bold text-emerald-300">{bookingNotice === "waitlisted" ? "You joined the waitlist." : bookingNotice === "already_confirmed" ? "Your booking is already confirmed." : "Your ride reservation is saved."}</p>}
       {booking?.status === "EXPIRED" && <p className="mt-5 rounded-2xl border border-amber-400/20 bg-amber-400/[.05] p-4 text-sm leading-6 text-amber-200">Your earlier payment hold expired and its seat was released. You may reserve again below; current capacity and waitlist rules apply.</p>}
       {activeBooking ? <div className="mt-5 rounded-2xl border border-white/10 bg-black/20 p-5">
@@ -102,7 +105,7 @@ export default async function RidePage({ params, searchParams }: Props) {
           })}</div>
         </div>}
       </div>
-      : ride.status === "PUBLISHED" ? session ? <RideBookingForm
+      : ride.status === "PUBLISHED" && (!soldOut || waitlistOpen) ? session ? <RideBookingForm
           rideId={ride.id}
           rideSlug={ride.slug}
           origins={ride.origins.map((origin) => ({ id: origin.id, label: `${origin.city} · ${origin.meetingPoint}` }))}
@@ -112,13 +115,15 @@ export default async function RidePage({ params, searchParams }: Props) {
           dietaryPreference={session.user.profile?.dietaryPreference ?? ""}
           accessibilityNotes={session.user.profile?.accessibilityNotes ?? ""}
           soldOut={soldOut}
+          waitlistSlotsLeft={waitlistSlotsLeft}
           newcomerConsentAvailable={ride.community.newcomerDisplayEnabled && !welcomeConsentActive}
           guildName={ride.community.name}
           upiAvailable={ride.community.paymentSettings?.upiEnabled ?? false}
           ridePricePaise={ride.pricePaise}
           confirmationDepositPaise={ride.confirmationDepositPaise}
           accommodations={ride.accommodations.filter((stay) => stay.options.length).map((stay) => ({ id: stay.id, label: `${stay.locality} · ${stay.exactLocationRestricted ? "Stay" : stay.propertyName}`, options: stay.options.map((option) => ({ id: option.id, name: option.name, description: option.description, pricingMode: option.pricingMode, pricePaise: option.pricePaise, maxOccupancy: option.maxOccupancy, availableRooms: option.availableRooms })) }))}
-        /> : <Link href={`/login?returnTo=${encodeURIComponent(`/rides/${ride.slug}#booking`)}`} className="mt-5 block rounded-2xl bg-orange-500 px-5 py-3.5 text-center text-sm font-black text-white hover:bg-orange-400">Sign in to reserve</Link>
+        /> : <Link href={`/login?returnTo=${encodeURIComponent(`/rides/${ride.slug}#booking`)}`} className="mt-5 block rounded-2xl bg-orange-500 px-5 py-3.5 text-center text-sm font-black text-white hover:bg-orange-400">Sign in to {soldOut ? "join the waitlist" : "reserve"}</Link>
+      : ride.status === "PUBLISHED" ? <p className="mt-5 rounded-2xl border border-amber-400/20 bg-amber-400/[.04] p-4 text-center text-sm font-bold text-amber-200">No participant or waitlist places remain for this ride.</p>
       : <p className="mt-5 rounded-2xl border border-white/10 p-4 text-center text-sm font-black text-zinc-300">This ride is {ride.status.toLowerCase()} and is not accepting reservations.</p>}
     </aside></section>
   </>;

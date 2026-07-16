@@ -71,7 +71,7 @@ async function processRide(rideId: string, now: Date) {
       _sum: { seatCount: true },
     });
     let occupiedSeats = occupied._sum.seatCount ?? 0;
-    const capacity = ride.totalSlots + ride.bufferSlots;
+    const capacity = ride.totalSlots;
     const canPromote = ride.status === "PUBLISHED"
       && ride.startsAt > now
       && (!ride.registrationClosesAt || ride.registrationClosesAt > now);

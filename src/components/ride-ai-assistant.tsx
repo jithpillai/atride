@@ -27,7 +27,7 @@ const assistantSectionForField: Record<DraftField, string> = {
 };
 
 const inputNames: Array<keyof RideAssistantFormInput> = [
-  "title", "summary", "description", "destination", "startsAt", "endsAt", "price", "confirmationDeposit", "totalSlots", "bufferSlots", "distanceKm", "vehicleType", "vehicleRequirements", "difficulty", "origins", "itinerary", "propertyName", "propertyLocality", "checkInAt", "checkOutAt", "roomSummary", "amenities", "participantNote", "inclusions", "exclusions", "addOns", "meals", "activities",
+  "title", "summary", "description", "destination", "startsAt", "endsAt", "price", "confirmationDeposit", "totalSlots", "waitlistCapacity", "distanceKm", "vehicleType", "vehicleRequirements", "difficulty", "origins", "itinerary", "propertyName", "propertyLocality", "checkInAt", "checkOutAt", "roomSummary", "amenities", "participantNote", "inclusions", "exclusions", "addOns", "meals", "activities",
 ];
 
 function formValues(form: HTMLFormElement) {

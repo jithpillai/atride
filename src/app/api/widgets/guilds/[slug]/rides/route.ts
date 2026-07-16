@@ -31,7 +31,7 @@ export async function GET(request: Request, { params }: Props) {
       rides: {
         where: { status: "PUBLISHED", visibility: "PUBLIC", startsAt: { gte: new Date() } },
         orderBy: [{ featured: "desc" }, { startsAt: "asc" }], take: 12,
-        select: { slug: true, title: true, summary: true, originCity: true, destination: true, startsAt: true, endsAt: true, pricePaise: true, totalSlots: true, bufferSlots: true, bookedSlots: true, vehicleType: true, difficulty: true, featured: true },
+        select: { slug: true, title: true, summary: true, originCity: true, destination: true, startsAt: true, endsAt: true, pricePaise: true, totalSlots: true, bookedSlots: true, vehicleType: true, difficulty: true, featured: true },
       },
     },
   });
@@ -39,6 +39,6 @@ export async function GET(request: Request, { params }: Props) {
   return Response.json({
     ok: true,
     guild: { slug: guild.slug, name: guild.name, shortName: guild.shortName },
-    rides: guild.rides.map((ride) => ({ slug: ride.slug, title: ride.title, summary: ride.summary, originCity: ride.originCity, destination: ride.destination, startsAt: ride.startsAt, endsAt: ride.endsAt, price: ride.pricePaise / 100, slotsAvailable: Math.max(0, ride.totalSlots + ride.bufferSlots - ride.bookedSlots), vehicleType: ride.vehicleType, difficulty: ride.difficulty, featured: ride.featured, url: `${new URL(request.url).origin}/rides/${ride.slug}` })),
+    rides: guild.rides.map((ride) => ({ slug: ride.slug, title: ride.title, summary: ride.summary, originCity: ride.originCity, destination: ride.destination, startsAt: ride.startsAt, endsAt: ride.endsAt, price: ride.pricePaise / 100, slotsAvailable: Math.max(0, ride.totalSlots - ride.bookedSlots), vehicleType: ride.vehicleType, difficulty: ride.difficulty, featured: ride.featured, url: `${new URL(request.url).origin}/rides/${ride.slug}` })),
   }, { headers: { ...cors(origin), "cache-control": "public, max-age=60, s-maxage=300" } });
 }

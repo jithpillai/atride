@@ -446,14 +446,18 @@ Alternative states are `POSTPONED` and `CANCELLED`.
 
 **Actor:** Ride Manager
 
-Capacity can exist at ride and starting-group levels. A ride can distinguish public capacity from controlled buffer capacity.
+`Total slots` is the hard participant capacity for the ride. Assigned captains, marshals, sweeps, volunteers, and other ride staff do not consume participant slots. Starting-group capacities are optional planning hints only and do not divide or override the ride-wide limit.
+
+`Waitlist capacity` is the maximum number of participant seats that may queue after Total slots are occupied. It does not create extra bookable ride places. A value of zero disables the waitlist.
 
 Rules:
 
 - Confirmed capacity cannot exceed the permitted maximum.
 - Capacity cannot be reduced below confirmed participants.
-- Capacity and buffer changes are audited.
-- Administrators may release buffer slots according to policy.
+- Total-slot and waitlist-capacity changes are audited.
+- Increasing Total slots may promote the oldest eligible waitlisted booking party into a time-limited reservation.
+- A multi-person party may join or be promoted only when the entire party fits the remaining waitlist or ride capacity.
+- Reducing Total slots below occupied participant seats, or Waitlist capacity below already queued seats, is prohibited.
 
 ### UC-13: Join a waitlist
 

@@ -243,7 +243,7 @@ Accepted architectural choices are recorded in [architecture decisions](docs/arc
 - Community verification and publishing approval policy
 - Default financial permissions for captains
 - Refund responsibilities for community-owned gateways
-- Waitlist and buffer-capacity rules
+- Hard participant capacity and a bounded waitlist
 - Required participant/vehicle documents and retention periods
 - Public versus participant-only progress summaries
 - Final managed hosting, PostgreSQL, Redis, and worker vendors

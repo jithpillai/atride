@@ -44,18 +44,12 @@ export function parseOrigins(value: string) {
   return rows(value).map((parts, sortOrder) => {
     if (parts.length < 3 || !parts[0] || !parts[1]) throw new Error("Invalid origin row");
     let capacity: number | null = null;
-    let bufferCapacity = 0;
     try {
       capacity = parts[3] ? positiveInteger(parts[3], 1) : null;
     } catch {
       throw new Error(`Invalid origin capacity:${sortOrder + 1}`);
     }
-    try {
-      bufferCapacity = parts[4] ? positiveInteger(parts[4]) : 0;
-    } catch {
-      throw new Error(`Invalid origin buffer:${sortOrder + 1}`);
-    }
-    return { city: parts[0], meetingPoint: parts[1], departureAt: requiredDate(parts[2]), capacity, bufferCapacity, mergePoint: parts[5] || null, routeSummary: parts.slice(6).join(" | ") || null, sortOrder };
+    return { city: parts[0], meetingPoint: parts[1], departureAt: requiredDate(parts[2]), capacity, bufferCapacity: 0, mergePoint: parts[4] || null, routeSummary: parts.slice(5).join(" | ") || null, sortOrder };
   });
 }
 

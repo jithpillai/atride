@@ -24,6 +24,7 @@ export function RideBookingForm({
   dietaryPreference,
   accessibilityNotes,
   soldOut,
+  waitlistSlotsLeft,
   newcomerConsentAvailable,
   guildName,
   upiAvailable,
@@ -40,6 +41,7 @@ export function RideBookingForm({
   dietaryPreference: string;
   accessibilityNotes: string;
   soldOut: boolean;
+  waitlistSlotsLeft: number;
   newcomerConsentAvailable: boolean;
   guildName: string;
   upiAvailable: boolean;
@@ -115,7 +117,7 @@ export function RideBookingForm({
     {!!addOns.length && <fieldset className="rounded-2xl border border-white/10 p-4"><legend className="px-2 text-sm font-black">Optional add-ons</legend><p className="mb-3 text-xs text-zinc-500">Displayed add-on prices apply per person in this booking party.</p><div className="grid gap-3">{addOns.map((item) => <label key={item.id} className="flex cursor-pointer items-start gap-3 text-sm"><input type="checkbox" name="addOnIds" value={item.id} checked={selectedAddOns.includes(item.id)} onChange={(event) => setSelectedAddOns((current) => event.target.checked ? [...current, item.id] : current.filter((id) => id !== item.id))} className="mt-1 accent-orange-500" /><span><strong>{item.title}</strong>{item.pricePaise !== null && <span className="ml-2 text-orange-300">+₹{(item.pricePaise / 100).toLocaleString("en-IN")} each</span>}{item.description && <span className="mt-1 block text-xs leading-5 text-zinc-500">{item.description}</span>}</span></label>)}</div></fieldset>}
     <div className="rounded-2xl border border-orange-400/20 bg-orange-400/[.04] p-4"><div className="flex items-center justify-between gap-4"><div><p className="text-xs font-bold uppercase tracking-wider text-orange-300">Estimated booking total</p><p className="mt-1 text-2xl font-black">₹{(estimatedTotal / 100).toLocaleString("en-IN")}</p></div><div className="text-right text-xs leading-5 text-zinc-500"><p>{partySize} × ₹{(ridePricePaise / 100).toLocaleString("en-IN")} ride fee</p>{accommodationEstimate > 0 && <p>+ ₹{(accommodationEstimate / 100).toLocaleString("en-IN")} accommodation</p>}<p className="font-bold text-amber-300">₹{(estimatedDeposit / 100).toLocaleString("en-IN")} due for hold</p></div></div></div>
     {!soldOut && <label className="text-sm font-bold">Payment method<select name="paymentMethod" className="field bg-[#101419]">{upiAvailable && <option value="UPI">UPI — app or QR</option>}<option value="BANK_TRANSFER">Bank transfer</option><option value="CASH">Cash — organizer confirmation required</option></select>{!upiAvailable && <span className="mt-2 block text-xs font-normal leading-5 text-zinc-500">This Guild has not enabled assisted UPI for new bookings.</span>}</label>}
-    {soldOut && <><input type="hidden" name="paymentMethod" value={upiAvailable ? "UPI" : "BANK_TRANSFER"} /><label className="flex cursor-pointer gap-3 rounded-2xl border border-amber-400/20 bg-amber-400/[.04] p-4 text-sm"><input required type="checkbox" name="joinWaitlistWhenFull" className="mt-1 accent-orange-500" /><span><strong>Join the waitlist</strong><span className="mt-1 block text-xs text-zinc-500">This does not reserve a slot or request payment. The Guild can contact you if capacity becomes available.</span></span></label></>}
+    {soldOut && <><input type="hidden" name="paymentMethod" value={upiAvailable ? "UPI" : "BANK_TRANSFER"} /><label className="flex cursor-pointer gap-3 rounded-2xl border border-amber-400/20 bg-amber-400/[.04] p-4 text-sm"><input required type="checkbox" name="joinWaitlistWhenFull" className="mt-1 accent-orange-500" /><span><strong>Join the waitlist · {waitlistSlotsLeft} {waitlistSlotsLeft === 1 ? "place" : "places"} left</strong><span className="mt-1 block text-xs text-zinc-500">This does not reserve a ride slot or request payment. Your entire booking party must fit within the remaining waitlist places.</span></span></label></>}
     <label className="flex cursor-pointer gap-3 text-sm leading-6"><input required type="checkbox" name="waiverAccepted" className="mt-1.5 accent-orange-500" /><span>I have reviewed and accept the ride rules, safety requirements, and waiver shown on this page.</span></label>
     <label className="flex cursor-pointer gap-3 text-sm leading-6"><input required type="checkbox" name="commercialTermsAccepted" className="mt-1.5 accent-orange-500" /><span>I accept the displayed price, inclusions, exclusions, payment schedule, cancellation, refund, and replacement policies.</span></label>
     {newcomerConsentAvailable && <label className="flex cursor-pointer gap-3 text-sm leading-6 text-zinc-400"><input type="checkbox" name="newcomerDisplayConsent" className="mt-1.5 accent-orange-500" /><span>If this becomes my first confirmed ride with {guildName}, allow a member-only welcome tile using my first name, profile image, and city.</span></label>}

@@ -138,8 +138,23 @@ export async function reserveRide(input: ReserveRideInput) {
 
     const existingHeldSeat = existing && CAPACITY_HOLDING_STATUSES.includes(existing.status as typeof CAPACITY_HOLDING_STATUSES[number]) ? existing.seatCount : 0;
     const effectiveOccupied = occupiedSeats - existingHeldSeat;
-    const hasCapacity = effectiveOccupied + partySize <= ride.totalSlots + ride.bufferSlots;
+    const hasCapacity = effectiveOccupied + partySize <= ride.totalSlots;
     if (!hasCapacity && !input.joinWaitlistWhenFull) throw new AuthError("RIDE_FULL", "This ride is full. Join the waitlist instead.", 409);
+    if (!hasCapacity) {
+      if (ride.waitlistCapacity <= 0) throw new AuthError("WAITLIST_CLOSED", "This ride's waitlist is closed.", 409);
+      const waitlisted = await tx.rideBooking.aggregate({
+        where: {
+          rideId: ride.id,
+          status: "WAITLISTED",
+          id: existing ? { not: existing.id } : undefined,
+        },
+        _sum: { seatCount: true },
+      });
+      const queuedSeats = waitlisted._sum.seatCount ?? 0;
+      if (queuedSeats + partySize > ride.waitlistCapacity) {
+        throw new AuthError("WAITLIST_FULL", "The remaining waitlist does not have room for this entire booking party.", 409);
+      }
+    }
 
     if (hasCapacity) {
       for (const selection of accommodationOptions) {
