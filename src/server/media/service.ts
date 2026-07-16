@@ -200,6 +200,7 @@ export async function completeMediaUpload(session: NonNullable<SessionShape>, in
       pathsToRevalidate.add(`/guilds/${payment.booking.community.slug}/manage`);
       pathsToRevalidate.add(`/guilds/${payment.booking.community.slug}`);
       pathsToRevalidate.add(`/rides/${payment.booking.ride.slug}`);
+      pathsToRevalidate.add("/account/bookings");
       pathsToRevalidate.add("/");
     }
     return created;

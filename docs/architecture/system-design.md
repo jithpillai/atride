@@ -543,6 +543,8 @@ The Phase 5 foundation maps this conceptual model into executable Prisma aggrega
 
 ### 10.5 Ride operations
 
+- `participant_attendance` (one record per booking participant, never only per booking lead)
+- `participant_attendance_events` (append-only actor/time/checkpoint transition history)
 - `ride_checkins`
 - `location_updates`
 - `ride_progress_events`
@@ -551,6 +553,8 @@ The Phase 5 foundation maps this conceptual model into executable Prisma aggrega
 - `ride_announcements`
 - `ride_announcement_acknowledgements`
 - `ride_communication_channels`
+
+Attendance bulk actions are bounded state transitions rather than blanket rewrites. Group start applies `CHECKED_IN -> STARTED`; group completion applies `STARTED -> COMPLETED`. `EXPECTED` remains open for late checkpoint admission until the whole ride is finally closed, when unresolved `EXPECTED -> NO_SHOW`. `CHECKED_IN` at final closure is an exception requiring review and may become `DID_NOT_START`. `DISCONTINUED` and `REMOVED` are terminal operational exceptions and are not overwritten by completion. Every transition stores the actor, timestamp, optional starting group/checkpoint, and note.
 
 ### 10.6 Platform and communication
 
@@ -603,7 +607,7 @@ Within a database transaction:
 
 Online or verified offline payment later confirms the booking atomically. Expiry releases abandoned capacity. Concurrency tests must prove that simultaneous requests cannot consume the final slot twice.
 
-The current PostgreSQL implementation serializes reservation attempts by locking the canonical ride row with `SELECT ... FOR UPDATE` and computes occupancy from capacity-holding booking states. Before accepting a new reservation, the same idempotent expiry processor used by scheduled maintenance handles that ride. It never expires a hold whose initial payment is `SUBMITTED` or `CONFIRMED`; genuinely unpaid holds become `EXPIRED`, capacity is recomputed, and the oldest eligible waitlisted booking receives a fresh time-limited hold and payment obligations. The ride-level `bookedSlots` value is maintained as a denormalized display counter; it is never the sole source of truth for accepting a reservation. Audit and notification-outbox events are written in the same transaction, while email delivery remains outside it. Because this atomic workflow performs several Neon round trips while holding the ride lock, it uses a scoped 15-second interactive-transaction timeout and a five-second acquisition wait rather than Prisma's five-second runtime default. A protected global sweep endpoint handles rides that receive no subsequent booking traffic and can also be run by a platform administrator.
+The current PostgreSQL implementation serializes reservation attempts by locking the canonical ride row with `SELECT ... FOR UPDATE` and computes occupancy from capacity-holding booking states. Before accepting a new reservation, the same idempotent expiry processor used by scheduled maintenance handles that ride. It never expires a hold whose initial payment is `SUBMITTED` or `CONFIRMED`; genuinely unpaid holds become `EXPIRED`, capacity is recomputed, and the oldest eligible waitlisted booking receives a fresh time-limited hold and payment obligations. Authorized staff cancellation uses the same canonical ride lock, changes the booking to `CANCELLED` without deleting participant or financial evidence, recalculates the denormalized display counter, writes an audit event with the previous state and reason, and then safely attempts waitlist promotion. Confirmed or submitted funds are flagged for manual reconciliation and cannot be processed through the ordinary active-booking finance transition. The ride-level `bookedSlots` value is maintained as a denormalized display counter; it is never the sole source of truth for accepting a reservation. Audit and notification-outbox events are written in the same transaction, while email delivery remains outside it. Because this atomic workflow performs several Neon round trips while holding the ride lock, it uses a scoped 15-second interactive-transaction timeout and a five-second acquisition wait rather than Prisma's five-second runtime default. A protected global sweep endpoint handles rides that receive no subsequent booking traffic and can also be run by a platform administrator.
 
 ### 12.2 Optional gateway payment confirmation
 

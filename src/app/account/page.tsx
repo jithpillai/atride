@@ -64,6 +64,12 @@ export default async function AccountPage({ searchParams }: Props) {
       {!!invitations.length && <section id="invitations" className="mt-8 scroll-mt-24 rounded-3xl border border-orange-400/20 bg-orange-400/[.035] p-7"><p className="eyebrow">Guild invitations</p><h2 className="mt-3 text-2xl font-black">Staff access awaiting your approval</h2><div className="mt-5 grid gap-3">{invitations.map((invitation) => <article key={invitation.id} className="flex flex-col gap-4 rounded-2xl border border-white/10 p-5 sm:flex-row sm:items-center sm:justify-between"><div><p className="font-black">{invitation.community.name}</p><p className="mt-1 text-sm text-zinc-400">{invitation.role.replaceAll("_", " ")} · invited by {invitation.invitedBy.displayName}</p><p className="mt-1 text-xs text-zinc-600">Expires {invitation.expiresAt.toLocaleDateString("en-IN")}</p></div><form action={acceptGuildInvitation} className="relative"><input type="hidden" name="invitationId" value={invitation.id} /><FormPendingSubmit idleLabel="Accept invitation" pendingLabel="Accepting…" overlayLabel="Activating Guild access…" className="rounded-full bg-orange-500 px-5 py-2.5 text-sm font-black text-white" /></form></article>)}</div></section>}
 
       <div className="mt-10 grid gap-6 md:grid-cols-2">
+        <Link href="/account/bookings" className="rounded-3xl border border-orange-400/20 bg-orange-400/[.035] p-7 transition hover:border-orange-400/45 hover:bg-orange-400/[.06]">
+          <p className="eyebrow">Ride activity</p>
+          <h2 className="mt-3 text-2xl font-black">Bookings and payments</h2>
+          <p className="mt-3 text-sm leading-6 text-zinc-500">Review every reservation, pay an advance or balance, upload proof, and follow the Guild&apos;s finance review.</p>
+        </Link>
+
         <Link href="/account/profile" className="rounded-3xl border border-white/10 bg-white/[.025] p-7 transition hover:border-orange-400/30 hover:bg-orange-400/[.035]">
           <p className="eyebrow">Participant profile</p>
           <h2 className="mt-3 text-2xl font-black">Personal and ride details</h2>

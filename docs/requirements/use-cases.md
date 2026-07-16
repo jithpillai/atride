@@ -361,6 +361,16 @@ The optional in-product Ride Assistant uses the saved and currently unsaved fact
 
 Participant manifests are separate authorized views/exports with purpose-limited fields and auditability. Organizers should update structured data first and regenerate the announcement instead of maintaining an independent, conflicting source of truth in chat.
 
+### UC-09E: Review and share the participant manifest
+
+**Actor:** Guild Owner/Admin/Ride Manager or assigned Lead Captain/Captain/Vice Captain
+
+The operational manifest is built from immutable booking-participant snapshots rather than the participant's current public profile. It shows the booked party, starting group, occupant roles, booking-specific diet/accessibility/emergency details, lead contact, vehicle-sharing choice, accommodation, and summarized payment state. Guild ride managers may view the complete ride. Assigned ride staff see only their assigned starting group unless their assignment explicitly covers the whole ride.
+
+Authorized staff may download an Excel-compatible report for offline ride operations. Every export records the actor, ride, origin scope, booking count, participant count, and timestamp in the Guild audit history. Payment-proof media is never embedded in the report.
+
+For quick chat coordination, @Ride generates a numbered WhatsApp-ready list from confirmed participants. That message includes only names, starting cities, occupant roles, and dietary preferences. Phone numbers, email, blood group, medical/accessibility notes, emergency contacts, vehicle details, payment information, and proof media remain inside the protected manifest.
+
 ### UC-09D: Select vehicle type and policy
 
 **Actor:** Ride Manager
@@ -481,7 +491,7 @@ PAYMENT_REJECTED
 
 The signed-in booking lead may include named pillion/passenger companions without creating separate platform accounts for them. Every party member consumes a ride slot. Ride fees, confirmation deposits, and selected per-person add-ons scale by party size. Accommodation may be included, charged per person, or charged per room; per-room quantities round up by maximum occupancy and respect configured room inventory. The booking stores immutable participant and accommodation snapshots.
 
-Participant self-transfer is intentionally unsupported. When a replacement is necessary, authorized Guild staff cancel the original record and create or approve a new booking so capacity, payment evidence, consent, and audit history remain explicit.
+Participant self-transfer is intentionally unsupported. When a replacement is necessary, an authorized Guild ride manager cancels the original record with a mandatory operational reason. The replacement participant then submits a fresh booking and accepts the current waiver and commercial terms; staff do not impersonate a rider or copy another participant's consent. Cancellation is a status transition rather than deletion: participant snapshots, payments, proofs, and audit history remain available for reconciliation, while seat and room occupancy are released and the eligible waitlist may be promoted. Any refund or participant communication is a separate explicit operation.
 
 Payment progress is modelled independently rather than duplicated in the booking status. A booking payment uses `PENDING`, `SUBMITTED`, `CONFIRMED`, or `REJECTED`, and identifies whether it is a confirmation deposit, balance, full payment, or another obligation. A future completed-ride lifecycle may add `COMPLETED` after verified participation.
 
@@ -722,6 +732,12 @@ ANNOUNCEMENTS_ONLY (recommended default when enabled)
 - Route and checkpoints
 - Start/complete controls
 - Check-ins, delays, incidents, and merge status
+
+### UC-27A: Record attendance and progress participation
+
+Attendance belongs to each booked participant, including pillions/passengers within a party, and not only to the lead booking. Before departure each participant starts as `EXPECTED` and may be individually checked in. Starting a group is a bulk operational action that moves only `CHECKED_IN` participants to `STARTED`; it does not convert absent or late `EXPECTED` participants into no-shows.
+
+A captain may admit a late `EXPECTED` participant at a permitted checkpoint, recording the timestamp and checkpoint. Completing the group changes `STARTED` participants to `COMPLETED`. `DISCONTINUED` and `REMOVED` are explicit exceptions and are never overwritten by bulk completion. Only final closure of the entire ride converts remaining `EXPECTED` participants to `NO_SHOW`. A participant still `CHECKED_IN` at closure requires staff review and may be classified as `DID_NOT_START`. Every individual and bulk transition records its actor and time.
 
 ### Participant account
 
