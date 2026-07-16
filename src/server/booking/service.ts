@@ -283,6 +283,6 @@ export async function reserveRide(input: ReserveRideInput) {
 export async function findUserBookingForRide(userId: string, rideId: string) {
   return db.rideBooking.findUnique({
     where: { rideId_userId: { rideId, userId } },
-    include: { origin: true, addOns: true, participants: { orderBy: { sortOrder: "asc" } }, accommodationSelections: { orderBy: { createdAt: "asc" } }, payments: { orderBy: { createdAt: "asc" } } },
+    include: { origin: true, addOns: true, refund: true, participants: { orderBy: { sortOrder: "asc" } }, accommodationSelections: { orderBy: { createdAt: "asc" } }, payments: { orderBy: { createdAt: "asc" } } },
   });
 }

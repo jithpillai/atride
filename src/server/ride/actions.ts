@@ -11,6 +11,7 @@ import { DEFAULT_GUILD_RIDE_POLICIES } from "@/server/guild/default-ride-policie
 import { generateAnnouncementText } from "@/server/ride/announcement";
 import { isRideStatusTransitionAllowed } from "@/server/ride/status";
 import { dispatchNotificationOutbox } from "@/server/notifications/dispatcher";
+import { cancelRide, postponeRide } from "@/server/ride/disruption-service";
 
 function value(formData: FormData, name: string, max = 5000) {
   return String(formData.get(name) ?? "").trim().slice(0, max);
@@ -252,12 +253,13 @@ export async function setRideStatus(formData: FormData) {
   const requestedStatus = value(formData, "status", 20);
   const { session } = await requireRideEditor(guildSlug, rideId);
   const ride = await db.ride.findFirst({ where: { id: rideId, community: { slug: guildSlug } }, include: { origins: true, itineraryDays: true, packageItems: true, policies: true } });
-  if (!ride || !new Set(["DRAFT", "PUBLISHED", "CLOSED", "POSTPONED", "CANCELLED", "COMPLETED"]).has(requestedStatus)) redirect("/account?access=denied");
+  if (!ride || !new Set(["DRAFT", "PUBLISHED", "CLOSED", "COMPLETED"]).has(requestedStatus)) redirect(editor(guildSlug, rideId, "disruption-workflow"));
   if (!isRideStatusTransitionAllowed(ride.status, requestedStatus)) redirect(editor(guildSlug, ride.id, "transition"));
   if (requestedStatus === "PUBLISHED" && (ride.origins.length < 1 || ride.itineraryDays.length < 1 || ride.packageItems.length < 2 || new Set(ride.policies.map((policy) => policy.type)).size < 3 || ride.description.length < 20)) redirect(editor(guildSlug, ride.id, "incomplete"));
   if (requestedStatus === "DRAFT" && ride.bookedSlots > 0) redirect(editor(guildSlug, ride.id, "bookings"));
   await db.$transaction([
-    db.ride.update({ where: { id: ride.id }, data: { status: requestedStatus as "DRAFT" | "PUBLISHED" | "CLOSED" | "POSTPONED" | "CANCELLED" | "COMPLETED" } }),
+    db.ride.update({ where: { id: ride.id }, data: { status: requestedStatus as "DRAFT" | "PUBLISHED" | "CLOSED" | "COMPLETED" } }),
+    db.rideDisruption.updateMany({ where: { rideId: ride.id, type: "POSTPONEMENT", status: "ACTIVE" }, data: { status: "RESOLVED", resolvedAt: new Date(), resolutionNote: `Ride moved to ${requestedStatus}.` } }),
     db.communityAuditEvent.create({ data: { communityId: ride.communityId, actorUserId: session.userId, action: "RIDE_STATUS_CHANGED", metadata: { rideId: ride.id, from: ride.status, to: requestedStatus } } }),
   ]);
   revalidatePath(`/guilds/${guildSlug}/manage`);
@@ -265,6 +267,53 @@ export async function setRideStatus(formData: FormData) {
   revalidatePath(`/rides/${ride.slug}`);
   revalidatePath("/");
   redirect(`${editor(guildSlug, ride.id)}?statusSaved=1`);
+}
+
+export async function postponeRideAction(formData: FormData) {
+  const guildSlug = value(formData, "guildSlug", 80);
+  const rideId = value(formData, "rideId", 36);
+  const reason = value(formData, "reason", 3000);
+  const proposedResumeAtValue = value(formData, "proposedResumeAt", 40);
+  const acknowledged = formData.get("acknowledged") === "on";
+  const { session } = await requireRideManager(guildSlug);
+  if (reason.length < 20 || !acknowledged) redirect(editor(guildSlug, rideId, "disruption-details"));
+  let proposedResumeAt: Date | null = null;
+  try { proposedResumeAt = optionalDate(proposedResumeAtValue); } catch { redirect(editor(guildSlug, rideId, "date")); }
+  try {
+    const result = await postponeRide({ guildSlug, rideId, actorUserId: session.userId, reason, proposedResumeAt });
+    if (result.eventKeys.length) await dispatchNotificationOutbox({ eventKeys: result.eventKeys }).catch((error) => console.error("Ride postponement email dispatch failed; durable events remain queued", { rideId, error }));
+    revalidatePath(`/guilds/${guildSlug}/manage`);
+    revalidatePath(editor(guildSlug, rideId));
+    revalidatePath(`/rides/${result.rideSlug}`);
+    revalidatePath("/account/bookings");
+    revalidatePath("/");
+  } catch (error) {
+    console.error("Ride postponement failed", { guildSlug, rideId, error });
+    redirect(editor(guildSlug, rideId, "transition"));
+  }
+  redirect(`${editor(guildSlug, rideId)}?statusSaved=postponed#disruption`);
+}
+
+export async function cancelRideAction(formData: FormData) {
+  const guildSlug = value(formData, "guildSlug", 80);
+  const rideId = value(formData, "rideId", 36);
+  const reason = value(formData, "reason", 3000);
+  const acknowledged = formData.get("acknowledged") === "on";
+  const { session } = await requireRideManager(guildSlug);
+  if (reason.length < 20 || !acknowledged) redirect(editor(guildSlug, rideId, "disruption-details"));
+  try {
+    const result = await cancelRide({ guildSlug, rideId, actorUserId: session.userId, reason });
+    if (result.eventKeys.length) await dispatchNotificationOutbox({ eventKeys: result.eventKeys }).catch((error) => console.error("Ride cancellation email dispatch failed; durable events remain queued", { rideId, error }));
+    revalidatePath(`/guilds/${guildSlug}/manage`);
+    revalidatePath(editor(guildSlug, rideId));
+    revalidatePath(`/rides/${result.rideSlug}`);
+    revalidatePath("/account/bookings");
+    revalidatePath("/");
+  } catch (error) {
+    console.error("Ride cancellation failed", { guildSlug, rideId, error });
+    redirect(editor(guildSlug, rideId, "transition"));
+  }
+  redirect(`${editor(guildSlug, rideId)}?statusSaved=cancelled#disruption`);
 }
 
 export async function assignRideStaff(formData: FormData) {

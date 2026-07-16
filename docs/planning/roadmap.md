@@ -231,7 +231,7 @@ External accounts needed:
 
 ### Phase 5 — Booking and offline payments
 
-Implementation status: **in progress, closure slice implemented**. Reservation, multi-person party booking, party-aware capacity and pricing, room-choice pricing/inventory, waitlist, consent snapshot, separate advance/balance obligations, offline UPI/bank/cash selection, Guild-level UPI configuration, immutable recipient snapshots, exact-amount UPI intents/local QR, transaction-reference capture, private proof upload, finance confirmation/rejection, durable payment email outbox, audit trail, personalized upcoming-rides integration, revocable member-only newcomer presentation, an authorized participant manifest, an audited Excel-compatible report, a privacy-limited WhatsApp roster, audited staff cancellation, and the idempotent reservation-expiry/waitlist-promotion processor are implemented. Remaining closure work is production migration/deployment verification and connecting the protected expiry processor to an appropriately frequent production scheduler. Participant-requested transfer is deliberately excluded: authorized Guild staff cancel the old booking, while the replacement participant submits a fresh booking and accepts the current waiver and commercial terms.
+Implementation status: **in progress, closure slice implemented**. Reservation, multi-person party booking, party-aware capacity and pricing, room-choice pricing/inventory, waitlist, consent snapshot, separate advance/balance obligations, offline UPI/bank/cash selection, Guild-level UPI configuration, immutable recipient snapshots, exact-amount UPI intents/local QR, transaction-reference capture, private proof upload, finance confirmation/rejection, durable payment email outbox, audit trail, personalized upcoming-rides integration, revocable member-only newcomer presentation, an authorized participant manifest, an audited Excel-compatible report, a privacy-limited WhatsApp roster, audited staff booking cancellation, whole-ride postponement/cancellation, Guild refund reconciliation, and the idempotent reservation-expiry/waitlist-promotion processor are implemented. Remaining closure work is production migration/deployment verification and connecting the protected expiry processor to an appropriately frequent production scheduler. Participant-requested transfer is deliberately excluded: authorized Guild staff cancel the old booking, while the replacement participant submits a fresh booking and accepts the current waiver and commercial terms.
 
 Build:
 
@@ -254,6 +254,8 @@ Build:
 - Finance review
 - Reservation expiry and slot release
 - Admin-controlled cancellation and replacement; no participant self-transfer workflow
+- Dedicated whole-ride postponement and cancellation with mandatory participant-facing reason and acknowledgement
+- Refund reconciliation queue for confirmed payments and submitted-but-unconfirmed evidence
 - Booking relationships, payment state, role badges, and next actions in `Your upcoming rides`
 - Durable ride participation relationship and per-Guild newcomer consent capture
 - Participant manifest with booking-party, origin, operational, accommodation, vehicle, and payment details
@@ -292,6 +294,10 @@ Acceptance tests:
 - Cancellation preserves the booking, participants, payment proofs, and audit history while releasing derived seat and room occupancy.
 - Confirmed or submitted money is never silently refunded or deleted, and cancellation cannot be reversed accidentally by the normal finance-review action.
 - Cancelling an inventory-holding booking attempts to promote the oldest eligible waitlisted party; a failed immediate promotion remains safely retryable by the idempotent processor.
+- Postponing a ride preserves participant bookings while pausing reservations, UPI instructions, cash collection prompts, and proof upload.
+- Cancelling a ride atomically cancels active bookings without deleting participant/payment evidence and does not promote its waitlist.
+- Confirmed payments create a pending refund record; submitted but unconfirmed proofs create a finance review record.
+- A Guild finance user can record the reconciled refundable amount, cumulative refunded amount, and refund reference without implying that @Ride moved the money.
 
 External accounts needed:
 
@@ -305,7 +311,7 @@ Build:
 - Amazon SES email OTP
 - Booking confirmations
 - Offline payment notifications
-- Ride changes and cancellations
+- Ride changes and cancellation delivery across email and the in-app inbox (the canonical disruption/refund workflow begins in Phase 5)
 - Scheduled reminders
 - Waitlist offers
 - Ride-start and important operational messages

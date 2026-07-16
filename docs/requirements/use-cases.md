@@ -577,6 +577,23 @@ Financial access is not granted to captains by default. The current Phase 5 impl
 - Expired reservations release capacity.
 - Refund status is recorded even when the community performs the refund in its gateway account.
 - Final refund responsibility and policy must be visible to the participant.
+- A whole-ride cancellation creates one aggregate refund-reconciliation record per affected booking when confirmed money or submitted evidence exists.
+- Confirmed money begins in `PENDING`; submitted but unconfirmed evidence begins in `REVIEW_REQUIRED`.
+- Guild Owner/Admin/Finance records the reconciled refundable amount, cumulative returned amount, UTR/reference, note, actor, and time.
+- @Ride never claims to have transferred funds; the Guild remains responsible for returning direct UPI, bank, or cash payments.
+
+### UC-18A: Postpone or cancel a ride
+
+**Actor:** Guild Owner, Guild Admin, or Ride Manager
+
+1. Choose postpone or cancel from the Ride Studio disruption controls.
+2. Enter a participant-facing reason of at least 20 characters and acknowledge the operational impact.
+3. For postponement, optionally enter a proposed update date. Existing bookings remain intact while reservations and payment actions pause.
+4. Republish only after the schedule/package is corrected; this resolves the active postponement record.
+5. For cancellation, atomically cancel all active bookings, clear the derived occupied-slot counter, retain payment/proof history, and create refund-review records.
+6. Queue one idempotent participant notification per affected booking. Delivery failure never rolls back the canonical disruption.
+
+Cancellation is terminal and never promotes the cancelled ride's waitlist. Assigned captains without Guild ride-management permission cannot perform the financially consequential whole-ride action.
 
 ## 10. Ride operations
 
