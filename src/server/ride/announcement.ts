@@ -2,7 +2,7 @@ import { sanitizeAiSource } from "../ai/ride-assistant";
 
 type AnnouncementRide = {
   title: string; summary: string; destination: string; startsAt: Date; endsAt: Date; pricePaise: number;
-  confirmationDepositPaise: number; totalSlots: number; bufferSlots: number; bookedSlots: number; status: string;
+  confirmationDepositPaise: number; totalSlots: number; waitlistCapacity: number; bookedSlots: number; status: string;
   slug: string; vehicleType: string; distanceKm: number; updatedAt: Date;
   community: { name: string };
   origins: Array<{ city: string; meetingPoint: string; departureAt: Date; mergePoint: string | null; routeSummary: string | null }>;
@@ -29,7 +29,7 @@ export function generateAnnouncementText(ride: AnnouncementRide, appUrl = "https
   const byType = (type: string) => ride.packageItems.filter((item) => item.type === type);
   const latestPolicies = ride.policies.slice().sort((a, b) => b.version - a.version).filter((policy, index, policies) => policies.findIndex((candidate) => candidate.type === policy.type) === index);
   const stay = ride.accommodations[0];
-  const available = Math.max(0, ride.totalSlots + ride.bufferSlots - ride.bookedSlots);
+  const available = Math.max(0, ride.totalSlots - ride.bookedSlots);
   const sections = [
     `🏍️ *${ride.community.name} — ${ride.title}*`,
     ride.summary,

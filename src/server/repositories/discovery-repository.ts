@@ -383,6 +383,7 @@ export const findPublicRidePackageBySlug = cache(async (slug: string) => db.ride
     origins: { orderBy: { sortOrder: "asc" } }, itineraryDays: { orderBy: { sortOrder: "asc" } },
     accommodations: { orderBy: { checkInAt: "asc" }, include: { options: { where: { active: true }, orderBy: { sortOrder: "asc" } } } }, packageItems: { orderBy: [{ type: "asc" }, { sortOrder: "asc" }] },
     policies: { orderBy: [{ type: "asc" }, { version: "desc" }] },
+    bookings: { where: { status: "WAITLISTED" }, select: { seatCount: true } },
     coverAsset: true, mediaAssets: { where: { purpose: "RIDE_GALLERY" }, orderBy: [{ sortOrder: "asc" }, { createdAt: "asc" }] },
     staffAssignments: { include: { user: { select: { displayName: true } }, origin: { select: { city: true } } }, orderBy: { role: "asc" } },
   },

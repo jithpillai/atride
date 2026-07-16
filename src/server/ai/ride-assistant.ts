@@ -8,7 +8,7 @@ export type RideAssistantFormInput = {
   price: string;
   confirmationDeposit: string;
   totalSlots: string;
-  bufferSlots: string;
+  waitlistCapacity: string;
   distanceKm: string;
   vehicleType: string;
   vehicleRequirements: string;
@@ -73,7 +73,7 @@ export function parseRideAssistantInput(value: unknown): RideAssistantFormInput 
     title: text(input.title, 180), summary: text(input.summary, 1_000), description: text(input.description, 10_000),
     destination: text(input.destination, 160), startsAt: text(input.startsAt, 40), endsAt: text(input.endsAt, 40),
     price: text(input.price, 20), confirmationDeposit: text(input.confirmationDeposit, 20), totalSlots: text(input.totalSlots, 8),
-    bufferSlots: text(input.bufferSlots, 8), distanceKm: text(input.distanceKm, 8), vehicleType: text(input.vehicleType, 20), vehicleRequirements: text(input.vehicleRequirements, 3_000),
+    waitlistCapacity: text(input.waitlistCapacity, 8), distanceKm: text(input.distanceKm, 8), vehicleType: text(input.vehicleType, 20), vehicleRequirements: text(input.vehicleRequirements, 3_000),
     difficulty: text(input.difficulty, 20), origins: text(input.origins, 8_000), itinerary: text(input.itinerary, 15_000),
     propertyName: text(input.propertyName, 180), propertyLocality: text(input.propertyLocality, 180), checkInAt: text(input.checkInAt, 40),
     checkOutAt: text(input.checkOutAt, 40), roomSummary: text(input.roomSummary, 2_000), amenities: text(input.amenities, 1_000),
@@ -171,7 +171,7 @@ export function normalizeStructuredDraft(value: StructuredDraft, input?: RideAss
     origins: rows(value.origins, (row) => {
       const city = clean(row.city, 120); const meetingPoint = clean(row.meetingPoint, 240); const departureAt = clean(row.departureAt, 40);
       if (!city || !meetingPoint || !departureAt) return null;
-      return [city, meetingPoint, departureAt, optionalWholeNumber(row.capacity, 1), optionalWholeNumber(row.buffer, 0), clean(row.mergePoint, 240), clean(row.routeSummary, 1_000)].join(" | ");
+      return [city, meetingPoint, departureAt, optionalWholeNumber(row.capacity, 1), clean(row.mergePoint, 240), clean(row.routeSummary, 1_000)].join(" | ");
     }),
     itinerary: completedItinerary.itinerary,
     roomSummary: clean(accommodation.roomSummary, 2_000),
@@ -195,7 +195,8 @@ Rules:
 - Use "To be confirmed" only where a required structured field cannot be omitted. Also list every unresolved factual gap in missingFacts.
 - Do not include participant names, phone numbers, email addresses, payment handles, payment evidence, private invite links, or medical information.
 - Do not rewrite or weaken Guild policies. They are context only and are saved separately.
-- Keep destination capacity independent from optional starting-group allocations.
+- Total slots are the hard participant limit. Waitlist capacity only limits the number of queued people and never adds bookable ride places. Assigned ride staff do not consume either count.
+- Keep total participant capacity independent from optional starting-group planning allocations.
 - Return calendar dates as YYYY-MM-DD. For itinerary events with a confirmed time, use local YYYY-MM-DDTHH:mm without a timezone suffix; otherwise use YYYY-MM-DD.
 - Produce useful factual copy, not exaggerated marketing claims.
 - Give primary attention to these requested sections: ${requestedSections.join(", ")}. Return the complete schema, using empty values for unrequested sections when appropriate.
@@ -224,7 +225,7 @@ export function buildExternalRideAssistantPrompt(input: RideAssistantFormInput, 
 
 Return only these labelled sections, using the exact line formats shown:
 [DESCRIPTION]\nA clear public description
-[STARTING_GROUPS]\nCity | Meeting point | YYYY-MM-DDTHH:mm | optional Capacity | optional Buffer | Merge point | Route summary
+[STARTING_GROUPS]\nCity | Meeting point | YYYY-MM-DDTHH:mm | optional planning capacity | Merge point | Route summary
 [ITINERARY]\nYYYY-MM-DDTHH:mm (or YYYY-MM-DD when time is unknown) | Event title | Plan and places covered
 [ACCOMMODATION]\nRoom summary: ...\nAmenities: comma-separated values\nParticipant note: ...
 [INCLUSIONS]\nTitle | detail

@@ -6,7 +6,7 @@ const responseSchema = {
   required: ["description", "origins", "itinerary", "accommodation", "inclusions", "exclusions", "addOns", "meals", "activities", "missingFacts"],
   properties: {
     description: { type: "STRING" },
-    origins: { type: "ARRAY", items: { type: "OBJECT", required: ["city", "meetingPoint", "departureAt", "capacity", "buffer", "mergePoint", "routeSummary"], properties: { city: { type: "STRING" }, meetingPoint: { type: "STRING" }, departureAt: { type: "STRING" }, capacity: { type: "STRING" }, buffer: { type: "STRING" }, mergePoint: { type: "STRING" }, routeSummary: { type: "STRING" } } } },
+    origins: { type: "ARRAY", items: { type: "OBJECT", required: ["city", "meetingPoint", "departureAt", "capacity", "mergePoint", "routeSummary"], properties: { city: { type: "STRING" }, meetingPoint: { type: "STRING" }, departureAt: { type: "STRING" }, capacity: { type: "STRING" }, mergePoint: { type: "STRING" }, routeSummary: { type: "STRING" } } } },
     itinerary: { type: "ARRAY", items: { type: "OBJECT", required: ["date", "title", "plan"], properties: { date: { type: "STRING" }, title: { type: "STRING" }, plan: { type: "STRING" } } } },
     accommodation: { type: "OBJECT", required: ["roomSummary", "amenities", "participantNote"], properties: { roomSummary: { type: "STRING" }, amenities: { type: "ARRAY", items: { type: "STRING" } }, participantNote: { type: "STRING" } } },
     inclusions: simpleItemSchema(), exclusions: simpleItemSchema(), addOns: simpleItemSchema(),

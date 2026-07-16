@@ -4,11 +4,13 @@ import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 
 import { db } from "@/lib/db";
+import { processExpiredReservations } from "@/server/booking/expiry-service";
 import { requireRideEditor, requireRideManager } from "@/server/auth/authorization";
 import { moneyToPaise, optionalDate, parseAccommodationOptions, parseDayItems, parseItinerary, parseOrigins, parseSimpleItems, positiveInteger, requiredDate, validRideSlug } from "@/server/ride/validation";
 import { DEFAULT_GUILD_RIDE_POLICIES } from "@/server/guild/default-ride-policies";
 import { generateAnnouncementText } from "@/server/ride/announcement";
 import { isRideStatusTransitionAllowed } from "@/server/ride/status";
+import { dispatchNotificationOutbox } from "@/server/notifications/dispatcher";
 
 function value(formData: FormData, name: string, max = 5000) {
   return String(formData.get(name) ?? "").trim().slice(0, max);
@@ -29,7 +31,6 @@ function editor(slug: string, rideId: string, error?: string) {
 function rideEditorErrorCode(error: unknown) {
   if (!(error instanceof Error)) return "server";
   if (error.message.startsWith("Invalid origin capacity:")) return `origin-capacity-${error.message.split(":")[1]}`;
-  if (error.message.startsWith("Invalid origin buffer:")) return `origin-buffer-${error.message.split(":")[1]}`;
   if (error.message.startsWith("Invalid package day:")) return `package-day-${error.message.split(":")[1]}`;
   if (error.message.startsWith("Invalid accommodation option:")) return `room-option-${error.message.split(":")[1]}`;
   if (error.message.startsWith("Invalid integer:")) return `integer-${error.message.split(":")[1]}`;
@@ -116,6 +117,7 @@ export async function updateRidePackage(formData: FormData) {
     origins: true,
     accommodations: { include: { options: true }, orderBy: { checkInAt: "asc" } },
     policies: { orderBy: { version: "desc" } },
+    bookings: { where: { status: "WAITLISTED" }, select: { seatCount: true } },
   } });
   if (!ride) redirect("/account?access=denied");
   try {
@@ -128,7 +130,7 @@ export async function updateRidePackage(formData: FormData) {
     const pricePaise = moneyToPaise(value(formData, "price", 20));
     const confirmationDepositPaise = moneyToPaise(value(formData, "confirmationDeposit", 20));
     const totalSlots = integerValue(formData, "totalSlots", 1);
-    const bufferSlots = integerValue(formData, "bufferSlots");
+    const waitlistCapacity = integerValue(formData, "waitlistCapacity");
     const distanceKm = integerValue(formData, "distanceKm", 1);
     const vehicleType = value(formData, "vehicleType", 20);
     const vehicleRequirements = value(formData, "vehicleRequirements", 3_000);
@@ -142,7 +144,9 @@ export async function updateRidePackage(formData: FormData) {
     const meals = parseDayItems(value(formData, "meals"));
     const activities = parseDayItems(value(formData, "activities"));
     if (title.length < 5 || summary.length < 20 || description.length < 20 || destination.length < 2 || vehicleRequirements.length < 10 || endsAt <= startsAt || confirmationDepositPaise > pricePaise || origins.length < 1 || itineraryDays.length < 1) throw new Error("invalid");
-    if (totalSlots + bufferSlots < ride.bookedSlots) throw new Error("booked-capacity");
+    if (totalSlots < ride.bookedSlots) throw new Error("booked-capacity");
+    const waitlistedSeats = ride.bookings.reduce((total, booking) => total + booking.seatCount, 0);
+    if (waitlistCapacity < waitlistedSeats) throw new Error("waitlist-capacity");
     if (!new Set(["BIKE", "CAR", "SUV", "JEEP", "OTHER"]).has(vehicleType) || !new Set(["EASY", "MODERATE", "CHALLENGING"]).has(difficulty) || !new Set(["PUBLIC", "VERIFIED_USERS", "GUILD_MEMBERS", "INVITE_ONLY"]).has(visibility)) throw new Error("invalid");
 
     const propertyName = value(formData, "propertyName", 180);
@@ -167,7 +171,7 @@ export async function updateRidePackage(formData: FormData) {
       await tx.ride.update({ where: { id: ride.id }, data: {
         title, summary, description, originCity: origins[0].city, destination, startsAt, endsAt,
         pricePaise, confirmationDepositPaise, balanceDueAt: optionalDate(value(formData, "balanceDueAt", 40)),
-        registrationClosesAt: optionalDate(value(formData, "registrationClosesAt", 40)), totalSlots, bufferSlots,
+        registrationClosesAt: optionalDate(value(formData, "registrationClosesAt", 40)), totalSlots, waitlistCapacity,
         vehicleType: vehicleType as "BIKE" | "CAR" | "SUV" | "JEEP" | "OTHER", vehicleRequirements, difficulty: difficulty as "EASY" | "MODERATE" | "CHALLENGING",
         visibility: visibility as "PUBLIC" | "VERIFIED_USERS" | "GUILD_MEMBERS" | "INVITE_ONLY", distanceKm,
       } });
@@ -220,6 +224,17 @@ export async function updateRidePackage(formData: FormData) {
       }
       await tx.communityAuditEvent.create({ data: { communityId: ride.communityId, actorUserId: session.userId, action: "RIDE_PACKAGE_UPDATED", metadata: { rideId: ride.id, title } } });
     });
+    if (totalSlots > ride.totalSlots) {
+      const promotion = await processExpiredReservations({ rideId: ride.id }).catch((error) => {
+        console.error("Waitlist promotion after capacity increase failed", { rideId: ride.id, error });
+        return null;
+      });
+      if (promotion?.eventKeys.length) {
+        await dispatchNotificationOutbox({ eventKeys: promotion.eventKeys }).catch((error) => {
+          console.error("Waitlist promotion notification dispatch failed", { rideId: ride.id, error });
+        });
+      }
+    }
     revalidatePath(editor(guildSlug, ride.id));
     revalidatePath(`/rides/${ride.slug}`);
     redirect(`${editor(guildSlug, ride.id)}?saved=1`);

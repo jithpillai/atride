@@ -607,7 +607,7 @@ Within a database transaction:
 
 Online or verified offline payment later confirms the booking atomically. Expiry releases abandoned capacity. Concurrency tests must prove that simultaneous requests cannot consume the final slot twice.
 
-The current PostgreSQL implementation serializes reservation attempts by locking the canonical ride row with `SELECT ... FOR UPDATE` and computes occupancy from capacity-holding booking states. Before accepting a new reservation, the same idempotent expiry processor used by scheduled maintenance handles that ride. It never expires a hold whose initial payment is `SUBMITTED` or `CONFIRMED`; genuinely unpaid holds become `EXPIRED`, capacity is recomputed, and the oldest eligible waitlisted booking receives a fresh time-limited hold and payment obligations. Authorized staff cancellation uses the same canonical ride lock, changes the booking to `CANCELLED` without deleting participant or financial evidence, recalculates the denormalized display counter, writes an audit event with the previous state and reason, and then safely attempts waitlist promotion. Confirmed or submitted funds are flagged for manual reconciliation and cannot be processed through the ordinary active-booking finance transition. The ride-level `bookedSlots` value is maintained as a denormalized display counter; it is never the sole source of truth for accepting a reservation. Audit and notification-outbox events are written in the same transaction, while email delivery remains outside it. Because this atomic workflow performs several Neon round trips while holding the ride lock, it uses a scoped 15-second interactive-transaction timeout and a five-second acquisition wait rather than Prisma's five-second runtime default. A protected global sweep endpoint handles rides that receive no subsequent booking traffic and can also be run by a platform administrator.
+The current PostgreSQL implementation serializes reservation attempts by locking the canonical ride row with `SELECT ... FOR UPDATE` and computes occupancy from capacity-holding booking states. `totalSlots` is the hard participant limit; assigned ride staff are operational roles outside that participant count. The legacy `buffer_slots` database column is exposed by the application as `waitlistCapacity` and limits queued participant seats only—it never increases ride capacity. Before accepting a new reservation, the same idempotent expiry processor used by scheduled maintenance handles that ride. It never expires a hold whose initial payment is `SUBMITTED` or `CONFIRMED`; genuinely unpaid holds become `EXPIRED`, capacity is recomputed, and the oldest eligible waitlisted booking receives a fresh time-limited hold and payment obligations. Authorized staff cancellation uses the same canonical ride lock, changes the booking to `CANCELLED` without deleting participant or financial evidence, recalculates the denormalized display counter, writes an audit event with the previous state and reason, and then safely attempts waitlist promotion. Confirmed or submitted funds are flagged for manual reconciliation and cannot be processed through the ordinary active-booking finance transition. The ride-level `bookedSlots` value is maintained as a denormalized display counter; it is never the sole source of truth for accepting a reservation. Audit and notification-outbox events are written in the same transaction, while email delivery remains outside it. Because this atomic workflow performs several Neon round trips while holding the ride lock, it uses a scoped 15-second interactive-transaction timeout and a five-second acquisition wait rather than Prisma's five-second runtime default. A protected global sweep endpoint handles rides that receive no subsequent booking traffic and can also be run by a platform administrator.
 
 ### 12.2 Optional gateway payment confirmation
 
@@ -722,6 +722,22 @@ Security, transactional/service, and marketing communication are separate catego
 - Notification delivery history
 
 Casual conversation and participant social interaction may occur in an optional organizer-managed WhatsApp group.
+
+### 14.2 Notification retention and recycling
+
+The in-app inbox is a bounded operational feed, not a permanent mailbox. Canonical booking, payment, ride, policy, acknowledgement, and audit records remain the source of truth; an inbox item or delivery payload may be deleted without deleting the underlying business event.
+
+Initial retention defaults are intentionally conservative for the Neon storage budget:
+
+- Read ordinary inbox items: delete after 30 days.
+- Unread ordinary inbox items: delete after 90 days.
+- Ride-operational items: delete 30 days after the ride ends, but never before the ordinary unread limit has elapsed.
+- Critical items: retain until acknowledged or resolved, then delete after 90 days; store the compact acknowledgement/audit record separately.
+- Successfully delivered outbox rows and their provider payloads: delete after 14 days.
+- Permanently failed or dead-letter outbox rows: retain for 30 days for diagnosis, then delete after aggregate failure metrics are recorded.
+- Pending, retrying, unacknowledged-critical, or unresolved-action notifications are never removed merely because a cleanup job ran.
+
+A scheduled, idempotent cleanup job deletes eligible rows in small batches and records counts rather than copying message bodies into another archive. Notification content must remain compact and must link to canonical records instead of duplicating ride descriptions, booking snapshots, payment proofs, or media. Users see the applicable retention notice in the notification centre; @Ride does not promise a permanent communication archive.
 
 ```text
 RideCommunicationChannel

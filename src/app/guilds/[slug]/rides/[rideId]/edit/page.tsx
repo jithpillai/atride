@@ -44,31 +44,29 @@ export default async function EditRidePage({ params, searchParams }: Props) {
   const latestPolicy = (type: string) => ride.policies.find((policy) => policy.type === type)?.content ?? "";
   const packageOf = (type: string) => ride.packageItems.filter((item) => item.type === type);
   const originCapacityRow = state.error?.startsWith("origin-capacity-") ? state.error.slice("origin-capacity-".length) : null;
-  const originBufferRow = state.error?.startsWith("origin-buffer-") ? state.error.slice("origin-buffer-".length) : null;
   const packageDayRow = state.error?.startsWith("package-day-") ? state.error.slice("package-day-".length) : null;
   const roomOptionRow = state.error?.startsWith("room-option-") ? state.error.slice("room-option-".length) : null;
   const integerField = state.error?.startsWith("integer-") ? state.error.slice("integer-".length) : null;
-  const integerLabels: Record<string, string> = { totalSlots: "Total slots", bufferSlots: "Buffer slots", distanceKm: "Distance" };
+  const integerLabels: Record<string, string> = { totalSlots: "Total slots", waitlistCapacity: "Waitlist capacity", distanceKm: "Distance" };
   const errorMessage = roomOptionRow
     ? `Accommodation option row ${roomOptionRow} is invalid. Use: Name | INCLUDED, PER_PERSON, or PER_ROOM | price | maximum people per room | optional available rooms | description.`
     : originCapacityRow
     ? `Starting-group row ${originCapacityRow} has an invalid capacity. Enter a whole number of at least 1, or leave the optional column blank.`
-    : originBufferRow
-      ? `Starting-group row ${originBufferRow} has an invalid buffer. Enter a whole number of 0 or more, or leave the optional column blank.`
-      : packageDayRow
+    : packageDayRow
         ? `Meal/activity row ${packageDayRow} has an invalid day number. Start the row with a whole-number ride day such as 1 or 2.`
         : integerField
           ? `${integerLabels[integerField] ?? integerField} must be a whole number within the displayed limit.`
       : state.error ? ({
     capacity: "Starting-point capacity is now optional and independent of total ride slots. Save again using the updated origin format.",
-    "booked-capacity": "Total plus buffer capacity cannot be reduced below the number of riders already booked.",
+    "booked-capacity": "Total slots cannot be reduced below the number of participants already holding ride places.",
+    "waitlist-capacity": "Waitlist capacity cannot be reduced below the number of people already waiting.",
     stay: "Complete all accommodation fields and ensure check-out is after check-in, or remove the property name to omit accommodation.",
     policy: "Every policy section must contain at least 10 characters.",
-    origins: "A starting-group row is incomplete. Use: City | Meeting point | YYYY-MM-DDTHH:mm | optional Capacity | optional Buffer | Merge point | Route summary.",
+    origins: "A starting-group row is incomplete. Use: City | Meeting point | YYYY-MM-DDTHH:mm | optional planning capacity | Merge point | Route summary.",
     itinerary: "An itinerary row is incomplete. Use: YYYY-MM-DD | Day title | Plan and places covered.",
     package: "A package, meal, or activity row has the wrong structure. Follow the format shown above its field.",
     money: "Ride fee and confirmation deposit must be valid non-negative amounts; the deposit cannot exceed the fee.",
-    number: "Distance, slots, buffers, and origin capacities must be whole numbers within the displayed limits.",
+    number: "Distance, total slots, waitlist capacity, and optional origin planning capacities must be whole numbers within the displayed limits.",
     date: "One of the entered dates or times is invalid.",
     required: "Check the required identity, dates, origins, itinerary, package, and policy fields.",
     incomplete: "This ride is not ready to publish. Complete its description, origins, itinerary, package items, and at least three policy sections.",
@@ -76,7 +74,7 @@ export default async function EditRidePage({ params, searchParams }: Props) {
     transition: "That ride status change is not allowed from the current state.",
     server: "The database could not save this ride package. Your browser draft is preserved; check the local server log for the diagnostic.",
   } as Record<string, string>)[state.error] ?? "The ride package could not be saved. Your browser draft is preserved." : null;
-  const origins = ride.origins.map((origin) => [origin.city, origin.meetingPoint, indiaLocal(origin.departureAt), origin.capacity ?? "", origin.bufferCapacity || "", origin.mergePoint ?? "", origin.routeSummary ?? ""].join(" | ")).join("\n");
+  const origins = ride.origins.map((origin) => [origin.city, origin.meetingPoint, indiaLocal(origin.departureAt), origin.capacity ?? "", origin.mergePoint ?? "", origin.routeSummary ?? ""].join(" | ")).join("\n");
   const itinerary = ride.itineraryDays.map((day) => `${day.scheduledAt ? indiaLocal(day.scheduledAt) : indiaDate(day.date)} | ${day.title} | ${day.summary}`).join("\n");
   const rideDayCount = Math.max(1, Math.ceil((ride.endsAt.getTime() - ride.startsAt.getTime()) / 86400000));
   const sampleRows = Array.from({ length: rideDayCount }, (_, index) => {
@@ -114,7 +112,7 @@ export default async function EditRidePage({ params, searchParams }: Props) {
         <label className="text-sm font-semibold">Ride fee (₹)<input required type="number" min="0" step="0.01" name="price" defaultValue={ride.pricePaise / 100} className="field" /></label>
         <label className="text-sm font-semibold">Confirmation deposit (₹)<input required type="number" min="0" step="0.01" name="confirmationDeposit" defaultValue={ride.confirmationDepositPaise / 100} className="field" /></label>
         <label className="text-sm font-semibold">Total slots<input required type="number" min="1" name="totalSlots" defaultValue={ride.totalSlots} className="field" /></label>
-        <label className="text-sm font-semibold">Buffer slots<input required type="number" min="0" name="bufferSlots" defaultValue={ride.bufferSlots} className="field" /></label>
+        <label className="text-sm font-semibold">Waitlist capacity<input required type="number" min="0" name="waitlistCapacity" defaultValue={ride.waitlistCapacity} className="field" /><span className="mt-2 block text-xs font-normal leading-5 text-zinc-500">Maximum people allowed to queue after all Total slots are taken. Use 0 to disable the waitlist.</span></label>
       </div></div>
 
       <div className="rounded-3xl border border-white/10 bg-white/[.025] p-7"><p className="eyebrow">3 · Accommodation facts</p><p className="mt-3 text-sm leading-6 text-zinc-500">Enter only confirmed property facts. The Ride Assistant can use them to prepare the public stay summary and package content.</p><div className="mt-6 grid gap-5 sm:grid-cols-2">
@@ -127,7 +125,7 @@ export default async function EditRidePage({ params, searchParams }: Props) {
 
       <RideAiAssistant guildSlug={slug} rideId={ride.id} enabled={process.env.AI_ASSIST_ENABLED === "true" && Boolean(process.env.GEMINI_API_KEY)} />
 
-      <div className="rounded-3xl border border-white/10 bg-white/[.025] p-7"><p className="eyebrow">5 · Starting groups</p><p className="mt-3 text-xs leading-6 text-zinc-500">One per line: City | Meeting point | departure date/time | optional planning capacity | optional buffer | merge point | route summary. Total ride slots belong to the destination/stay and do not need to be split across origins.</p><p className={exampleBox}>Flexible example based on this ride:{"\n"}{ride.originCity} | Confirmed meeting point | {indiaLocal(ride.startsAt)} |  |  | {ride.destination} | {ride.originCity} to {ride.destination} via confirmed regrouping stops{"\n\n"}Optional allocation example:{"\n"}{ride.originCity} | Confirmed meeting point | {indiaLocal(ride.startsAt)} | {ride.totalSlots} | {ride.bufferSlots} | {ride.destination} | {ride.originCity} to {ride.destination}</p><textarea required rows={6} name="origins" defaultValue={origins} className="field mt-4 font-mono text-xs" /></div>
+      <div className="rounded-3xl border border-white/10 bg-white/[.025] p-7"><p className="eyebrow">5 · Starting groups</p><p className="mt-3 text-xs leading-6 text-zinc-500">One per line: City | Meeting point | departure date/time | optional planning capacity | merge point | route summary. The optional city figure is only a planning hint; it does not divide or limit Total slots.</p><p className={exampleBox}>Flexible example based on this ride:{"\n"}{ride.originCity} | Confirmed meeting point | {indiaLocal(ride.startsAt)} |  | {ride.destination} | {ride.originCity} to {ride.destination} via confirmed regrouping stops{"\n\n"}Optional planning example:{"\n"}{ride.originCity} | Confirmed meeting point | {indiaLocal(ride.startsAt)} | {ride.totalSlots} | {ride.destination} | {ride.originCity} to {ride.destination}</p><textarea required rows={6} name="origins" defaultValue={origins} className="field mt-4 font-mono text-xs" /></div>
       <div className="rounded-3xl border border-white/10 bg-white/[.025] p-7"><p className="eyebrow">6 · Day-wise itinerary</p><p className="mt-3 text-xs leading-6 text-zinc-500">One event per line: YYYY-MM-DDTHH:mm | Event title | Plan and places covered. Omit <span className="font-mono">THH:mm</span> when only the date is known. Multiple timed events may share the same date.</p><p className={exampleBox}>Example for this {rideDayCount}-day ride:{"\n"}{sampleItinerary}</p><textarea required rows={7} name="itinerary" defaultValue={itinerary} className="field mt-4 font-mono text-xs" /></div>
 
       <div className="rounded-3xl border border-white/10 bg-white/[.025] p-7"><p className="eyebrow">7 · Package</p><div className="mt-6 grid gap-6 lg:grid-cols-2">

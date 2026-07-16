@@ -199,7 +199,7 @@ Build:
 - Captains, vice-captains, sweeps, and marshals
 - Routes, checkpoints, and merge points
 - Published, closed, postponed, cancelled, and completed states
-- Capacity, group capacity, and buffer capacity
+- Hard participant capacity, optional starting-group planning counts, and a bounded waitlist
 - Ride-staff assignments feed the personalized upcoming-rides section
 - Public read-only upcoming/featured ride widget endpoints
 - WhatsApp-ready/plain-text announcement generation from canonical ride data without participant PII
@@ -270,6 +270,8 @@ Acceptance tests:
 - A booking preserves the accepted price, itinerary/package summary, rules, waiver, and refund-policy versions.
 - Changing a ride package later does not silently rewrite confirmed booking snapshots.
 - A sold-out ride rejects new bookings and exposes only the configured waitlist/contact path.
+- Total slots are the hard participant limit; assigned ride staff do not consume participant or waitlist capacity.
+- The waitlist accepts no more than its configured participant-seat limit, and a multi-person party is queued only when the whole party fits.
 - Simultaneous requests cannot oversell the final slot.
 - Unpaid reservations expire and release capacity.
 - A participant uploads offline payment proof.
@@ -312,6 +314,7 @@ Build:
 - Retries and dead-letter processing
 - Delivery-status webhooks
 - Notification preferences and in-app inbox
+- Bounded notification retention with scheduled inbox/outbox cleanup
 - Authoritative ride announcement/activity feed
 - Critical announcement acknowledgements
 - Optional protected WhatsApp group invite-link configuration
@@ -332,6 +335,8 @@ Acceptance tests:
 - `ANNOUNCEMENTS_ONLY` requires the organizer to confirm that WhatsApp admin-only posting was configured manually.
 - Participants who do not join WhatsApp still receive essential information through @Ride.
 - The system never reports that a user joined WhatsApp based only on opening the link.
+- Read, expired, delivered, and dead-letter notification rows are recycled according to the documented retention policy without deleting canonical booking, payment, ride, acknowledgement, or audit records.
+- Pending retries, unresolved actions, and unacknowledged critical notices are protected from cleanup.
 
 External accounts needed:
 
