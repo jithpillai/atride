@@ -11,22 +11,14 @@ Programmatic creation of normal large WhatsApp groups is not a dependable MVP ca
 
 ## Decision
 
-Do not build participant-to-participant chat in the MVP. Build a tenant-scoped official announcement/activity feed with optional acknowledgement for critical updates. Allow a ride administrator to attach a manually created WhatsApp invite link using one of these modes:
-
-```text
-DISABLED
-DISCUSSION
-ANNOUNCEMENTS_ONLY
-```
-
-When WhatsApp is enabled, `ANNOUNCEMENTS_ONLY` is the recommended default. The organizer manually configures WhatsApp so only admins can send and confirms that step in @Ride. Essential information remains in @Ride regardless of WhatsApp participation.
+Do not build participant-to-participant chat in the MVP. Build a tenant-scoped official announcement/activity feed with optional acknowledgement for critical updates. A ride administrator may attach an optional, manually created WhatsApp invite link to a ride. @Ride does not represent or synchronize the external group’s posting permissions or other settings. Essential information remains in @Ride regardless of WhatsApp participation.
 
 ## Consequences
 
 - @Ride remains the authoritative operational record.
 - Communities retain familiar WhatsApp conversation without @Ride rebuilding chat.
-- Invite links require protected storage, access control, expiry, and privacy disclosure.
-- Opening an invite link cannot be treated as verified group membership.
+- Invite links require protected storage, access control, and privacy disclosure.
+- @Ride does not record link opens or claim knowledge of external group membership.
 - External group moderation remains the community's responsibility.
 - Official announcements fan out through in-app and email initially; an approved optional SMS adapter may be added later.
 - A future official WhatsApp adapter can be added behind the communication-channel interface if API limits and eligibility become suitable.

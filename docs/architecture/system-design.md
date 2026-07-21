@@ -36,7 +36,7 @@ Participants             Community staff                 @Ride staff
                                |
                                v
                     @Ride application platform
-                  PostgreSQL + Redis + workers
+             PostgreSQL + scheduled workers initially
 ```
 
 @Ride is the system of record for communities, rides, bookings, payment obligations/status, staff assignments, check-ins, notifications, and audit history. The Guild's bank/UPI provider is the source of truth for actual fund movement; permitted Guild staff reconcile transaction references and protected proof in @Ride. An automated community-owned gateway may be added later without making @Ride the merchant or settlement intermediary.
@@ -64,16 +64,16 @@ TypeScript on Node.js
                 Application/domain modules
   identity | tenants | rides | bookings | payments | tracking
   discovery | notifications | media | audit | reporting
-             |                   |                 |
-             v                   v                 v
-     PostgreSQL/PostGIS        Redis        External providers
-     authoritative data     cache/OTP/queue  UPI/SES/
-                                             Maps/Cloudinary
-             ^                   |
-             |                   v
-             +---------- TypeScript worker ----------+
-                  BullMQ jobs, reminders, retries,
-                  notification and expiry processing
+             |                                     |
+             v                                     v
+     PostgreSQL/PostGIS                      External providers
+     authoritative data                     UPI/SES/
+     + transactional outbox                  Maps/Cloudinary
+             ^
+             |
+             +------ scheduled TypeScript worker ------+
+                  reminders, retries, notifications,
+                  expiry and waitlist processing
 ```
 
 The request-response application handles interactive web and API traffic. The worker handles work that must survive a closed browser, provider timeout, deployment restart, or scheduled execution.
@@ -91,8 +91,8 @@ The request-response application handles interactive web and API traffic. The wo
 | Database | PostgreSQL | Authoritative transactional data |
 | Geospatial | PostGIS | Nearby discovery and route/location queries |
 | ORM | Prisma | Typed data access, migrations, and transactions |
-| Cache/ephemeral state | Redis | OTP, rate limits, caches, reservations, and live state |
-| Queue | BullMQ | Delayed and asynchronous work |
+| Cache/ephemeral state | PostgreSQL initially; Redis when measured load requires it | OTP, rate limits, caches, reservations, and live state |
+| Queue | PostgreSQL transactional outbox plus scheduled workers initially | Durable asynchronous work without a launch-stage Redis dependency |
 | Media | Cloudinary initially | Images, transformations, and protected proof uploads |
 | Payments | Dynamic UPI intent/QR plus manual reconciliation | Direct-to-Guild collection without platform settlement |
 | SMS | Disabled initially | Optional compliant post-launch adapter |
@@ -586,7 +586,7 @@ Detailed Prisma fields and indexes will be introduced as versioned migrations du
 - A checkpoint check-in identifies its actor and ride group.
 - Notification deliveries have stable idempotency keys.
 - External communication invite links never appear in public responses, caches, metadata, or logs.
-- A recorded external channel mode represents organizer-configured intent, not verified WhatsApp state.
+- External group settings and membership remain outside @Ride; the application stores no inferred WhatsApp state.
 - Individual Ride Passports, newcomer tiles, and awards are never public in the initial release.
 - Completed-ride aggregates derive only from verified participation, not arbitrary bookings.
 - @Ride has no public rider star-rating aggregate.
@@ -635,7 +635,7 @@ The browser success page is never the payment source of truth.
 
 ### 12.4 Transactional outbox
 
-Business updates and their outbox records commit together. A publisher moves pending events to BullMQ, and idempotent workers deliver notifications or integration work.
+Business updates and their outbox records commit together. Initially, protected scheduled workers claim eligible rows directly from PostgreSQL and perform idempotent notification or integration delivery. Redis/BullMQ may later sit behind the same outbox contracts when measured scale warrants a dedicated queue; see [ADR-017](decisions/ADR-017-postgres-outbox-scheduled-worker-first.md).
 
 ```text
 Database transaction
@@ -643,9 +643,9 @@ Database transaction
   +-- insert outbox event
             |
             v
-Outbox publisher -> BullMQ -> worker -> provider
-                                  |
-                                  +-> delivery status and retries
+Scheduled worker -> claim outbox row -> provider
+                              |
+                              +-> delivery status and retry time
 ```
 
 This avoids losing a message after a successful booking commit and avoids calling providers while a database transaction is open.
@@ -714,6 +714,8 @@ Every delivery records recipient, redacted destination, provider request ID, tem
 
 Security, transactional/service, and marketing communication are separate categories. Marketing requires separate consent and unsubscribe behavior.
 
+Optional email preferences are intentionally narrow. A participant may disable the final 24-hour ride reminder and routine (`NORMAL`) announcement email while those events remain in the in-app inbox. Authentication, booking, waitlist, payment, postponement, cancellation, refund, important, critical, acknowledgement-required, and safety communication remains mandatory service email.
+
 ### 14.1 Ride communication boundary
 
 @Ride does not implement participant chat in the MVP. It owns the structured, authoritative communication layer:
@@ -744,23 +746,14 @@ Initial retention defaults are intentionally conservative for the Neon storage b
 A scheduled, idempotent cleanup job deletes eligible rows in small batches and records counts rather than copying message bodies into another archive. Notification content must remain compact and must link to canonical records instead of duplicating ride descriptions, booking snapshots, payment proofs, or media. Users see the applicable retention notice in the notification centre; @Ride does not promise a permanent communication archive.
 
 ```text
-RideCommunicationChannel
-- id
-- rideId
-- type: WHATSAPP_GROUP
-- mode: DISABLED | DISCUSSION | ANNOUNCEMENTS_ONLY
-- inviteUrlEncrypted
-- visibilityPolicy
-- availableFrom
-- expiresAt
-- configuredBy
-- configurationConfirmedAt
-- status
+Ride
+- whatsappInviteEncrypted (optional, AES-256-GCM)
+- whatsappInviteUpdatedAt
 ```
 
-`ANNOUNCEMENTS_ONLY` is the recommended enabled default. Because the normal WhatsApp group is managed outside @Ride, the organizer manually sets WhatsApp's group permission to allow only admins to send and confirms that configuration in @Ride. The platform stores intent and confirmation, not a guarantee of current external state.
+The link exists only when an authorized ride editor has configured it. WhatsApp group permissions remain entirely inside WhatsApp and are not duplicated in @Ride. Saving, replacing, or removing it creates a tenant audit event.
 
-Invite links are bearer-style access information. They are encrypted/protected at rest, returned only through an authorized endpoint, excluded from logs and analytics, and never included in public page HTML, metadata, sitemaps, or caches. Confirmed participants see a privacy notice before opening the link.
+Invite links are bearer-style access information. They are encrypted at rest with ride-bound authenticated encryption, decrypted only for an authorized server-rendered view belonging to a confirmed participant or assigned ride staff member, excluded from logs and analytics, and never included in unauthorized page HTML, metadata, sitemaps, or public discovery responses. Eligible participants see a privacy notice before opening the link. @Ride does not record link opens or external membership.
 
 The MVP does not use unofficial WhatsApp-Web automation or depend on Meta Groups API eligibility. A future provider adapter may automate creation/settings only if the official API becomes practical for expected ride sizes and account eligibility.
 

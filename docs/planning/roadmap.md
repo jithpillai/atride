@@ -306,7 +306,7 @@ External accounts needed:
 
 ### Phase 6 — Email, in-app, and event notifications
 
-Implementation status: **in progress**. Phase 5 supplied the transactional email outbox, SES adapter, immediate best-effort dispatch, retry backoff, booking/payment/disruption templates, and protected retry endpoint. Phase 6 now includes booking-created events, a bounded in-app notification centre, authoritative ride announcements delivered to active participants through both inbox and transactional email, urgency levels, and durable acknowledgements for critical or acknowledgement-required updates. Scheduled reminders, notification preferences, protected WhatsApp invite controls, provider callbacks, worker deployment, and cleanup automation remain before the phase closes.
+Implementation status: **in progress**. Phase 5 supplied the transactional email outbox, SES adapter, immediate best-effort dispatch, retry backoff, booking/payment/disruption templates, and protected retry endpoint. Phase 6 now includes booking-created and waitlist-offer events, a bounded in-app notification centre, authoritative ride announcements delivered to active participants through both inbox and transactional email, urgency levels, durable acknowledgements for critical or acknowledgement-required updates, idempotent ride-start/payment reminders derived from current canonical dates, optional-email preferences, and an encrypted per-ride WhatsApp invite visible only to confirmed participants or assigned crew. Provider callbacks, production scheduler deployment, and cleanup automation remain before the phase closes.
 
 Build:
 
@@ -318,15 +318,14 @@ Build:
 - Waitlist offers
 - Ride-start and important operational messages
 - Transactional outbox
-- BullMQ notification worker
+- Protected scheduled notification worker backed by the PostgreSQL outbox; BullMQ remains an evidence-gated scale upgrade
 - Retries and dead-letter processing
 - Delivery-status webhooks
 - Notification preferences and in-app inbox
 - Bounded notification retention with scheduled inbox/outbox cleanup
 - Authoritative ride announcement/activity feed
 - Critical announcement acknowledgements
-- Optional protected WhatsApp group invite-link configuration
-- WhatsApp channel modes: `DISABLED`, `DISCUSSION`, and recommended `ANNOUNCEMENTS_ONLY`
+- Optional protected per-ride WhatsApp group invite link
 - Participant privacy notice and eligibility-based link access
 
 Acceptance tests:
@@ -340,9 +339,8 @@ Acceptance tests:
 - Authorized ride staff can publish an official announcement to the correct audience.
 - A critical announcement records participant acknowledgements.
 - Confirmed participants can view an enabled WhatsApp invite link; public and unrelated users cannot.
-- `ANNOUNCEMENTS_ONLY` requires the organizer to confirm that WhatsApp admin-only posting was configured manually.
 - Participants who do not join WhatsApp still receive essential information through @Ride.
-- The system never reports that a user joined WhatsApp based only on opening the link.
+- @Ride does not create the group, manage its settings, add members, or record link opens/group membership.
 - Read, expired, delivered, and dead-letter notification rows are recycled according to the documented retention policy without deleting canonical booking, payment, ride, acknowledgement, or audit records.
 - Pending retries, unresolved actions, and unacknowledged critical notices are protected from cleanup.
 
@@ -353,7 +351,7 @@ External accounts needed:
 - SPF, DKIM, and DMARC DNS records
 - SES production access
 - Approved sender addresses such as `security@atride.in`
-- Redis and continuously running worker infrastructure
+- A deployment scheduler capable of invoking protected HTTPS endpoints (Redis is not required initially)
 
 ### Phase 7 — Captain console and ride progress
 

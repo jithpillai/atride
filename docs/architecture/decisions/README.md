@@ -29,6 +29,7 @@ Architecture Decision Records (ADRs) capture important choices, their context, a
 | [ADR-014](ADR-014-firebase-phone-verification.md) | Firebase for one-time phone ownership verification | Accepted |
 | [ADR-015](ADR-015-review-before-apply-ai-authoring.md) | Review-before-apply AI ride authoring | Accepted |
 | [ADR-016](ADR-016-assisted-upi-defer-gateway.md) | Assisted UPI by default; defer payment gateways | Accepted |
+| [ADR-017](ADR-017-postgres-outbox-scheduled-worker-first.md) | PostgreSQL outbox and scheduled worker before a dedicated queue | Accepted |
 
 ## Adding a decision
 

@@ -254,7 +254,7 @@ After activation, authorized staff can manage:
 - Payment methods
 - Staff and role assignments
 - Notification reply-to contact
-- Default ride communication preference: no WhatsApp, discussion, or announcements-only
+- Optional protected WhatsApp invite links configured separately for individual rides
 - Acknowledgement that essential information must remain available in @Ride
 - Directory visibility: listed or unlisted
 - Guild Hall access: public, verified users, Guild members, or invite-only

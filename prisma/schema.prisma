@@ -242,6 +242,8 @@ enum NotificationEventType {
   RIDE_POSTPONED
   RIDE_CANCELLED
   RIDE_ANNOUNCEMENT
+  RIDE_START_REMINDER
+  BOOKING_PAYMENT_REMINDER
 }
 
 enum RideAnnouncementUrgency {
@@ -389,6 +391,8 @@ model Ride {
   heroGradient             String         @map("hero_gradient") @db.Text
   distanceKm               Int            @map("distance_km")
   coverAssetId             String?        @unique @map("cover_asset_id") @db.Uuid
+  whatsappInviteEncrypted  String?        @map("whatsapp_invite_encrypted") @db.Text
+  whatsappInviteUpdatedAt  DateTime?      @map("whatsapp_invite_updated_at") @db.Timestamptz(3)
   createdAt                DateTime       @default(now()) @map("created_at") @db.Timestamptz(3)
   updatedAt                DateTime       @updatedAt @map("updated_at") @db.Timestamptz(3)
 
@@ -564,6 +568,7 @@ model User {
   reviewedBookingPayments     BookingPayment[]             @relation("BookingPaymentReviewer")
   notificationEvents          NotificationOutboxEvent[]
   notificationInboxItems      NotificationInboxItem[]
+  notificationPreference      UserNotificationPreference?
   createdRideDisruptions      RideDisruption[]             @relation("RideDisruptionCreator")
   reviewedBookingRefunds      BookingRefund[]              @relation("BookingRefundReviewer")
 
@@ -1180,4 +1185,17 @@ model NotificationInboxItem {
   @@index([recipientUserId, readAt, createdAt])
   @@index([communityId, createdAt])
   @@map("notification_inbox_items")
+}
+
+model UserNotificationPreference {
+  id                        String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  userId                    String   @unique @map("user_id") @db.Uuid
+  emailRideReminders        Boolean  @default(true) @map("email_ride_reminders")
+  emailRoutineAnnouncements Boolean  @default(true) @map("email_routine_announcements")
+  createdAt                 DateTime @default(now()) @map("created_at") @db.Timestamptz(3)
+  updatedAt                 DateTime @updatedAt @map("updated_at") @db.Timestamptz(3)
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@map("user_notification_preferences")
 }

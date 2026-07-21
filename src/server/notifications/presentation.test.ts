@@ -32,4 +32,12 @@ describe("in-app notification presentation", () => {
     expect(item.body).toBe("Report by 05:15.");
     expect(item.actionUrl).toBe("/rides/agumbe-trail#ride-updates");
   });
+
+  it("distinguishes upcoming and overdue reminder inbox items", () => {
+    const ride = notificationPresentation("RIDE_START_REMINDER", { rideTitle: "Agumbe Trail", bookingUrl: "/rides/agumbe-trail" });
+    const payment = notificationPresentation("BOOKING_PAYMENT_REMINDER", { rideTitle: "Agumbe Trail", reminderKind: "PAYMENT_OVERDUE", bookingUrl: "/account/bookings" });
+    expect(ride.title).toContain("Ride starts soon");
+    expect(payment.title).toContain("Payment overdue");
+    expect(payment.actionUrl).toBe("/account/bookings");
+  });
 });
