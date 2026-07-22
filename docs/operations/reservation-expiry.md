@@ -27,6 +27,6 @@ Set the same strong `CRON_SECRET` in the deployment and scheduler. Do not place 
 
 ## Scheduling policy
 
-Use a 5–10 minute interval when a production scheduler with that frequency is available. Vercel Hobby cron currently supports only one run per day and does not provide precise execution time, which is too coarse for a 24-hour seat hold. Therefore this repository does not commit a misleading frequent `vercel.json` schedule. Booking attempts also process the relevant ride opportunistically, while the platform-admin action provides a safe manual fallback.
+Use a 5–10 minute interval when product activity later justifies a production scheduler with that frequency. For the hobby stage, `vercel.json` commits one daily safety sweep through `/api/internal/maintenance/daily`. This is intentionally not presented as precise hold expiry: booking attempts also process the relevant ride opportunistically, while the platform-admin action remains a safe manual fallback.
 
 When the deployment moves to a scheduler that supports frequent jobs, point it at the protected endpoint; the booking algorithm and data model do not need to change.

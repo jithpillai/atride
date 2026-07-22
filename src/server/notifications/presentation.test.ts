@@ -21,4 +21,23 @@ describe("in-app notification presentation", () => {
     });
     expect(item.body).toBe("Unsafe weather conditions");
   });
+
+  it("presents official ride announcements with their ride-feed action", () => {
+    const item = notificationPresentation("RIDE_ANNOUNCEMENT", {
+      announcementTitle: "Departure update",
+      announcementBody: "Report by 05:15.",
+      rideUrl: "/rides/agumbe-trail#ride-updates",
+    });
+    expect(item.title).toContain("Departure update");
+    expect(item.body).toBe("Report by 05:15.");
+    expect(item.actionUrl).toBe("/rides/agumbe-trail#ride-updates");
+  });
+
+  it("distinguishes upcoming and overdue reminder inbox items", () => {
+    const ride = notificationPresentation("RIDE_START_REMINDER", { rideTitle: "Agumbe Trail", bookingUrl: "/rides/agumbe-trail" });
+    const payment = notificationPresentation("BOOKING_PAYMENT_REMINDER", { rideTitle: "Agumbe Trail", reminderKind: "PAYMENT_OVERDUE", bookingUrl: "/account/bookings" });
+    expect(ride.title).toContain("Ride starts soon");
+    expect(payment.title).toContain("Payment overdue");
+    expect(payment.actionUrl).toBe("/account/bookings");
+  });
 });

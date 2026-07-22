@@ -9,7 +9,7 @@ Current infrastructure status:
 - `atride.in` is live on Vercel.
 - Neon PostgreSQL/PostGIS is provisioned and the initial migration/seed are active.
 - The `atride.in` identity is configured in Amazon SES and sandbox access is available.
-- SES production-access approval has been requested and is pending.
+- SES production access was not approved in the first review. The verified-domain sandbox remains active for approved test recipients; the application keeps provider activation separate from Phase delivery.
 - The SES email adapter and branded OTP template are implemented; both the mailbox-simulator smoke test and real OTP delivery to a verified sandbox recipient have passed.
 - SMS is explicitly outside the launch critical path and is deferred to an optional final phase. Cloudinary media uploads are active; maps, Redis workers, and payments remain deferred to their delivery phases.
 - Phase 2 foundations are implemented: Google OpenID Connect plus email OTP, opaque sessions, account/logout, first-login onboarding, private participant profiles, a vehicle garage, seeded roles, optional Firebase phone verification, and protected platform/Guild authorization boundaries. Personalized upcoming rides and distributed abuse controls remain scheduled with their dependent phases.
@@ -306,7 +306,7 @@ External accounts needed:
 
 ### Phase 6 — Email, in-app, and event notifications
 
-Implementation status: **in progress**. Phase 5 supplied the transactional email outbox, SES adapter, immediate best-effort dispatch, retry backoff, booking/payment/disruption templates, and protected retry endpoint. The first Phase 6 slice adds booking-created events and a bounded in-app notification centre before scheduled reminders, announcements, acknowledgements, provider callbacks, worker deployment, and cleanup automation.
+Implementation status: **complete for the current sandbox scope**. Phase 5 supplied the transactional email outbox, SES adapter, immediate best-effort dispatch, retry backoff, booking/payment/disruption templates, and protected retry endpoint. Phase 6 adds booking-created and waitlist-offer events, a bounded in-app notification centre, authoritative ride announcements delivered through inbox and transactional email, urgency levels, durable acknowledgements, idempotent upcoming-ride/payment reminders, narrow optional-email preferences, an encrypted per-ride WhatsApp invite, verified/idempotent SES-SNS callback handling, address suppression after permanent bounce/complaint, and bounded retention cleanup. Vercel Hobby invokes one combined maintenance worker daily; immediate business actions still dispatch synchronously after commit. AWS configuration-set/SNS activation remains an external deployment setting and can be enabled in sandbox or after a later production-access approval without code changes.
 
 Build:
 
@@ -318,15 +318,14 @@ Build:
 - Waitlist offers
 - Ride-start and important operational messages
 - Transactional outbox
-- BullMQ notification worker
+- Protected scheduled notification worker backed by the PostgreSQL outbox; BullMQ remains an evidence-gated scale upgrade
 - Retries and dead-letter processing
 - Delivery-status webhooks
 - Notification preferences and in-app inbox
 - Bounded notification retention with scheduled inbox/outbox cleanup
 - Authoritative ride announcement/activity feed
 - Critical announcement acknowledgements
-- Optional protected WhatsApp group invite-link configuration
-- WhatsApp channel modes: `DISABLED`, `DISCUSSION`, and recommended `ANNOUNCEMENTS_ONLY`
+- Optional protected per-ride WhatsApp group invite link
 - Participant privacy notice and eligibility-based link access
 
 Acceptance tests:
@@ -340,9 +339,8 @@ Acceptance tests:
 - Authorized ride staff can publish an official announcement to the correct audience.
 - A critical announcement records participant acknowledgements.
 - Confirmed participants can view an enabled WhatsApp invite link; public and unrelated users cannot.
-- `ANNOUNCEMENTS_ONLY` requires the organizer to confirm that WhatsApp admin-only posting was configured manually.
 - Participants who do not join WhatsApp still receive essential information through @Ride.
-- The system never reports that a user joined WhatsApp based only on opening the link.
+- @Ride does not create the group, manage its settings, add members, or record link opens/group membership.
 - Read, expired, delivered, and dead-letter notification rows are recycled according to the documented retention policy without deleting canonical booking, payment, ride, acknowledgement, or audit records.
 - Pending retries, unresolved actions, and unacknowledged critical notices are protected from cleanup.
 
@@ -353,7 +351,7 @@ External accounts needed:
 - SPF, DKIM, and DMARC DNS records
 - SES production access
 - Approved sender addresses such as `security@atride.in`
-- Redis and continuously running worker infrastructure
+- A deployment scheduler capable of invoking protected HTTPS endpoints (Redis is not required initially)
 
 ### Phase 7 — Captain console and ride progress
 

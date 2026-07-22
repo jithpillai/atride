@@ -672,6 +672,8 @@ Exact live location is never public or indexable. Access expires according to po
 
 Messages are delivered through approved templates. Marketing consent is separate from security and essential service communication.
 
+Participants may turn off email for the upcoming-ride reminder and routine announcements. Those events remain available in the @Ride inbox. Booking, waitlist, payment, disruption, important, critical, acknowledgement-required, and safety communication cannot be disabled as optional email.
+
 ### UC-26: Publish an official ride announcement
 
 **Actor:** Lead Captain, assigned Captain, Ride Manager, Community Admin, or another explicitly permitted ride role
@@ -702,29 +704,20 @@ Examples include assembly instructions, schedule/route changes, accommodation ch
 
 1. Create and administer the WhatsApp group manually.
 2. Paste its invite link into protected ride communication settings.
-3. Choose a mode:
-
-```text
-DISABLED
-DISCUSSION
-ANNOUNCEMENTS_ONLY (recommended default when enabled)
-```
-
-4. Choose visibility, normally confirmed participants and assigned staff.
-5. For `ANNOUNCEMENTS_ONLY`, confirm that WhatsApp's `Only admins can send messages` group permission has been set manually.
-6. Publish the channel and optionally notify eligible participants.
+3. Save the link; it is available only to confirmed participants and assigned ride staff.
+4. Replace or remove the link when the external group changes or the invitation is revoked.
 
 **Rules:**
 
 - @Ride does not create or manage the normal WhatsApp group in the MVP.
-- @Ride stores the intended mode but cannot verify a manually managed group's live permissions.
+- @Ride does not store or describe the external group’s live posting permissions or settings.
 - The invite URL is treated as protected bearer-style information and is not exposed publicly or indexed.
 - Booking does not silently add a participant to WhatsApp.
 - Before opening the link, participants are told that joining can expose their WhatsApp phone number/profile information to group members.
 - Essential ride information remains available in @Ride for participants who do not join WhatsApp.
 - The organizer, not @Ride, moderates the external group.
-- The link can have availability and expiry times and can be replaced if leaked.
-- @Ride may record link availability, viewing, and opening, but must not claim that a participant joined unless WhatsApp provides a verified event.
+- The link can be replaced or removed if leaked.
+- @Ride does not record invite-link opens or external group membership.
 
 ## 12. Dashboards
 

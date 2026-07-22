@@ -23,7 +23,7 @@ export default async function NotificationCentrePage() {
     <Link href="/account" className="text-sm font-bold text-zinc-400 transition hover:text-white">← Account</Link>
     <div className="mt-8 flex flex-col gap-5 border-b border-white/10 pb-8 sm:flex-row sm:items-end sm:justify-between">
       <div><p className="eyebrow">Notification centre</p><h1 className="mt-3 text-4xl font-black tracking-tight">Ride updates and actions</h1><p className="mt-3 max-w-2xl text-sm leading-6 text-zinc-500">A compact operational inbox—not a permanent message archive. Booking, payment, and ride records remain available in their canonical pages.</p></div>
-      {unread > 0 && <form action={markAllNotificationsRead} className="relative"><FormPendingSubmit idleLabel={`Mark all ${unread} read`} pendingLabel="Updating…" overlayLabel="Updating notifications…" className="rounded-full border border-orange-400/30 px-5 py-2.5 text-sm font-black text-orange-300" /></form>}
+      <div className="flex flex-wrap gap-2"><Link href="/account/notifications/preferences" className="rounded-full border border-white/15 px-5 py-2.5 text-sm font-black text-zinc-300 hover:border-orange-400/40 hover:text-orange-300">Email preferences</Link>{unread > 0 && <form action={markAllNotificationsRead} className="relative"><FormPendingSubmit idleLabel={`Mark all ${unread} read`} pendingLabel="Updating…" overlayLabel="Updating notifications…" className="rounded-full border border-orange-400/30 px-5 py-2.5 text-sm font-black text-orange-300" /></form>}</div>
     </div>
 
     <div className="mt-8 grid gap-4">

@@ -32,5 +32,11 @@ export function notificationPresentation(eventType: NotificationEventType, rawPa
       return { title: `Ride postponed · ${ride}`, body: text(payload, "reason", `${guild} postponed this ride.`), actionUrl };
     case "RIDE_CANCELLED":
       return { title: `Ride cancelled · ${ride}`, body: text(payload, "reason", `${guild} cancelled this ride.`), actionUrl };
+    case "RIDE_ANNOUNCEMENT":
+      return { title: `${text(payload, "announcementTitle", "Ride update")} · ${ride}`, body: text(payload, "announcementBody", `${guild} published a ride update.`), actionUrl: text(payload, "rideUrl") || actionUrl };
+    case "RIDE_START_REMINDER":
+      return { title: `Ride starts soon · ${ride}`, body: `Review the latest meeting point, itinerary, requirements, and official updates before departure.`, actionUrl: text(payload, "bookingUrl") || actionUrl };
+    case "BOOKING_PAYMENT_REMINDER":
+      return { title: `${text(payload, "reminderKind") === "PAYMENT_OVERDUE" ? "Payment overdue" : "Payment due soon"} · ${ride}`, body: `Open your booking to review the current payment obligation and Guild instructions.`, actionUrl: text(payload, "bookingUrl") || actionUrl };
   }
 }
