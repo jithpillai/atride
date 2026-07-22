@@ -54,7 +54,10 @@ export async function invalidateObsoleteReminderEvents() {
 export async function processDueReminders(options: { now?: Date; limit?: number } = {}) {
   const now = options.now ?? new Date();
   const limit = Math.min(Math.max(options.limit ?? 100, 1), 200);
-  const rideHorizon = new Date(now.getTime() + 24 * 60 * 60_000);
+  // Hobby scheduling is daily and can run anywhere within the configured hour.
+  // A 36-hour horizon prevents boundary gaps while the stable event key still
+  // guarantees one reminder per booking and canonical start time.
+  const rideHorizon = new Date(now.getTime() + 36 * 60 * 60_000);
   const paymentHorizon = new Date(now.getTime() + 48 * 60 * 60_000);
   const contactSelection = {
     where: { type: "EMAIL" as const, verifiedAt: { not: null } },
@@ -121,7 +124,7 @@ export async function processDueReminders(options: { now?: Date; limit?: number 
       recipientUserId: booking.userId,
       recipientEmail: email,
       recipientName: booking.user.displayName,
-      payload: { reminderKind: "RIDE_START_24H", guildName: booking.ride.community.name, rideTitle: booking.ride.title, startsAt: scheduledFor, scheduledFor, bookingUrl: `${baseUrl}/rides/${encodeURIComponent(booking.ride.slug)}#ride-updates` },
+      payload: { reminderKind: "UPCOMING_RIDE", guildName: booking.ride.community.name, rideTitle: booking.ride.title, startsAt: scheduledFor, scheduledFor, bookingUrl: `${baseUrl}/rides/${encodeURIComponent(booking.ride.slug)}#ride-updates` },
     }];
   });
   const paymentEvents = payments.flatMap((payment) => {

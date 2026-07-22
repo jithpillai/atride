@@ -11,6 +11,7 @@ type SesConfig = {
   fromEmail: string;
   fromName: string;
   replyToEmail?: string;
+  configurationSet?: string;
 };
 
 function required(name: string) {
@@ -28,6 +29,7 @@ function getSesConfig(): SesConfig {
     fromEmail: required("SES_FROM_EMAIL"),
     fromName: process.env.SES_FROM_NAME?.trim() || "@Ride",
     replyToEmail: process.env.SES_REPLY_TO_EMAIL?.trim() || undefined,
+    configurationSet: process.env.SES_CONFIGURATION_SET?.trim() || undefined,
   };
 }
 
@@ -101,6 +103,7 @@ export class SesHttpEmailProvider implements EmailProvider {
       FromEmailAddress: `${safeDisplayName(config.fromName)} <${config.fromEmail}>`,
       Destination: { ToAddresses: [message.to] },
       ReplyToAddresses: config.replyToEmail ? [config.replyToEmail] : undefined,
+      ConfigurationSetName: config.configurationSet,
       Content: {
         Simple: {
           Subject: { Data: message.subject, Charset: "UTF-8" },

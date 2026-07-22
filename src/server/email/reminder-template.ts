@@ -3,7 +3,7 @@ import type { NotificationEventType } from "@/generated/prisma/enums";
 export type ReminderEmailPayload = {
   guildName: string;
   rideTitle: string;
-  reminderKind: "RIDE_START_24H" | "PAYMENT_DUE" | "PAYMENT_OVERDUE";
+  reminderKind: "UPCOMING_RIDE" | "PAYMENT_DUE" | "PAYMENT_OVERDUE";
   startsAt?: string | null;
   dueAt?: string | null;
   amountPaise?: number | null;
@@ -25,10 +25,10 @@ function money(paise?: number | null) {
 
 export function renderReminderEmail(eventType: NotificationEventType, recipientName: string, payload: ReminderEmailPayload) {
   if (eventType !== "RIDE_START_REMINDER" && eventType !== "BOOKING_PAYMENT_REMINDER") throw new Error("Unsupported reminder email event.");
-  const rideStart = payload.reminderKind === "RIDE_START_24H";
+  const rideStart = payload.reminderKind === "UPCOMING_RIDE";
   const overdue = payload.reminderKind === "PAYMENT_OVERDUE";
   const headline = rideStart ? "Your ride starts soon" : overdue ? "Your ride payment is overdue" : "Your ride payment is due soon";
-  const subject = rideStart ? `${payload.rideTitle}: starts within 24 hours` : `${payload.rideTitle}: ${overdue ? "payment overdue" : "payment reminder"}`;
+  const subject = rideStart ? `${payload.rideTitle}: upcoming ride reminder` : `${payload.rideTitle}: ${overdue ? "payment overdue" : "payment reminder"}`;
   const copy = rideStart
     ? `${payload.rideTitle} starts at ${indiaTime(payload.startsAt)}. Review the latest meeting point, itinerary, vehicle requirements, and official updates before departure.`
     : `${money(payload.amountPaise)} is ${overdue ? "overdue" : "due by"} ${indiaTime(payload.dueAt)}. Open your booking to review the current payment obligation and Guild instructions.`;

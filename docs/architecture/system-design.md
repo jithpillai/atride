@@ -714,7 +714,9 @@ Every delivery records recipient, redacted destination, provider request ID, tem
 
 Security, transactional/service, and marketing communication are separate categories. Marketing requires separate consent and unsubscribe behavior.
 
-Optional email preferences are intentionally narrow. A participant may disable the final 24-hour ride reminder and routine (`NORMAL`) announcement email while those events remain in the in-app inbox. Authentication, booking, waitlist, payment, postponement, cancellation, refund, important, critical, acknowledgement-required, and safety communication remains mandatory service email.
+Optional email preferences are intentionally narrow. A participant may disable the upcoming-ride reminder and routine (`NORMAL`) announcement email while those events remain in the in-app inbox. Authentication, booking, waitlist, payment, postponement, cancellation, refund, important, critical, acknowledgement-required, and safety communication remains mandatory service email.
+
+SES acceptance and recipient delivery are separate states. `notification_outbox_events.status=DELIVERED` means the durable event was rendered and handed to the configured channel (or intentionally kept in-app by preference); `providerDeliveryStatus` records `ACCEPTED`, `DELIVERED`, `DELAYED`, `BOUNCED`, `COMPLAINED`, `REJECTED`, or `SUPPRESSED` independently. Signed SNS callbacks are restricted to one configured topic ARN and recorded by provider event ID without storing the raw callback body. Permanent bounces and complaints create an address-level email suppression while in-app delivery continues.
 
 ### 14.1 Ride communication boundary
 
@@ -744,6 +746,8 @@ Initial retention defaults are intentionally conservative for the Neon storage b
 - Pending, retrying, unacknowledged-critical, or unresolved-action notifications are never removed merely because a cleanup job ran.
 
 A scheduled, idempotent cleanup job deletes eligible rows in small batches and records counts rather than copying message bodies into another archive. Notification content must remain compact and must link to canonical records instead of duplicating ride descriptions, booking snapshots, payment proofs, or media. Users see the applicable retention notice in the notification centre; @Ride does not promise a permanent communication archive.
+
+On Vercel Hobby, one daily maintenance invocation performs reservation-expiry recovery, waitlist promotion, reminders, outbox retry, and bounded cleanup. Immediate booking, payment, disruption, and announcement actions still attempt delivery after their database transaction. Because Hobby execution may occur anywhere within the selected hour, upcoming-ride eligibility uses a 36-hour horizon with a stable event key instead of promising an exact 24-hour send time.
 
 ```text
 Ride

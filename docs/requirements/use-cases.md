@@ -672,7 +672,7 @@ Exact live location is never public or indexable. Access expires according to po
 
 Messages are delivered through approved templates. Marketing consent is separate from security and essential service communication.
 
-Participants may turn off email for the final 24-hour ride reminder and routine announcements. Those events remain available in the @Ride inbox. Booking, waitlist, payment, disruption, important, critical, acknowledgement-required, and safety communication cannot be disabled as optional email.
+Participants may turn off email for the upcoming-ride reminder and routine announcements. Those events remain available in the @Ride inbox. Booking, waitlist, payment, disruption, important, critical, acknowledgement-required, and safety communication cannot be disabled as optional email.
 
 ### UC-26: Publish an official ride announcement
 

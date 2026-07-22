@@ -9,7 +9,7 @@ Current infrastructure status:
 - `atride.in` is live on Vercel.
 - Neon PostgreSQL/PostGIS is provisioned and the initial migration/seed are active.
 - The `atride.in` identity is configured in Amazon SES and sandbox access is available.
-- SES production-access approval has been requested and is pending.
+- SES production access was not approved in the first review. The verified-domain sandbox remains active for approved test recipients; the application keeps provider activation separate from Phase delivery.
 - The SES email adapter and branded OTP template are implemented; both the mailbox-simulator smoke test and real OTP delivery to a verified sandbox recipient have passed.
 - SMS is explicitly outside the launch critical path and is deferred to an optional final phase. Cloudinary media uploads are active; maps, Redis workers, and payments remain deferred to their delivery phases.
 - Phase 2 foundations are implemented: Google OpenID Connect plus email OTP, opaque sessions, account/logout, first-login onboarding, private participant profiles, a vehicle garage, seeded roles, optional Firebase phone verification, and protected platform/Guild authorization boundaries. Personalized upcoming rides and distributed abuse controls remain scheduled with their dependent phases.
@@ -306,7 +306,7 @@ External accounts needed:
 
 ### Phase 6 — Email, in-app, and event notifications
 
-Implementation status: **in progress**. Phase 5 supplied the transactional email outbox, SES adapter, immediate best-effort dispatch, retry backoff, booking/payment/disruption templates, and protected retry endpoint. Phase 6 now includes booking-created and waitlist-offer events, a bounded in-app notification centre, authoritative ride announcements delivered to active participants through both inbox and transactional email, urgency levels, durable acknowledgements for critical or acknowledgement-required updates, idempotent ride-start/payment reminders derived from current canonical dates, optional-email preferences, and an encrypted per-ride WhatsApp invite visible only to confirmed participants or assigned crew. Provider callbacks, production scheduler deployment, and cleanup automation remain before the phase closes.
+Implementation status: **complete for the current sandbox scope**. Phase 5 supplied the transactional email outbox, SES adapter, immediate best-effort dispatch, retry backoff, booking/payment/disruption templates, and protected retry endpoint. Phase 6 adds booking-created and waitlist-offer events, a bounded in-app notification centre, authoritative ride announcements delivered through inbox and transactional email, urgency levels, durable acknowledgements, idempotent upcoming-ride/payment reminders, narrow optional-email preferences, an encrypted per-ride WhatsApp invite, verified/idempotent SES-SNS callback handling, address suppression after permanent bounce/complaint, and bounded retention cleanup. Vercel Hobby invokes one combined maintenance worker daily; immediate business actions still dispatch synchronously after commit. AWS configuration-set/SNS activation remains an external deployment setting and can be enabled in sandbox or after a later production-access approval without code changes.
 
 Build:
 

@@ -53,7 +53,7 @@ describe("scheduled reminder processor", () => {
     ]);
     expect(mocks.outboxCreateMany).toHaveBeenCalledWith({
       data: expect.arrayContaining([
-        expect.objectContaining({ eventType: "RIDE_START_REMINDER", recipientUserId: "rider-1" }),
+        expect.objectContaining({ eventType: "RIDE_START_REMINDER", recipientUserId: "rider-1", payload: expect.objectContaining({ reminderKind: "UPCOMING_RIDE" }) }),
         expect.objectContaining({ eventType: "BOOKING_PAYMENT_REMINDER", bookingPaymentId: "payment-1" }),
       ]),
       skipDuplicates: true,

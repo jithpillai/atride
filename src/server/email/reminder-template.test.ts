@@ -7,11 +7,11 @@ describe("scheduled reminder email template", () => {
     const email = renderReminderEmail("RIDE_START_REMINDER", "Demo Rider", {
       guildName: "Demo Guild",
       rideTitle: "Agumbe Trail",
-      reminderKind: "RIDE_START_24H",
+      reminderKind: "UPCOMING_RIDE",
       startsAt: "2026-08-01T00:00:00.000Z",
       bookingUrl: "https://atride.in/rides/agumbe-trail#ride-updates",
     });
-    expect(email.subject).toContain("starts within 24 hours");
+    expect(email.subject).toContain("upcoming ride reminder");
     expect(email.text).toContain("Agumbe Trail starts at");
     expect(email.html).toContain("#ride-updates");
   });

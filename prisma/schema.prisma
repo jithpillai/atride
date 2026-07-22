@@ -259,6 +259,17 @@ enum NotificationOutboxStatus {
   FAILED
 }
 
+enum EmailDeliveryStatus {
+  NOT_TRACKED
+  ACCEPTED
+  DELIVERED
+  DELAYED
+  BOUNCED
+  COMPLAINED
+  REJECTED
+  SUPPRESSED
+}
+
 model Community {
   id                     String          @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
   slug                   String          @unique @db.VarChar(80)
@@ -1149,6 +1160,8 @@ model NotificationOutboxEvent {
   lockedAt          DateTime?                @map("locked_at") @db.Timestamptz(3)
   deliveredAt       DateTime?                @map("delivered_at") @db.Timestamptz(3)
   providerMessageId String?                  @map("provider_message_id") @db.VarChar(240)
+  providerDeliveryStatus EmailDeliveryStatus @default(NOT_TRACKED) @map("provider_delivery_status")
+  providerStatusUpdatedAt DateTime?           @map("provider_status_updated_at") @db.Timestamptz(3)
   lastError         String?                  @map("last_error") @db.Text
   createdAt         DateTime                 @default(now()) @map("created_at") @db.Timestamptz(3)
   updatedAt         DateTime                 @updatedAt @map("updated_at") @db.Timestamptz(3)
@@ -1159,10 +1172,40 @@ model NotificationOutboxEvent {
   recipient      User            @relation(fields: [recipientUserId], references: [id], onDelete: Cascade)
 
   @@index([status, availableAt, createdAt])
+  @@index([providerMessageId])
+  @@index([providerDeliveryStatus, providerStatusUpdatedAt])
   @@index([communityId, eventType, createdAt])
   @@index([bookingPaymentId, eventType])
   @@index([bookingId, eventType])
   @@map("notification_outbox_events")
+}
+
+model EmailProviderEvent {
+  id                String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  provider          String   @db.VarChar(24)
+  providerEventId   String   @unique @map("provider_event_id") @db.VarChar(240)
+  providerMessageId String?  @map("provider_message_id") @db.VarChar(240)
+  eventType         String   @map("event_type") @db.VarChar(40)
+  occurredAt        DateTime @map("occurred_at") @db.Timestamptz(3)
+  processedAt       DateTime @default(now()) @map("processed_at") @db.Timestamptz(3)
+  createdAt         DateTime @default(now()) @map("created_at") @db.Timestamptz(3)
+
+  @@index([providerMessageId, occurredAt])
+  @@index([createdAt])
+  @@map("email_provider_events")
+}
+
+model EmailSuppression {
+  id              String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  normalizedEmail String   @unique @map("normalized_email") @db.VarChar(320)
+  reason          String   @db.VarChar(40)
+  provider        String   @db.VarChar(24)
+  providerEventId String   @map("provider_event_id") @db.VarChar(240)
+  createdAt       DateTime @default(now()) @map("created_at") @db.Timestamptz(3)
+  updatedAt       DateTime @updatedAt @map("updated_at") @db.Timestamptz(3)
+
+  @@index([reason, createdAt])
+  @@map("email_suppressions")
 }
 
 model NotificationInboxItem {
